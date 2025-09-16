@@ -29,6 +29,10 @@ ASSETS_STYLES = """
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -37,8 +41,11 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg);
+  background-image: radial-gradient(120% 120% at 50% 0%, rgba(255, 90, 95, 0.06) 0%, rgba(28, 100, 242, 0.03) 42%, transparent 100%);
   color: var(--text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 img {
@@ -55,6 +62,25 @@ a {
 a:hover,
 a:focus {
   color: var(--brand-dark);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+a:focus-visible,
+button:focus-visible,
+.button-link:focus-visible,
+.cta-button:focus-visible,
+.cta-secondary:focus-visible,
+.pill-link:focus-visible {
+  color: var(--brand-dark);
+}
+
+button,
+input {
+  font: inherit;
 }
 
 .skip-link {
@@ -348,10 +374,36 @@ main {
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.15);
 }
 
-.card img {
+.card-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-media img {
   width: 100%;
   height: 220px;
   object-fit: cover;
+  transition: transform 160ms ease;
+}
+
+.card:hover .card-media img {
+  transform: scale(1.03);
+}
+
+.card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.3);
 }
 
 .card-content {
@@ -373,8 +425,62 @@ main {
   font-size: 0.95rem;
 }
 
-.card-content .button-link {
-  margin-top: 0.25rem;
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  align-items: center;
+}
+
+.card-price {
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(28, 100, 242, 0.12);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 90, 95, 0.15);
+  color: var(--brand-dark);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.card-rating svg {
+  width: 14px;
+  height: 14px;
+}
+
+.card-rating-count {
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.card-actions {
+  margin-top: auto;
+}
+
+.card-actions .button-link {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .card-actions .button-link {
+    width: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .card-media img {
+    height: 200px;
+  }
 }
 
 .category-hero {
@@ -600,6 +706,11 @@ footer {
     justify-content: space-between;
   }
 
+  .nav-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .search-form {
     width: 100%;
     justify-content: space-between;
@@ -621,6 +732,26 @@ footer {
 
   .product-page {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card:hover,
+  .button-link:hover,
+  .cta-button:hover,
+  .cta-secondary:hover,
+  .pill-link:hover {
+    transform: none !important;
+    box-shadow: none !important;
   }
 }
 """
@@ -1351,13 +1482,39 @@ input.addEventListener('input', (event) => {
     def _product_card(self, product: Product) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
         image = html.escape(product.image or "")
+        category_badge = ""
+        category = self._category_lookup.get(product.category_slug)
+        if category:
+            category_badge = f'<span class="card-badge">{html.escape(category.name)}</span>'
+        price_html = (
+            f'<span class="card-price">{html.escape(product.price)}</span>'
+            if product.price
+            else ""
+        )
+        rating_html = ""
+        if product.rating and product.total_reviews:
+            rating_html = (
+                f'<span class="card-rating" aria-label="{product.rating:.1f} out of 5 stars based on {product.total_reviews:,} reviews">'
+                '<svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>'
+                f'{product.rating:.1f}<span class="card-rating-count">({product.total_reviews:,})</span></span>'
+            )
+        meta_parts = [part for part in (price_html, rating_html) if part]
+        meta_html = (
+            f'<div class="card-meta">{"".join(meta_parts)}</div>'
+            if meta_parts
+            else ""
+        )
         return f"""
 <article class=\"card\">
-  <a href=\"/{self._product_path(product)}\"><img src=\"{image}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" /></a>
+  <a class=\"card-media\" href=\"/{self._product_path(product)}\">
+    <img src=\"{image}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" />
+    {category_badge}
+  </a>
   <div class=\"card-content\">
     <h3><a href=\"/{self._product_path(product)}\">{html.escape(product.title)}</a></h3>
     <p>{description}</p>
-    <div><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a></div>
+    {meta_html}
+    <div class=\"card-actions\"><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a></div>
   </div>
 </article>
 """
@@ -1365,7 +1522,9 @@ input.addEventListener('input', (event) => {
     def _category_card(self, category: Category) -> str:
         return f"""
 <article class=\"card\">
-  <a href=\"/{self._category_path(category.slug)}\"><img src=\"https://source.unsplash.com/600x400/?{html.escape(category.slug)}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" /></a>
+  <a class=\"card-media\" href=\"/{self._category_path(category.slug)}\">
+    <img src=\"https://source.unsplash.com/600x400/?{html.escape(category.slug)}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" />
+  </a>
   <div class=\"card-content\">
     <h3><a href=\"/{self._category_path(category.slug)}\">{html.escape(category.name)}</a></h3>
     <p>{html.escape(category.blurb)}</p>
