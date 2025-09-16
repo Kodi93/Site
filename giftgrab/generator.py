@@ -5,6 +5,7 @@ import html
 import json
 import logging
 import re
+from urllib.parse import quote_plus
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +30,10 @@ ASSETS_STYLES = """
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -37,8 +42,11 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg);
+  background-image: radial-gradient(120% 120% at 50% 0%, rgba(255, 90, 95, 0.06) 0%, rgba(28, 100, 242, 0.03) 42%, transparent 100%);
   color: var(--text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 img {
@@ -55,6 +63,25 @@ a {
 a:hover,
 a:focus {
   color: var(--brand-dark);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+a:focus-visible,
+button:focus-visible,
+.button-link:focus-visible,
+.cta-button:focus-visible,
+.cta-secondary:focus-visible,
+.pill-link:focus-visible {
+  color: var(--brand-dark);
+}
+
+button,
+input {
+  font: inherit;
 }
 
 .skip-link {
@@ -171,6 +198,17 @@ nav {
   background: rgba(255, 90, 95, 0.16);
   color: var(--brand-dark);
   transform: translateY(-1px);
+}
+
+.surprise-link {
+  background: rgba(28, 100, 242, 0.14);
+  color: var(--accent);
+}
+
+.surprise-link:hover,
+.surprise-link:focus {
+  background: rgba(28, 100, 242, 0.2);
+  color: var(--accent);
 }
 
 .search-form {
@@ -348,10 +386,36 @@ main {
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.15);
 }
 
-.card img {
+.card-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-media img {
   width: 100%;
   height: 220px;
   object-fit: cover;
+  transition: transform 160ms ease;
+}
+
+.card:hover .card-media img {
+  transform: scale(1.03);
+}
+
+.card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.3);
 }
 
 .card-content {
@@ -373,8 +437,112 @@ main {
   font-size: 0.95rem;
 }
 
-.card-content .button-link {
-  margin-top: 0.25rem;
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  align-items: center;
+}
+
+.card-price {
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(28, 100, 242, 0.12);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 90, 95, 0.15);
+  color: var(--brand-dark);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.card-rating svg {
+  width: 14px;
+  height: 14px;
+}
+
+.card-rating-count {
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.card-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.card-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.card-cta-row .button-link,
+.card-cta-row .cta-secondary {
+  flex: 1 1 140px;
+  justify-content: center;
+}
+
+.card-share {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.card-share span {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.share-link {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--muted);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.share-link:hover,
+.share-link:focus {
+  background: var(--brand);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.share-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (min-width: 640px) {
+  .card-cta-row .button-link,
+  .card-cta-row .cta-secondary {
+    flex: 0 1 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .card-media img {
+    height: 200px;
+  }
 }
 
 .category-hero {
@@ -498,8 +666,43 @@ main {
   padding-left: 1.2rem;
 }
 
-.cta-row {
+.cta-stack {
   margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cta-stack .cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.cta-stack .cta-row .cta-button,
+.cta-stack .cta-row .cta-secondary {
+  flex: 1 1 180px;
+  justify-content: center;
+}
+
+.share-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.share-links.share-inline {
+  flex-wrap: wrap;
+}
+
+.share-links span {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.share-links .share-link {
+  width: 36px;
+  height: 36px;
 }
 
 .related-grid {
@@ -531,6 +734,103 @@ main {
   margin: 0 auto;
 }
 
+.search-page-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.filter-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  padding: 1.25rem 1.5rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.filter-group legend {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.filter-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.filter-chip span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 500;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.filter-chip input:checked + span {
+  background: rgba(255, 90, 95, 0.16);
+  border-color: var(--brand);
+  color: var(--brand-dark);
+  transform: translateY(-1px);
+}
+
+.filter-summary {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filter-clear {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.filter-clear:hover,
+.filter-clear:focus {
+  color: var(--brand-dark);
+  background: rgba(255, 90, 95, 0.12);
+}
+
 .search-results {
   list-style: none;
   margin: 2rem 0 0;
@@ -557,10 +857,59 @@ main {
   color: var(--muted);
 }
 
+.search-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.result-price {
+  background: rgba(28, 100, 242, 0.12);
+  color: var(--accent);
+}
+
+.result-category {
+  background: rgba(255, 90, 95, 0.14);
+  color: var(--brand-dark);
+}
+
+.result-recipient {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--muted);
+}
+
 .search-empty {
   text-align: center;
   color: var(--muted);
   margin-top: 2rem;
+}
+
+.random-redirect {
+  min-height: 50vh;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+.random-redirect p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.random-redirect a {
+  color: var(--brand);
+  font-weight: 600;
 }
 
 footer {
@@ -600,6 +949,11 @@ footer {
     justify-content: space-between;
   }
 
+  .nav-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .search-form {
     width: 100%;
     justify-content: space-between;
@@ -621,6 +975,26 @@ footer {
 
   .product-page {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card:hover,
+  .button-link:hover,
+  .cta-button:hover,
+  .cta-secondary:hover,
+  .pill-link:hover {
+    transform: none !important;
+    box-shadow: none !important;
   }
 }
 """
@@ -659,6 +1033,7 @@ class SiteGenerator:
         self.products_dir.mkdir(parents=True, exist_ok=True)
         self._nav_cache: List[Category] = []
         self._category_lookup: dict[str, Category] = {}
+        self._all_products: List[Product] = []
 
     def build(self, categories: List[Category], products: List[Product]) -> None:
         logger.info("Generating site with %s products", len(products))
@@ -666,9 +1041,11 @@ class SiteGenerator:
         self.preload_navigation(categories)
         self._category_lookup = {category.slug: category for category in categories}
         products_sorted = sorted(products, key=lambda p: p.updated_at, reverse=True)
+        self._all_products = products_sorted
         self._write_index(categories, products_sorted[:12], products_sorted)
         self._write_latest_page(products_sorted)
         self._write_search_page(categories, products_sorted)
+        self._write_random_page(products_sorted)
         for category in categories:
             category_products = [
                 product
@@ -702,7 +1079,10 @@ class SiteGenerator:
             f"<a href=\"/{self._category_path(slug)}\">{html.escape(name)}</a>"
             for slug, name in self._navigation_links()
         )
-        nav_action_links = ['<a href="/latest.html">Latest</a>']
+        nav_action_links = [
+            '<a href="/latest.html">Latest</a>',
+            '<a class="pill-link surprise-link" href="/random.html">Surprise me</a>',
+        ]
         if getattr(self.settings, "newsletter_url", None):
             newsletter_url = html.escape(self.settings.newsletter_url)
             nav_action_links.append(
@@ -1011,6 +1391,35 @@ class SiteGenerator:
             if product.rating and product.total_reviews
             else ""
         )
+        merchant_links = self._merchant_links(product)
+        cta_buttons = ""
+        if merchant_links:
+            button_parts = []
+            for index, link in enumerate(merchant_links):
+                url = html.escape(link["url"])
+                label = html.escape(link.get("label", "Shop"))
+                rel = html.escape(link.get("rel", "noopener"))
+                classes = "cta-button" if index == 0 else "cta-secondary"
+                button_parts.append(
+                    f'<a class="{classes}" href="{url}" target="_blank" rel="{rel}">{label}</a>'
+                )
+            cta_buttons = "".join(button_parts)
+        share_markup = self._share_links_markup(product)
+        share_block = (
+            f'<div class="share-links share-inline"><span>Share</span>{share_markup}</div>'
+            if share_markup
+            else ""
+        )
+        cta_sections = []
+        if cta_buttons:
+            cta_sections.append(f'<div class="cta-row">{cta_buttons}</div>')
+        if share_block:
+            cta_sections.append(share_block)
+        cta_block = (
+            f'<div class="cta-stack">{"".join(cta_sections)}</div>'
+            if cta_sections
+            else ""
+        )
         related_section = ""
         if related:
             related_cards = "".join(self._product_card(item) for item in related)
@@ -1034,7 +1443,7 @@ class SiteGenerator:
     {price_line}
     {rating_line}
     {product.blog_content or ''}
-    <p class=\"cta-row\"><a class=\"cta-button\" href=\"{html.escape(product.link)}\" target=\"_blank\" rel=\"noopener sponsored\">Grab it on Amazon</a></p>
+    {cta_block}
   </div>
 </div>
 {related_section}
@@ -1099,53 +1508,195 @@ class SiteGenerator:
 
     def _write_search_page(self, categories: List[Category], products: List[Product]) -> None:
         category_lookup = {category.slug: category.name for category in categories}
-        index_entries = [
-            {
-                "title": product.title,
-                "summary": product.summary or "",
-                "url": f"/{self._product_path(product)}",
-                "category": category_lookup.get(product.category_slug, ""),
-            }
-            for product in products
+        category_map = {category.slug: category for category in categories}
+        price_filters = [
+            ("any", "Any price"),
+            ("under-25", "Under $25"),
+            ("25-50", "$25 – $50"),
+            ("50-100", "$50 – $100"),
+            ("over-100", "$100+"),
         ]
-        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\\/")
+        recipient_counts: dict[str, int] = {}
+        recipient_labels: dict[str, str] = {}
+        index_entries: list[dict[str, object]] = []
+        for product in products:
+            category_name = category_lookup.get(product.category_slug, "")
+            category_obj = category_map.get(product.category_slug)
+            price_bucket_slug, price_bucket_label = self._price_bucket(product.price)
+            recipients = self._recipient_tags(category_obj)
+            unique_recipients: list[str] = []
+            seen_recipients: set[str] = set()
+            for label in recipients:
+                if label not in seen_recipients:
+                    unique_recipients.append(label)
+                    seen_recipients.add(label)
+            recipient_slugs: list[str] = []
+            for label in unique_recipients:
+                slug = self._filter_slug(label)
+                recipient_slugs.append(slug)
+                recipient_labels.setdefault(slug, label)
+                recipient_counts[slug] = recipient_counts.get(slug, 0) + 1
+            keywords = [keyword.strip() for keyword in (product.keywords or []) if keyword and keyword.strip()]
+            keyword_blob = " ".join(keyword.lower() for keyword in keywords)
+            index_entries.append(
+                {
+                    "title": product.title,
+                    "summary": product.summary or "",
+                    "url": f"/{self._product_path(product)}",
+                    "category": category_name,
+                    "price": product.price or "",
+                    "priceBucket": price_bucket_slug or "any",
+                    "priceLabel": price_bucket_label or "",
+                    "recipientTags": unique_recipients,
+                    "recipientSlugs": recipient_slugs,
+                    "keywords": keywords,
+                    "keywordBlob": keyword_blob,
+                }
+            )
+        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\/")
+        price_filter_controls = "".join(
+            f'<label class="filter-chip"><input type="radio" name="price-filter" value="{value}"'
+            f"{' checked' if value == 'any' else ''} /><span>{html.escape(label)}</span></label>"
+            for value, label in price_filters
+        )
+        sorted_recipients = [
+            item
+            for item in sorted(
+                recipient_labels.items(),
+                key=lambda entry: (-recipient_counts.get(entry[0], 0), entry[1].lower()),
+            )
+            if recipient_counts.get(item[0], 0) > 0
+        ]
+        top_recipient_filters = sorted_recipients[:8]
+        recipient_controls = "".join(
+            f'<label class="filter-chip"><input type="checkbox" name="recipient-filter" value="{slug}" /><span>{html.escape(label)}</span></label>'
+            for slug, label in top_recipient_filters
+        )
+        recipient_fieldset = (
+            f'<fieldset class="filter-group"><legend>Recipients</legend><div class="filter-pills">{recipient_controls}</div></fieldset>'
+            if recipient_controls
+            else ""
+        )
+        price_labels = {value: label for value, label in price_filters}
+        price_labels_json = json.dumps(price_labels, ensure_ascii=False).replace("</", "<\/")
+        recipient_labels_json = json.dumps(recipient_labels, ensure_ascii=False).replace("</", "<\/")
         body = f"""
-<section class=\"search-page\">
+<section class="search-page">
   <h1>Search the gift radar</h1>
-  <p>Filter our conversion-ready product library by keyword, category, or gift recipient.</p>
-  <form id=\"search-page-form\" class=\"search-form\" action=\"/search.html\" method=\"get\" role=\"search\">
-    <label class=\"sr-only\" for=\"search-query\">Search curated gifts</label>
-    <input id=\"search-query\" type=\"search\" name=\"q\" placeholder=\"Type a gift, keyword, or category\" aria-label=\"Search curated gifts\" />
-    <button type=\"submit\" aria-label=\"Submit search\">
-      <svg aria-hidden=\"true\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><line x1=\"20\" y1=\"20\" x2=\"16.65\" y2=\"16.65\"></line></svg>
-    </button>
+  <p>Pinpoint curated gifts by combining keyword search with quick filters for price and recipient vibes.</p>
+  <form id="search-page-form" class="search-page-form" action="/search.html" method="get" role="search">
+    <div class="search-form">
+      <label class="sr-only" for="search-query">Search curated gifts</label>
+      <input id="search-query" type="search" name="q" placeholder="Type a gift, keyword, or category" aria-label="Search curated gifts" />
+      <button type="submit" aria-label="Submit search">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.65" y2="16.65"></line></svg>
+      </button>
+    </div>
+    <div class="filter-toolbar">
+      <p class="filter-summary">Layer filters to surface the exact gift energy you're chasing.</p>
+      <fieldset class="filter-group">
+        <legend>Price</legend>
+        <div class="filter-pills">{price_filter_controls}</div>
+      </fieldset>
+      {recipient_fieldset}
+      <div class="filter-actions">
+        <span class="filter-summary" id="active-filter-summary">No quick filters applied.</span>
+        <button type="button" id="clear-filters" class="filter-clear">Clear filters</button>
+      </div>
+    </div>
   </form>
-  <div id=\"search-feedback\" class=\"search-empty\">Start typing to reveal the latest gift ideas.</div>
-  <ol id=\"search-results\" class=\"search-results\" aria-live=\"polite\"></ol>
+  <div id="search-feedback" class="search-empty" role="status" aria-live="polite" aria-atomic="true">Use quick filters or start typing to reveal the latest gift ideas.</div>
+  <ol id="search-results" class="search-results" aria-live="polite"></ol>
 </section>
 <script>
 const PRODUCT_INDEX = {dataset};
+const PRICE_LABELS = {price_labels_json};
+const RECIPIENT_LABELS = {recipient_labels_json};
 const form = document.getElementById('search-page-form');
 const input = document.getElementById('search-query');
 const feedback = document.getElementById('search-feedback');
 const resultsList = document.getElementById('search-results');
+const filterSummary = document.getElementById('active-filter-summary');
+const priceInputs = Array.from(document.querySelectorAll('input[name="price-filter"]'));
+const recipientInputs = Array.from(document.querySelectorAll('input[name="recipient-filter"]'));
+const clearButton = document.getElementById('clear-filters');
+
+function activePrice() {
+  const checked = priceInputs.find((input) => input.checked);
+  return checked ? checked.value : 'any';
+}
+
+function activeRecipients() {
+  return recipientInputs.filter((input) => input.checked).map((input) => input.value);
+}
+
+function updateFilterSummary(priceValue, recipientValues) {
+  if (!filterSummary) return;
+  const parts = [];
+  if (priceValue !== 'any' && PRICE_LABELS[priceValue]) {
+    parts.push(PRICE_LABELS[priceValue]);
+  }
+  const labels = recipientValues
+    .map((value) => RECIPIENT_LABELS[value] || '')
+    .filter((label) => label);
+  if (labels.length) {
+    parts.push(labels.join(', '));
+  }
+  filterSummary.textContent = parts.length
+    ? `Filters active: ${parts.join(' • ')}`
+    : 'No quick filters applied.';
+}
+
+let currentQuery = '';
+
+function updateUrl() {
+  const url = new URL(window.location.href);
+  if (currentQuery) {
+    url.searchParams.set('q', currentQuery);
+  } else {
+    url.searchParams.delete('q');
+  }
+  const priceValue = activePrice();
+  if (priceValue && priceValue !== 'any') {
+    url.searchParams.set('price', priceValue);
+  } else {
+    url.searchParams.delete('price');
+  }
+  url.searchParams.delete('recipient');
+  for (const value of activeRecipients()) {
+    url.searchParams.append('recipient', value);
+  }
+  window.history.replaceState(null, '', url.toString());
+}
+
 function renderResults(query) {
+  currentQuery = query;
   resultsList.innerHTML = '';
-  if (!query) {
-    feedback.textContent = 'Start typing to reveal the latest gift ideas.';
+  const priceValue = activePrice();
+  const recipientValues = activeRecipients();
+  const normalized = query.toLowerCase();
+  const hasQuery = normalized.length > 0;
+  const hasFilters = priceValue !== 'any' || recipientValues.length > 0;
+  if (!hasQuery && !hasFilters) {
+    feedback.textContent = 'Use quick filters or start typing to reveal the latest gift ideas.';
+    updateFilterSummary(priceValue, recipientValues);
     return;
   }
-  const normalized = query.toLowerCase();
   const matches = PRODUCT_INDEX.filter((item) => {
-    return item.title.toLowerCase().includes(normalized) ||
+    const matchesQuery = !normalized ||
+      item.title.toLowerCase().includes(normalized) ||
       item.summary.toLowerCase().includes(normalized) ||
-      (item.category && item.category.toLowerCase().includes(normalized));
+      (item.category && item.category.toLowerCase().includes(normalized)) ||
+      (item.keywordBlob && item.keywordBlob.includes(normalized));
+    const matchesPrice = priceValue === 'any' || item.priceBucket === priceValue;
+    const matchesRecipients = !recipientValues.length || recipientValues.every((value) => item.recipientSlugs.includes(value));
+    return matchesQuery && matchesPrice && matchesRecipients;
   }).slice(0, 30);
   if (!matches.length) {
-    feedback.textContent = 'No matching gifts yet — try a different keyword.';
+    feedback.textContent = 'No matching gifts yet — try another keyword or adjust the filters.';
+    updateFilterSummary(priceValue, recipientValues);
     return;
   }
-  feedback.textContent = `Showing ${matches.length} conversion-ready picks.`;
   const frag = document.createDocumentFragment();
   for (const match of matches) {
     const li = document.createElement('li');
@@ -1159,35 +1710,115 @@ function renderResults(query) {
     const summary = document.createElement('p');
     summary.textContent = match.summary || 'Tap through to read the full hype breakdown.';
     li.appendChild(summary);
+    const meta = document.createElement('div');
+    meta.className = 'search-result-meta';
+    if (match.price) {
+      const price = document.createElement('span');
+      price.className = 'result-badge result-price';
+      price.textContent = match.price;
+      meta.appendChild(price);
+    } else if (match.priceLabel) {
+      const bucket = document.createElement('span');
+      bucket.className = 'result-badge result-price';
+      bucket.textContent = match.priceLabel;
+      meta.appendChild(bucket);
+    }
     if (match.category) {
-      const badge = document.createElement('p');
-      badge.className = 'badge';
-      badge.textContent = match.category;
-      li.appendChild(badge);
+      const categoryBadge = document.createElement('span');
+      categoryBadge.className = 'result-badge result-category';
+      categoryBadge.textContent = match.category;
+      meta.appendChild(categoryBadge);
+    }
+    if (Array.isArray(match.recipientTags)) {
+      for (const tag of match.recipientTags.slice(0, 3)) {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'result-badge result-recipient';
+        tagEl.textContent = tag;
+        meta.appendChild(tagEl);
+      }
+    }
+    if (meta.childElementCount) {
+      li.appendChild(meta);
     }
     frag.appendChild(li);
   }
   resultsList.appendChild(frag);
+  const priceLabel = priceValue !== 'any' ? PRICE_LABELS[priceValue] : '';
+  const recipientLabelsActive = recipientValues
+    .map((value) => (RECIPIENT_LABELS[value] || '').replace(/^For\s+/i, ''))
+    .filter((label) => label);
+  let suffix = '';
+  if (priceLabel) {
+    suffix += ` in ${priceLabel}`;
+  }
+  if (recipientLabelsActive.length) {
+    suffix += ` for ${recipientLabelsActive.join(', ')}`;
+  }
+  feedback.textContent = `Showing ${matches.length} conversion-ready picks${suffix}.`;
+  updateFilterSummary(priceValue, recipientValues);
 }
+
 const params = new URLSearchParams(window.location.search);
-const initial = (params.get('q') || '').trim();
-input.value = initial;
-renderResults(initial);
+const initialQuery = (params.get('q') || '').trim();
+const initialPrice = params.get('price') || 'any';
+const initialRecipients = params.getAll('recipient');
+
+const priceDefault = priceInputs.find((input) => input.value === initialPrice);
+if (priceDefault) {
+  priceDefault.checked = true;
+} else if (priceInputs.length) {
+  priceInputs[0].checked = true;
+}
+
+const recipientPreset = new Set(initialRecipients);
+for (const checkbox of recipientInputs) {
+  checkbox.checked = recipientPreset.has(checkbox.value);
+}
+
+input.value = initialQuery;
+renderResults(initialQuery);
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   const value = input.value.trim();
-  const url = new URL(window.location.href);
-  if (value) {
-    url.searchParams.set('q', value);
-  } else {
-    url.searchParams.delete('q');
-  }
-  window.history.replaceState(null, '', url.toString());
   renderResults(value);
+  updateUrl();
 });
+
 input.addEventListener('input', (event) => {
-  renderResults(event.target.value.trim());
+  const value = event.target.value.trim();
+  renderResults(value);
+  updateUrl();
 });
+
+for (const radio of priceInputs) {
+  radio.addEventListener('change', () => {
+    renderResults(currentQuery);
+    updateUrl();
+  });
+}
+
+for (const checkbox of recipientInputs) {
+  checkbox.addEventListener('change', () => {
+    renderResults(currentQuery);
+    updateUrl();
+  });
+}
+
+if (clearButton) {
+  clearButton.addEventListener('click', () => {
+    input.value = '';
+    if (priceInputs.length) {
+      priceInputs[0].checked = true;
+    }
+    for (const checkbox of recipientInputs) {
+      checkbox.checked = false;
+    }
+    renderResults('');
+    updateUrl();
+    input.focus();
+  });
+}
 </script>
 """
         structured_data = [
@@ -1208,6 +1839,39 @@ input.addEventListener('input', (event) => {
             noindex=True,
         )
         self._write_page(self.output_dir / "search.html", context)
+
+    def _write_random_page(self, products: List[Product]) -> None:
+        if not products:
+            return
+        product_paths = [f"/{self._product_path(product)}" for product in products]
+        dataset = json.dumps(product_paths, ensure_ascii=False).replace("</", "<\\/")
+        fallback = html.escape(product_paths[0])
+        body = f"""
+<section class=\"random-redirect\">
+  <h1>Loading a surprise pick…</h1>
+  <p>We’re spinning up a random product to keep your inspiration flowing.</p>
+  <p><a href=\"{fallback}\">Take me there now</a> if you don’t want to wait.</p>
+  <noscript>Enable JavaScript for the instant redirect or browse the <a href=\"/latest.html\">latest drops</a>.</noscript>
+</section>
+<script>
+const PRODUCT_PATHS = {dataset};
+if (PRODUCT_PATHS.length) {
+  const index = Math.floor(Math.random() * PRODUCT_PATHS.length);
+  const target = PRODUCT_PATHS[index] || PRODUCT_PATHS[0];
+  if (target) {
+    window.location.replace(target);
+  }
+}
+</script>
+"""
+        context = PageContext(
+            title=f"Surprise me — {self.settings.site_name}",
+            description="Jump to a random trending gift idea for quick inspiration.",
+            canonical_url=f"{self.settings.base_url.rstrip('/')}/random.html",
+            body=body,
+            noindex=True,
+        )
+        self._write_page(self.output_dir / "random.html", context)
 
     def _write_feed(self, products: List[Product]) -> None:
         items = "".join(
@@ -1306,14 +1970,39 @@ input.addEventListener('input', (event) => {
         if product.image:
             data["image"] = [product.image]
         price_value, currency = self._extract_price_components(product.price)
-        if price_value:
-            data["offers"] = {
-                "@type": "Offer",
-                "price": price_value,
-                "priceCurrency": currency or "USD",
-                "availability": "https://schema.org/InStock",
-                "url": product.link,
-            }
+        offers: List[dict[str, object]] = []
+        if product.link:
+            offer: dict[str, object] = {"@type": "Offer", "url": product.link}
+            if price_value:
+                offer.update(
+                    {
+                        "price": price_value,
+                        "priceCurrency": currency or "USD",
+                        "availability": "https://schema.org/InStock",
+                    }
+                )
+            offers.append(offer)
+        for entry in product.alternate_links:
+            if not isinstance(entry, dict):
+                continue
+            url = entry.get("url")
+            if not url:
+                continue
+            label = entry.get("label")
+            offer = {"@type": "Offer", "url": url}
+            if price_value:
+                offer.update(
+                    {
+                        "price": price_value,
+                        "priceCurrency": currency or "USD",
+                        "availability": "https://schema.org/InStock",
+                    }
+                )
+            if label:
+                offer["seller"] = {"@type": "Organization", "name": label}
+            offers.append(offer)
+        if offers:
+            data["offers"] = offers[0] if len(offers) == 1 else offers
         if product.rating and product.total_reviews:
             data["aggregateRating"] = {
                 "@type": "AggregateRating",
@@ -1348,24 +2037,243 @@ input.addEventListener('input', (event) => {
             numeric = head + "." + "".join(tail)
         return numeric, currency
 
+    def _price_bucket(self, price: str | None) -> tuple[str | None, str | None]:
+        if not price:
+            return None, None
+        value, _currency = self._extract_price_components(price)
+        if not value:
+            return None, None
+        try:
+            amount = float(value)
+        except ValueError:
+            return None, None
+        if amount < 25:
+            return "under-25", "Under $25"
+        if amount < 50:
+            return "25-50", "$25 – $50"
+        if amount < 100:
+            return "50-100", "$50 – $100"
+        return "over-100", "$100+"
+
+    def _filter_slug(self, value: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+        return normalized or "general"
+
+    def _format_recipient_tag(self, raw: str | None) -> str | None:
+        candidate = (raw or "").strip()
+        if not candidate:
+            return None
+        lower = candidate.lower()
+        occasion_map = {
+            "gift exchange": "Gift Exchange",
+            "white elephant": "White Elephant",
+            "stocking stuffer": "Stocking Stuffer",
+            "stocking stuffers": "Stocking Stuffers",
+        }
+        if lower in occasion_map:
+            return occasion_map[lower]
+        cleaned = re.sub(r"\bgift ideas?\b", "", candidate, flags=re.I)
+        cleaned = re.sub(r"\bgifts?\b", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"\bfor\b", " ", cleaned, flags=re.I)
+        cleaned = re.sub(r"[-_/]+", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            cleaned = candidate.strip()
+        base_lower = cleaned.lower()
+        if base_lower.startswith("for "):
+            cleaned = cleaned[4:].strip()
+            base_lower = cleaned.lower()
+        direct_terms = {
+            "men",
+            "man",
+            "women",
+            "woman",
+            "him",
+            "her",
+            "mom",
+            "moms",
+            "dad",
+            "dads",
+            "parents",
+            "kids",
+            "kid",
+            "teen",
+            "teens",
+            "boyfriend",
+            "girlfriend",
+            "husband",
+            "wife",
+            "brother",
+            "sister",
+            "grandma",
+            "grandpa",
+            "family",
+            "friend",
+            "friends",
+            "coworker",
+            "coworkers",
+            "boss",
+            "teacher",
+            "baby",
+        }
+        if base_lower in direct_terms:
+            return f"For {cleaned.title()}"
+        if "him" in base_lower:
+            return f"For {cleaned.title()}"
+        if "her" in base_lower:
+            return f"For {cleaned.title()}"
+        if base_lower.endswith("s") and base_lower[:-1] in direct_terms:
+            return f"For {cleaned.title()}"
+        return None
+
+    def _recipient_tags(self, category: Category | None) -> List[str]:
+        if not category:
+            return []
+        tags: List[str] = []
+        for keyword in category.keywords:
+            formatted = self._format_recipient_tag(keyword)
+            if formatted:
+                tags.append(formatted)
+        name_tag = self._format_recipient_tag(category.name)
+        if name_tag:
+            tags.append(name_tag)
+        ordered: List[str] = []
+        seen: set[str] = set()
+        for tag in tags:
+            if tag not in seen:
+                ordered.append(tag)
+                seen.add(tag)
+        return ordered
+
+    def _merchant_links(self, product: Product) -> List[dict[str, str]]:
+        links: List[dict[str, str]] = []
+        if product.link:
+            links.append(
+                {
+                    "label": "Amazon",
+                    "url": product.link,
+                    "rel": "noopener sponsored",
+                }
+            )
+        for entry in product.alternate_links:
+            url = entry.get("url") if isinstance(entry, dict) else None
+            if not url:
+                continue
+            label = entry.get("label") if isinstance(entry, dict) else None
+            rel = entry.get("rel") if isinstance(entry, dict) else None
+            links.append(
+                {
+                    "label": label or "Shop",
+                    "url": url,
+                    "rel": rel or "noopener",
+                }
+            )
+        unique_links: List[dict[str, str]] = []
+        seen_urls: set[str] = set()
+        for link in links:
+            if link["url"] in seen_urls:
+                continue
+            seen_urls.add(link["url"])
+            unique_links.append(link)
+        return unique_links
+
+    def _share_links_markup(self, product: Product) -> str:
+        share_target = product.share_url or self._absolute_url(self._product_path(product))
+        encoded_url = quote_plus(share_target)
+        encoded_title = quote_plus(product.title)
+        twitter_icon = (
+            '<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">'
+            '<path d="M23 3a10.9 10.9 0 01-3.14 1.53A4.48 4.48 0 0016.11 3c-2.63 0-4.77 2.14-4.77 4.77 0 .37.04.74.12 1.09A12.94 12.94 0 013 4.11a4.77 4.77 0 001.48 6.36 4.41 4.41 0 01-2.16-.6v.06c0 2.28 1.63 4.18 3.8 4.62a4.5 4.5 0 01-2.14.08 4.79 4.79 0 004.47 3.32A9 9 0 012 19.54 12.73 12.73 0 008.29 21c8.3 0 12.84-6.88 12.84-12.84 0-.2 0-.39-.01-.58A9.18 9.18 0 0023 3z"/></svg>'
+        )
+        pinterest_icon = (
+            '<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">'
+            '<path d="M12.04 2C7.5 2 4 5.37 4 9.85c0 3.09 1.8 4.84 2.84 4.84.44 0 .7-1.21.7-1.54 0-.4-1.02-1.24-1.02-2.89 0-3.42 2.62-5.81 6.07-5.81 2.95 0 5.08 1.84 5.08 4.86 0 3.42-1.73 5.79-3.98 5.79-1.25 0-2.18-1.03-1.88-2.29.36-1.51 1.06-3.15 1.06-4.25 0-.98-.53-1.8-1.62-1.8-1.28 0-2.3 1.32-2.3 3.09 0 1.13.38 1.89.38 1.89s-1.31 5.54-1.55 6.52c-.46 1.94-.07 4.31-.04 4.55.02.15.22.19.31.07.13-.17 1.79-2.22 2.36-4.27.16-.59.91-3.62.91-3.62.45.86 1.76 1.61 3.15 1.61 4.15 0 6.96-3.48 6.96-8.17C20.02 5.17 16.9 2 12.04 2z"/></svg>'
+        )
+        twitter_url = f"https://twitter.com/intent/tweet?text={encoded_title}&url={encoded_url}"
+        pinterest_url = (
+            f"https://www.pinterest.com/pin/create/button/?url={encoded_url}&description={encoded_title}"
+        )
+        if product.image:
+            pinterest_url += f"&media={quote_plus(product.image)}"
+        links = [
+            ("Twitter", twitter_url, twitter_icon),
+            ("Pinterest", pinterest_url, pinterest_icon),
+        ]
+        rendered: List[str] = []
+        for label, href, icon in links:
+            rendered.append(
+                f'<a class="share-link" href="{html.escape(href)}" target="_blank" rel="noopener" aria-label="Share on {label}">{icon}</a>'
+            )
+        return "".join(rendered)
+
     def _product_card(self, product: Product) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
         image = html.escape(product.image or "")
+        category_badge = ""
+        category = self._category_lookup.get(product.category_slug)
+        if category:
+            category_badge = f'<span class="card-badge">{html.escape(category.name)}</span>'
+        price_html = (
+            f'<span class="card-price">{html.escape(product.price)}</span>'
+            if product.price
+            else ""
+        )
+        rating_html = ""
+        if product.rating and product.total_reviews:
+            rating_html = (
+                f'<span class="card-rating" aria-label="{product.rating:.1f} out of 5 stars based on {product.total_reviews:,} reviews">'
+                '<svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>'
+                f'{product.rating:.1f}<span class="card-rating-count">({product.total_reviews:,})</span></span>'
+            )
+        meta_parts = [part for part in (price_html, rating_html) if part]
+        meta_html = (
+            f'<div class="card-meta">{"".join(meta_parts)}</div>'
+            if meta_parts
+            else ""
+        )
+        detail_path = f"/{self._product_path(product)}"
+        merchant_links = self._merchant_links(product)
+        outbound_buttons = []
+        for link in merchant_links[:2]:
+            url = html.escape(link["url"])
+            label = html.escape(link.get("label", "Shop"))
+            rel = html.escape(link.get("rel", "noopener"))
+            outbound_buttons.append(
+                f'<a class="cta-secondary" href="{url}" target="_blank" rel="{rel}">{label}</a>'
+            )
+        cta_row = "".join(
+            [f'<a class="button-link" href="{html.escape(detail_path)}">Read the hype</a>']
+            + outbound_buttons
+        )
+        share_links = self._share_links_markup(product)
+        share_html = (
+            f'<div class="card-share"><span>Share</span>{share_links}</div>'
+            if share_links
+            else ""
+        )
         return f"""
-<article class=\"card\">
-  <a href=\"/{self._product_path(product)}\"><img src=\"{image}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" /></a>
-  <div class=\"card-content\">
-    <h3><a href=\"/{self._product_path(product)}\">{html.escape(product.title)}</a></h3>
+<article class="card">
+  <a class="card-media" href="{html.escape(detail_path)}">
+    <img src="{image}" alt="{html.escape(product.title)}" loading="lazy" decoding="async" />
+    {category_badge}
+  </a>
+  <div class="card-content">
+    <h3><a href="{html.escape(detail_path)}">{html.escape(product.title)}</a></h3>
     <p>{description}</p>
-    <div><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a></div>
+    {meta_html}
+    <div class="card-actions">
+      <div class="card-cta-row">{cta_row}</div>
+      {share_html}
+    </div>
   </div>
 </article>
 """
-
     def _category_card(self, category: Category) -> str:
         return f"""
 <article class=\"card\">
-  <a href=\"/{self._category_path(category.slug)}\"><img src=\"https://source.unsplash.com/600x400/?{html.escape(category.slug)}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" /></a>
+  <a class=\"card-media\" href=\"/{self._category_path(category.slug)}\">
+    <img src=\"https://source.unsplash.com/600x400/?{html.escape(category.slug)}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" />
+  </a>
   <div class=\"card-content\">
     <h3><a href=\"/{self._category_path(category.slug)}\">{html.escape(category.name)}</a></h3>
     <p>{html.escape(category.blurb)}</p>

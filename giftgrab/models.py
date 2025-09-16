@@ -23,6 +23,8 @@ class Product:
     keywords: List[str] = field(default_factory=list)
     summary: str | None = None
     blog_content: str | None = None
+    alternate_links: List[dict[str, str]] = field(default_factory=list)
+    share_url: Optional[str] = None
     created_at: str = field(default_factory=timestamp)
     updated_at: str = field(default_factory=timestamp)
 
@@ -43,6 +45,8 @@ class Product:
             "keywords": self.keywords,
             "summary": self.summary,
             "blog_content": self.blog_content,
+            "alternate_links": [dict(link) for link in self.alternate_links],
+            "share_url": self.share_url,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -61,6 +65,8 @@ class Product:
             keywords=list(data.get("keywords") or []),
             summary=data.get("summary"),
             blog_content=data.get("blog_content"),
+            alternate_links=[dict(link) for link in data.get("alternate_links", []) if link],
+            share_url=data.get("share_url"),
             created_at=data.get("created_at", timestamp()),
             updated_at=data.get("updated_at", timestamp()),
         )
