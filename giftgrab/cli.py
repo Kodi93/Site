@@ -5,7 +5,7 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import parse_qsl
 
 from .amazon import AmazonCredentials
@@ -13,6 +13,7 @@ from .config import DEFAULT_CATEGORIES, DATA_DIR, OUTPUT_DIR, SiteSettings, ensu
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
+from .retailers import AmazonRetailerAdapter, StaticRetailerAdapter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -135,6 +136,23 @@ def load_credentials() -> Optional[AmazonCredentials]:
     )
 
 
+def load_static_retailers() -> List[StaticRetailerAdapter]:
+    """Discover JSON-backed retailer feeds stored on disk."""
+
+    adapters: List[StaticRetailerAdapter] = []
+    directory_override = os.getenv("STATIC_RETAILER_DIR")
+    base_path = Path(directory_override).expanduser() if directory_override else DATA_DIR / "retailers"
+    if not base_path.exists():
+        return adapters
+    for path in sorted(base_path.glob("*.json")):
+        if not path.is_file():
+            continue
+        slug = path.stem.lower().replace("_", "-")
+        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+        adapters.append(StaticRetailerAdapter(slug=slug, name=display, dataset=path))
+    return adapters
+
+
 def configure_logging(level: str) -> None:
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
@@ -154,23 +172,31 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     if args.command == "update":
         credentials = load_credentials()
-        if credentials is None:
+        static_retailers = load_static_retailers()
+        if credentials is None and not static_retailers:
             parser.error(
-                "Missing Amazon API credentials. Please set AMAZON_PAAPI_ACCESS_KEY, AMAZON_PAAPI_SECRET_KEY, and AMAZON_ASSOCIATE_TAG."
+                "No retailer sources configured. Provide Amazon credentials or add JSON feeds under data/retailers/."
             )
+        retailer_adapters = []
+        if credentials:
+            retailer_adapters.append(AmazonRetailerAdapter(credentials))
+        retailer_adapters.extend(static_retailers)
         pipeline = GiftPipeline(
             repository=repository,
             generator=generator,
             categories=DEFAULT_CATEGORIES,
             credentials=credentials,
+            retailers=retailer_adapters,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=False)
     else:
+        retailer_adapters = load_static_retailers()
         pipeline = GiftPipeline(
             repository=repository,
             generator=generator,
             categories=DEFAULT_CATEGORIES,
             credentials=None,
+            retailers=retailer_adapters,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=True)
 

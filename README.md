@@ -9,6 +9,9 @@ An automated static site generator that pulls trending gift ideas from Amazon's 
 - **Affiliate-ready links** that enforce your Amazon partner tag on every product card and category deep-link.
 - **AdSense support** baked into the base layout so ads render on each page once you provide your client and slot IDs.
 - **Conversion-focused cards** that surface Amazon star ratings and add a direct “Shop on Amazon” button alongside internal hype links.
+- **Multi-marketplace aggregation** with Amazon PA-API data plus optional JSON feeds for additional retailers or curated partners.
+- **Automated price history** that records every refresh and calls out live drops, lowest-ever prices, and trend directions on product pages.
+- **Advanced discovery tools** including price/rating/retailer filters, retailer badges, and a built-in wishlist/share workflow for every product.
 - **Analytics and audience growth ready** with GA4 snippet injection plus an inline newsletter form that posts straight to your ESP.
 - **SEO-friendly pages** with dynamic metadata, schema.org markup, RSS feed, and sitemaps that advertise last-modified times.
 - **No external dependencies** – the tooling runs entirely on Python’s standard library so it can execute in constrained hosting environments.
@@ -71,6 +74,7 @@ The CLI reads configuration from environment variables so you can keep secrets o
 | `SITE_NEWSLETTER_EMAIL_FIELD` | No | The `name` attribute applied to the email input (default `email`) |
 | `SITE_NEWSLETTER_HIDDEN_INPUTS` | No | Extra hidden inputs encoded as a query string (e.g. `u=123&id=abc`) |
 | `SITE_NEWSLETTER_CTA_COPY` | No | Custom label for the newsletter button/submit action |
+| `STATIC_RETAILER_DIR` | No | Directory containing JSON retailer feeds (defaults to `data/retailers`) |
 
 If both `SITE_ANALYTICS_ID` and `SITE_ANALYTICS_SNIPPET` are present, the raw snippet takes precedence. Hidden newsletter inputs are supplied as a URL query string so you can include provider-specific fields (e.g. `u`, `id`, `form` IDs) without editing templates.
 
@@ -93,6 +97,35 @@ export SITE_NEWSLETTER_HIDDEN_INPUTS="u=abcd1234&id=efgh5678"
 ```
 
 When a form action is configured the navigation “Newsletter” link jumps to the inline banner; otherwise it links to `SITE_NEWSLETTER_URL`.
+
+### Adding additional retailers
+
+The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed should export a list of product dictionaries or an object with an `items` array. Supported keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
+
+Example feed (`data/retailers/handmade.json`):
+
+```json
+{
+  "name": "Handmade Marketplace",
+  "homepage": "https://example.com",
+  "cta_label": "Shop this maker",
+  "items": [
+    {
+      "id": "artisan-001",
+      "title": "Artisan Pour-over Stand",
+      "url": "https://example.com/products/artisan-001",
+      "price": "$68.00",
+      "image": "https://example.com/images/artisan-001.jpg",
+      "rating": 4.8,
+      "total_reviews": 112,
+      "features": ["walnut", "handmade"],
+      "keywords": ["coffee", "pour over"]
+    }
+  ]
+}
+```
+
+Every retailer feed is merged alongside Amazon data, producing separate product cards with the correct outbound CTA, retailer badge, and inclusion in the site-wide search filters.
 
 ## Usage
 

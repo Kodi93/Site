@@ -4,12 +4,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import List, Sequence
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-
-from .amazon import AmazonCredentials, AmazonProductClient
+from .amazon import AmazonCredentials
 from .blog import generate_blog_post
 from .config import CategoryDefinition
 from .models import Category, Product
+from .retailers import AmazonRetailerAdapter, RetailerAdapter
 from .repository import ProductRepository
 
 logger = logging.getLogger(__name__)
@@ -31,14 +30,18 @@ class GiftPipeline:
         generator,
         categories: Sequence[CategoryDefinition],
         credentials: AmazonCredentials | None = None,
+        retailers: Sequence[RetailerAdapter] | None = None,
     ) -> None:
         self.repository = repository
         self.generator = generator
         self.categories_config = categories
         self.credentials = credentials
-        self.client: AmazonProductClient | None = (
-            AmazonProductClient(credentials) if credentials else None
-        )
+        if retailers is not None:
+            self.retailers: List[RetailerAdapter] = list(retailers)
+        elif credentials is not None:
+            self.retailers = [AmazonRetailerAdapter(credentials)]
+        else:
+            self.retailers = []
 
     def run(self, *, item_count: int = 6, regenerate_only: bool = False) -> PipelineResult:
         logger.info("Starting pipeline regenerate_only=%s", regenerate_only)
@@ -54,36 +57,43 @@ class GiftPipeline:
         ]
         new_products: List[Product] = []
         if not regenerate_only:
-            if not self.client:
+            if not self.retailers:
                 raise RuntimeError(
-                    "Amazon credentials are required for fetching products. Set AMAZON_PAAPI_ACCESS_KEY, "
-                    "AMAZON_PAAPI_SECRET_KEY, and AMAZON_ASSOCIATE_TAG."
+                    "At least one retailer adapter is required when fetching new products."
                 )
-            for definition in self.categories_config:
-                items = self.client.search_items(keywords=definition.keywords, item_count=item_count)
-                logger.info(
-                    "Fetched %s products for %s", len(items), definition.name
-                )
-                for item in items:
-                    product = self._build_product(item, definition)
-                    new_products.append(product)
+            for retailer in self.retailers:
+                for definition in self.categories_config:
+                    items = retailer.search_items(
+                        keywords=definition.keywords, item_count=item_count
+                    )
+                    logger.info(
+                        "Fetched %s products for %s from %s",
+                        len(items),
+                        definition.name,
+                        retailer.name,
+                    )
+                    for item in items:
+                        product = self._build_product(item, definition, retailer)
+                        new_products.append(product)
         combined = self.repository.upsert_products(new_products) if new_products else existing_products
         logger.info("Total products stored: %s", len(combined))
         self.generator.build(categories, combined)
         return PipelineResult(products=combined, categories=categories)
 
-    def _build_product(self, item: dict, definition: CategoryDefinition) -> Product:
-        asin = item.get("asin") or item.get("ASIN")
-        if not asin:
-            raise ValueError("Amazon response missing ASIN")
-        title = item.get("title") or "Untitled Amazon Find"
-        partner_tag = self.credentials.partner_tag if self.credentials else None
-        link = ensure_partner_tag(item.get("detail_page_url"), partner_tag)
-        image = item.get("image_url")
+    def _build_product(
+        self, item: dict, definition: CategoryDefinition, retailer: RetailerAdapter
+    ) -> Product:
+        product_id = item.get("id") or item.get("asin") or item.get("ASIN")
+        if not product_id:
+            raise ValueError("Retailer response missing product identifier")
+        title = item.get("title") or "Untitled marketplace find"
+        link = retailer.decorate_url(item.get("url") or item.get("detail_page_url"))
+        image = item.get("image") or item.get("image_url")
         price = item.get("price")
         features = item.get("features") or []
         rating_value = item.get("rating")
         total_reviews_value = item.get("total_reviews")
+        extra_keywords = item.get("keywords") or []
 
         def _as_float(value):
             if value is None:
@@ -107,8 +117,12 @@ class GiftPipeline:
         for feature in features:
             if feature and feature not in keywords:
                 keywords.append(feature)
+        for keyword in extra_keywords:
+            if keyword and keyword not in keywords:
+                keywords.append(keyword)
+        cta_label = getattr(retailer, "cta_label", None) or f"Shop on {retailer.name}"
         product = Product(
-            asin=asin,
+            asin=str(product_id),
             title=title,
             link=link,
             image=image,
@@ -117,27 +131,13 @@ class GiftPipeline:
             total_reviews=total_reviews,
             category_slug=definition.slug,
             keywords=keywords[:12],
+            retailer_slug=getattr(retailer, "slug", "marketplace"),
+            retailer_name=getattr(retailer, "name", "Marketplace"),
+            retailer_homepage=getattr(retailer, "homepage", None),
+            call_to_action=cta_label,
         )
         blog = generate_blog_post(product, definition.name, features)
         product.summary = blog.summary
         product.blog_content = blog.html
+        product.record_price(price)
         return product
-
-
-def ensure_partner_tag(url: str | None, partner_tag: str | None) -> str:
-    if not url:
-        return "https://www.amazon.com/"
-    if not partner_tag:
-        return url
-    parsed = urlparse(url)
-    query = dict(parse_qsl(parsed.query))
-    query["tag"] = partner_tag
-    new_query = urlencode(query)
-    return urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        new_query,
-        parsed.fragment,
-    ))

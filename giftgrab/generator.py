@@ -9,11 +9,15 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List
+from urllib.parse import quote_plus
 
 from .config import OUTPUT_DIR, SiteSettings, ensure_directories
-from .models import Category, Product
+from .models import Category, PricePoint, Product
+from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string
 
 logger = logging.getLogger(__name__)
+
+CURRENCY_SYMBOL_BY_CODE = {code: symbol for symbol, code in PRICE_CURRENCY_SYMBOLS.items()}
 
 ASSETS_STYLES = """
 :root {
@@ -340,6 +344,38 @@ nav {
 .search-form button:hover,
 .search-form button:focus {
   color: var(--brand);
+}
+
+.search-filters {
+  margin: 1.4rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
+.search-filters label {
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-filters select {
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--muted-strong);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.search-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .theme-toggle {
@@ -679,6 +715,33 @@ main > section + section {
   align-items: center;
 }
 
+.card-retailer {
+  background: var(--badge-bg);
+  color: var(--badge-color);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.card-highlight {
+  margin-top: -0.25rem;
+}
+
+.card-deal {
+  display: inline-block;
+  margin-top: 0.35rem;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 12px;
+}
+
+.card-deal--up {
+  background: rgba(255, 90, 95, 0.15);
+  color: var(--brand);
+}
+
 .card-price {
   font-weight: 600;
   color: var(--accent);
@@ -917,12 +980,100 @@ main > section + section {
   font-weight: 500;
 }
 
+.retailer-callout {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.retailer-callout a {
+  color: var(--accent);
+}
+
+.deal-callout {
+  margin: 0;
+  background: var(--price-bg);
+  color: var(--accent);
+  padding: 0.6rem 0.8rem;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.deal-callout--up {
+  background: rgba(255, 90, 95, 0.15);
+  color: var(--brand);
+}
+
 .feature-list {
   padding-left: 1.2rem;
 }
 
 .cta-row {
   margin-top: 1.35rem;
+}
+
+.engagement-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+.wishlist-toggle {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.45rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted-strong);
+}
+
+.wishlist-toggle.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.share-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.share-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.share-links {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.share-links a,
+.share-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.share-copy {
+  background: transparent;
 }
 
 .related-grid {
@@ -932,6 +1083,49 @@ main > section + section {
 .related-grid h2 {
   text-align: center;
   margin-bottom: 1.6rem;
+}
+
+.price-insights {
+  margin-top: 3rem;
+  background: var(--bg-muted);
+  padding: 1.6rem 1.8rem;
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+.price-insights h2 {
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+}
+
+.price-insights p {
+  margin: 0;
+  color: var(--muted-strong);
+}
+
+.price-history {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.price-history li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.55rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+}
+
+.price-history span {
+  color: var(--muted);
+}
+
+.price-history strong {
+  color: var(--accent);
 }
 
 .adsense-slot {
@@ -1709,24 +1903,55 @@ class SiteGenerator:
         self._write_page(path, context)
 
     def _write_product_page(self, product: Product, category: Category, related: List[Product]) -> None:
-        price_line = f"<p class=\"price-callout\">{html.escape(product.price)}</p>" if product.price else ""
+        price_line = f"<p class="price-callout">{html.escape(product.price)}</p>" if product.price else ""
         rating_line = (
-            f"<p class=\"review-callout\">{product.rating:.1f} / 5.0 ({product.total_reviews:,} reviews)</p>"
+            f"<p class="review-callout">{product.rating:.1f} / 5.0 ({product.total_reviews:,} reviews)</p>"
             if product.rating and product.total_reviews
             else ""
         )
+        retailer_line = ""
+        if product.retailer_name:
+            retailer_target = product.retailer_homepage or product.link
+            retailer_name_html = html.escape(product.retailer_name)
+            if retailer_target:
+                retailer_line = (
+                    f'<p class="retailer-callout">Sourced from <a href="{html.escape(retailer_target)}" target="_blank" rel="noopener">{retailer_name_html}</a>.</p>'
+                )
+            else:
+                retailer_line = f'<p class="retailer-callout">Sourced from {retailer_name_html}.</p>'
+        latest_point = product.latest_price_point
+        previous_point = product.previous_price_point
+        price_drop = product.price_drop_amount()
+        price_change = product.price_change_amount()
+        percent_drop = product.price_drop_percent()
+        deal_line = ""
+        if price_line:
+            if price_drop is not None and latest_point and previous_point:
+                drop_text = self._format_currency(price_drop, latest_point.currency)
+                prev_label = self._format_price_point_label(previous_point)
+                detail = drop_text
+                if percent_drop is not None:
+                    detail = f"{detail} ({percent_drop:.0f}% drop)"
+                deal_line = f"<p class="deal-callout">Price dropped {html.escape(detail)} since {html.escape(prev_label)}.</p>"
+            elif price_change is not None and price_change > 0 and latest_point and previous_point:
+                increase_text = self._format_currency(price_change, latest_point.currency)
+                prev_label = self._format_price_point_label(previous_point)
+                deal_line = f"<p class="deal-callout deal-callout--up">Price climbed {html.escape(increase_text)} since {html.escape(prev_label)}.</p>"
+            elif product.price_history:
+                first_label = self._format_price_point_label(product.price_history[0])
+                deal_line = f"<p class="deal-callout">Tracking this listing since {html.escape(first_label)} for quick deal alerts.</p>"
         related_section = ""
         if related:
             related_cards = "".join(self._product_card(item) for item in related)
             related_section = f"""
-<section class=\"related-grid\">
+<section class="related-grid">
   <h2>More {html.escape(category.name)} hits</h2>
-  <div class=\"grid\">{related_cards}</div>
+  <div class="grid">{related_cards}</div>
 </section>
-"""
-        breadcrumbs_html = f"""
-<div class=\"breadcrumbs\"><a href=\"/index.html\">Home</a> &rsaquo; <a href=\"/{self._category_path(category.slug)}\">{html.escape(category.name)}</a></div>
-"""
+""".strip()
+        breadcrumbs_html = (
+            f'<div class="breadcrumbs"><a href="/index.html">Home</a> &rsaquo; <a href="/{self._category_path(category.slug)}">{html.escape(category.name)}</a></div>'
+        )
         image_url = product.image or f"https://source.unsplash.com/1200x630/?{category.slug}"
         updated_dt = self._parse_iso_datetime(product.updated_at)
         published_dt = self._parse_iso_datetime(product.created_at)
@@ -1742,26 +1967,172 @@ class SiteGenerator:
             extra_head_parts.append(
                 f'<meta property="product:price:currency" content="{html.escape(currency_code)}" />'
             )
-        extra_head_parts.append(
-            '<meta property="product:availability" content="in stock" />'
-        )
-        extra_head = "\n    ".join(extra_head_parts)
+        extra_head_parts.append('<meta property="product:availability" content="in stock" />')
+        extra_head = "
+    ".join(extra_head_parts)
+        canonical_url = self._absolute_url(self._product_path(product))
+        encoded_url = quote_plus(canonical_url)
+        encoded_title = quote_plus(product.title)
+        tweet_url = f"https://twitter.com/intent/tweet?text={encoded_title}&url={encoded_url}"
+        facebook_url = f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}"
+        engagement_html = f"""
+<div class="engagement-tools">
+  <button class="wishlist-toggle" type="button" data-wishlist="toggle" data-product="{html.escape(product.slug)}" aria-pressed="false">Save to shortlist</button>
+  <div class="share-controls">
+    <button class="share-primary" type="button" data-share>Share with a friend</button>
+    <div class="share-links">
+      <button class="share-copy" type="button" data-copy="{html.escape(canonical_url)}">Copy link</button>
+      <a href="{tweet_url}" target="_blank" rel="noopener">Tweet</a>
+      <a href="{facebook_url}" target="_blank" rel="noopener">Share</a>
+    </div>
+  </div>
+</div>
+""".strip()
+        price_history_section = ""
+        history_points = product.price_history_summary(6)
+        if history_points:
+            if price_drop is not None and latest_point and previous_point:
+                drop_text = self._format_currency(price_drop, latest_point.currency)
+                prev_label = self._format_price_point_label(previous_point)
+                if percent_drop is not None:
+                    price_message = f"Currently {drop_text} off ({percent_drop:.0f}% drop) since {prev_label}."
+                else:
+                    price_message = f"Currently {drop_text} under the last update from {prev_label}."
+            elif price_change is not None and price_change > 0 and latest_point and previous_point:
+                increase_text = self._format_currency(price_change, latest_point.currency)
+                prev_label = self._format_price_point_label(previous_point)
+                price_message = f"Trending up {increase_text} since {prev_label} — keep it bookmarked."
+            else:
+                first_label = self._format_price_point_label(history_points[0])
+                price_message = f"Tracked pricing since {first_label} so you can time campaigns perfectly."
+            history_rows = []
+            for point in reversed(history_points):
+                label = self._format_price_point_label(point)
+                display = html.escape(point.display or product.price or "")
+                history_rows.append(f"    <li><span>{html.escape(label)}</span><strong>{display}</strong></li>")
+            rows_html = "
+".join(history_rows)
+            price_history_section = f"""
+<section class="price-insights">
+  <h2>Price pulse</h2>
+  <p>{html.escape(price_message)}</p>
+  <ul class="price-history">
+{rows_html}
+  </ul>
+</section>
+""".strip()
+        cta_block = ""
+        if product.link:
+            cta_label = product.call_to_action or f"Shop on {product.retailer_name}"
+            cta_block = (
+                f'<p class="cta-row"><a class="cta-button" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">{html.escape(cta_label)}</a></p>'
+            )
         body = f"""
 {breadcrumbs_html}
-<div class=\"product-page\">
+<div class="product-page">
   <div>
-    <img src=\"{html.escape(image_url)}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" />
+    <img src="{html.escape(image_url)}" alt="{html.escape(product.title)}" loading="lazy" decoding="async" />
   </div>
-  <div class=\"product-meta\">
+  <div class="product-meta">
     <h1>{html.escape(product.title)}</h1>
     {price_line}
     {rating_line}
+    {deal_line}
+    {retailer_line}
     {product.blog_content or ''}
-    <p class=\"cta-row\"><a class=\"cta-button\" href=\"{html.escape(product.link)}\" target=\"_blank\" rel=\"noopener sponsored\">Grab it on Amazon</a></p>
+    {engagement_html}
+    {cta_block}
   </div>
 </div>
+{price_history_section}
 {related_section}
-"""
+""".strip()
+        js_slug = json.dumps(product.slug)
+        js_link = json.dumps(canonical_url)
+        js_title = json.dumps(product.title)
+        wishlist_script = f"""
+<script>
+(function() {{
+  const STORAGE_KEY = 'giftgrab-wishlist';
+  const productId = {js_slug};
+  const link = {js_link};
+  const title = {js_title};
+  const toggle = document.querySelector('[data-wishlist]');
+  const shareButton = document.querySelector('[data-share]');
+  const copyButton = document.querySelector('[data-copy]');
+  function readList() {{
+    try {{
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }} catch (error) {{
+      return [];
+    }}
+  }}
+  function writeList(list) {{
+    try {{
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }} catch (error) {{}}
+  }}
+  function updateState() {{
+    if (!toggle) {{
+      return;
+    }}
+    const list = readList();
+    const active = list.includes(productId);
+    toggle.setAttribute('aria-pressed', String(active));
+    toggle.classList.toggle('is-active', active);
+    toggle.textContent = active ? 'Saved to shortlist' : 'Save to shortlist';
+  }}
+  if (toggle) {{
+    toggle.addEventListener('click', () => {{
+      const list = readList();
+      const index = list.indexOf(productId);
+      if (index === -1) {{
+        list.push(productId);
+      }} else {{
+        list.splice(index, 1);
+      }}
+      writeList(list);
+      updateState();
+    }});
+    updateState();
+  }}
+  function copyLink() {{
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      navigator.clipboard.writeText(link).catch(() => {{}});
+    }} else {{
+      const temp = document.createElement('input');
+      temp.value = link;
+      document.body.appendChild(temp);
+      temp.select();
+      try {{ document.execCommand('copy'); }} catch (error) {{}}
+      document.body.removeChild(temp);
+    }}
+  }}
+  if (copyButton) {{
+    copyButton.addEventListener('click', () => {{
+      copyLink();
+      copyButton.textContent = 'Link copied!';
+      window.setTimeout(() => {{ copyButton.textContent = 'Copy link'; }}, 2000);
+    }});
+  }}
+  if (shareButton) {{
+    shareButton.addEventListener('click', async () => {{
+      if (navigator.share) {{
+        try {{
+          await navigator.share({{ title: title, url: link }});
+          return;
+        }} catch (error) {{}}
+      }}
+      copyLink();
+      shareButton.textContent = 'Link copied!';
+      window.setTimeout(() => {{ shareButton.textContent = 'Share with a friend'; }}, 2000);
+    }});
+  }}
+}})();
+</script>
+""".strip()
+        body += wishlist_script
         structured_data = [
             self._breadcrumb_structured_data(
                 [
@@ -1840,30 +2211,59 @@ class SiteGenerator:
             raw_keywords = product.keywords or []
             keywords = [keyword.strip() for keyword in raw_keywords if keyword and keyword.strip()]
             keyword_blob = " ".join(keyword.lower() for keyword in keywords)
+            latest_point = product.latest_price_point
+            price_value = latest_point.amount if latest_point else None
+            price_display = product.price or (latest_point.display if latest_point else None)
             index_entries.append(
                 {
                     "title": product.title,
                     "summary": product.summary or "",
                     "url": f"/{self._product_path(product)}",
                     "category": category_lookup.get(product.category_slug, ""),
+                    "categorySlug": product.category_slug,
                     "keywords": keywords,
                     "keywordBlob": keyword_blob,
+                    "priceValue": price_value,
+                    "priceDisplay": price_display,
+                    "rating": product.rating,
+                    "retailerName": product.retailer_name,
+                    "retailerSlug": product.retailer_slug,
                 }
             )
-        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\\/")
+        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\/")
         body = f"""
-<section class=\"search-page\">
+<section class="search-page">
   <h1>Search the gift radar</h1>
-  <p>Filter our conversion-ready product library by keyword, category, or gift recipient.</p>
-  <form id=\"search-page-form\" class=\"search-form\" action=\"/search.html\" method=\"get\" role=\"search\">
-    <label class=\"sr-only\" for=\"search-query\">Search curated gifts</label>
-    <input id=\"search-query\" type=\"search\" name=\"q\" placeholder=\"Type a gift, keyword, or category\" aria-label=\"Search curated gifts\" />
-    <button type=\"submit\" aria-label=\"Submit search\">
-      <svg aria-hidden=\"true\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><line x1=\"20\" y1=\"20\" x2=\"16.65\" y2=\"16.65\"></line></svg>
+  <p>Filter our conversion-ready product library by keyword, price, rating, or marketplace partner.</p>
+  <form id="search-page-form" class="search-form" action="/search.html" method="get" role="search">
+    <label class="sr-only" for="search-query">Search curated gifts</label>
+    <input id="search-query" type="search" name="q" placeholder="Type a gift, keyword, or category" aria-label="Search curated gifts" />
+    <button type="submit" aria-label="Submit search">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.65" y2="16.65"></line></svg>
     </button>
   </form>
-  <div id=\"search-feedback\" class=\"search-empty\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">Start typing to reveal the latest gift ideas.</div>
-  <ol id=\"search-results\" class=\"search-results\" aria-live=\"polite\"></ol>
+  <div class="search-filters" role="group" aria-label="Filter search results">
+    <label for="filter-price">Price</label>
+    <select id="filter-price" name="price">
+      <option value="all">Any price</option>
+      <option value="under-25">Under $25</option>
+      <option value="25-50">$25 – $50</option>
+      <option value="50-100">$50 – $100</option>
+      <option value="100-plus">$100+</option>
+    </select>
+    <label for="filter-rating">Rating</label>
+    <select id="filter-rating" name="rating">
+      <option value="all">Any rating</option>
+      <option value="4">4★ &amp; up</option>
+      <option value="4.5">4.5★ &amp; up</option>
+    </select>
+    <label for="filter-retailer">Retailer</label>
+    <select id="filter-retailer" name="retailer">
+      <option value="all">All partners</option>
+    </select>
+  </div>
+  <div id="search-feedback" class="search-empty" role="status" aria-live="polite" aria-atomic="true">Start typing to reveal the latest gift ideas.</div>
+  <ol id="search-results" class="search-results" aria-live="polite"></ol>
 </section>
 <script>
 const PRODUCT_INDEX = {dataset};
@@ -1871,40 +2271,98 @@ const form = document.getElementById('search-page-form');
 const input = document.getElementById('search-query');
 const feedback = document.getElementById('search-feedback');
 const resultsList = document.getElementById('search-results');
-function renderResults(query) {
+const priceSelect = document.getElementById('filter-price');
+const ratingSelect = document.getElementById('filter-rating');
+const retailerSelect = document.getElementById('filter-retailer');
+const retailerMap = new Map();
+for (const item of PRODUCT_INDEX) {{
+  if (item.retailerSlug && !retailerMap.has(item.retailerSlug)) {{
+    retailerMap.set(item.retailerSlug, item.retailerName || item.retailerSlug);
+  }}
+}}
+for (const [slug, name] of retailerMap.entries()) {{
+  const option = document.createElement('option');
+  option.value = slug;
+  option.textContent = name;
+  retailerSelect.appendChild(option);
+}}
+function getFilters() {{
+  return {{
+    price: priceSelect.value || 'all',
+    rating: ratingSelect.value || 'all',
+    retailer: retailerSelect.value || 'all',
+  }};
+}}
+function matchesFilters(item, filters) {{
+  if (filters.price !== 'all') {{
+    const value = typeof item.priceValue === 'number' ? item.priceValue : null;
+    if (value === null) {{
+      return false;
+    }}
+    if (filters.price === 'under-25' && value >= 25) {{
+      return false;
+    }}
+    if (filters.price === '25-50' && (value < 25 || value > 50)) {{
+      return false;
+    }}
+    if (filters.price === '50-100' && (value < 50 || value > 100)) {{
+      return false;
+    }}
+    if (filters.price === '100-plus' && value < 100) {{
+      return false;
+    }}
+  }}
+  if (filters.rating !== 'all') {{
+    const minRating = parseFloat(filters.rating);
+    if (!item.rating || item.rating < minRating) {{
+      return false;
+    }}
+  }}
+  if (filters.retailer !== 'all' && item.retailerSlug !== filters.retailer) {{
+    return false;
+  }}
+  return true;
+}}
+function matchesQuery(item, normalized, hasQuery) {{
+  if (!hasQuery) {{
+    return true;
+  }}
+  if (item.title.toLowerCase().includes(normalized)) {{
+    return true;
+  }}
+  if ((item.summary || '').toLowerCase().includes(normalized)) {{
+    return true;
+  }}
+  if (item.category && item.category.toLowerCase().includes(normalized)) {{
+    return true;
+  }}
+  if (item.keywordBlob && item.keywordBlob.includes(normalized)) {{
+    return true;
+  }}
+  if (Array.isArray(item.keywords)) {{
+    return item.keywords.some((keyword) => (keyword || '').toLowerCase().includes(normalized));
+  }}
+  return false;
+}}
+function renderResults(query, filters) {{
   resultsList.innerHTML = '';
-  if (!query) {
+  const hasQuery = Boolean(query);
+  const hasFilters = filters.price !== 'all' || filters.rating !== 'all' || filters.retailer !== 'all';
+  if (!hasQuery && !hasFilters) {{
     feedback.textContent = 'Start typing to reveal the latest gift ideas.';
     return;
-  }
+  }}
   const normalized = query.toLowerCase();
   const matches = PRODUCT_INDEX.filter((item) => {
-    if (item.title.toLowerCase().includes(normalized)) {
-      return true;
-    }
-    if (item.summary.toLowerCase().includes(normalized)) {
-      return true;
-    }
-    if (item.category && item.category.toLowerCase().includes(normalized)) {
-      return true;
-    }
-    if (item.keywordBlob && item.keywordBlob.includes(normalized)) {
-      return true;
-    }
-    if (Array.isArray(item.keywords)) {
-      return item.keywords.some((keyword) => {
-        return (keyword || '').toLowerCase().includes(normalized);
-      });
-    }
-    return false;
-  }).slice(0, 30);
-  if (!matches.length) {
-    feedback.textContent = 'No matching gifts yet — try a different keyword.';
+    return matchesQuery(item, normalized, hasQuery) && matchesFilters(item, filters);
+  }).slice(0, 60);
+  if (!matches.length) {{
+    feedback.textContent = 'No matching gifts yet — try a different keyword or adjust the filters.';
     return;
-  }
+  }}
   feedback.textContent = `Showing ${matches.length} conversion-ready picks.`;
   const frag = document.createDocumentFragment();
-  for (const match of matches) {
+  for (const match of matches) {{
     const li = document.createElement('li');
     li.className = 'search-result';
     const heading = document.createElement('h3');
@@ -1916,35 +2374,93 @@ function renderResults(query) {
     const summary = document.createElement('p');
     summary.textContent = match.summary || 'Tap through to read the full hype breakdown.';
     li.appendChild(summary);
-    if (match.category) {
+    const metaParts = [];
+    if (match.priceDisplay) {{
+      metaParts.push(match.priceDisplay);
+    }}
+    if (typeof match.rating === 'number') {{
+      metaParts.push(`${match.rating.toFixed(1)}★`);
+    }}
+    if (match.retailerName) {{
+      metaParts.push(match.retailerName);
+    }}
+    if (metaParts.length) {{
+      const meta = document.createElement('p');
+      meta.className = 'search-meta';
+      meta.textContent = metaParts.join(' • ');
+      li.appendChild(meta);
+    }}
+    if (match.category) {{
       const badge = document.createElement('p');
       badge.className = 'badge';
       badge.textContent = match.category;
       li.appendChild(badge);
-    }
+    }}
     frag.appendChild(li);
-  }
+  }}
   resultsList.appendChild(frag);
-}
+}}
+function updateUrl(query, filters) {{
+  const url = new URL(window.location.href);
+  if (query) {{
+    url.searchParams.set('q', query);
+  }} else {{
+    url.searchParams.delete('q');
+  }}
+  for (const [key, value] of Object.entries(filters)) {{
+    if (value && value !== 'all') {{
+      url.searchParams.set(key, value);
+    }} else {{
+      url.searchParams.delete(key);
+    }}
+  }}
+  window.history.replaceState(null, '', url.toString());
+}}
+function applyState() {{
+  const filters = getFilters();
+  const query = input.value.trim();
+  updateUrl(query, filters);
+  renderResults(query, filters);
+}}
 const params = new URLSearchParams(window.location.search);
 const initial = (params.get('q') || '').trim();
+const initialFilters = {{
+  price: params.get('price') || 'all',
+  rating: params.get('rating') || 'all',
+  retailer: params.get('retailer') || 'all',
+}};
+const priceOptions = new Set(['all', 'under-25', '25-50', '50-100', '100-plus']);
+const ratingOptions = new Set(['all', '4', '4.5']);
+if (!priceOptions.has(initialFilters.price)) {{
+  initialFilters.price = 'all';
+}}
+if (!ratingOptions.has(initialFilters.rating)) {{
+  initialFilters.rating = 'all';
+}}
+if (initialFilters.retailer && !retailerMap.has(initialFilters.retailer)) {{
+  initialFilters.retailer = 'all';
+}}
 input.value = initial;
-renderResults(initial);
-form.addEventListener('submit', (event) => {
+priceSelect.value = initialFilters.price;
+ratingSelect.value = initialFilters.rating;
+retailerSelect.value = initialFilters.retailer;
+applyState();
+form.addEventListener('submit', (event) => {{
   event.preventDefault();
-  const value = input.value.trim();
-  const url = new URL(window.location.href);
-  if (value) {
-    url.searchParams.set('q', value);
-  } else {
-    url.searchParams.delete('q');
-  }
-  window.history.replaceState(null, '', url.toString());
-  renderResults(value);
-});
-input.addEventListener('input', (event) => {
-  renderResults(event.target.value.trim());
-});
+  applyState();
+}});
+input.addEventListener('input', () => {{
+  applyState();
+}});
+priceSelect.addEventListener('change', () => {{
+  applyState();
+}});
+ratingSelect.addEventListener('change', () => {{
+  applyState();
+}});
+retailerSelect.addEventListener('change', () => {{
+  applyState();
+}});
 </script>
 """
         structured_data = [
@@ -2209,28 +2725,16 @@ input.addEventListener('input', (event) => {
 
     @staticmethod
     def _extract_price_components(price: str | None) -> tuple[str | None, str | None]:
-        if not price:
+        parsed = parse_price_string(price)
+        if not parsed:
             return None, None
-        currency_map = {
-            "C$": "CAD",
-            "A$": "AUD",
-            "£": "GBP",
-            "€": "EUR",
-            "¥": "JPY",
-            "$": "USD",
-        }
-        currency = None
-        for symbol, code in currency_map.items():
-            if symbol in price:
-                currency = code
-                break
-        numeric_match = re.search(r"(\d+[\d.,]*)", price)
-        if not numeric_match:
-            return None, currency
-        numeric = numeric_match.group(1).replace(",", ".")
-        if numeric.count(".") > 1:
-            head, *tail = numeric.split(".")
-            numeric = head + "." + "".join(tail)
+        value, currency = parsed
+        if currency is None and price:
+            for symbol, code in PRICE_CURRENCY_SYMBOLS.items():
+                if symbol in price:
+                    currency = code
+                    break
+        numeric = f"{value:.2f}".rstrip("0").rstrip(".")
         return numeric, currency
 
     @staticmethod
@@ -2256,6 +2760,19 @@ input.addEventListener('input', (event) => {
             .replace("+00:00", "Z")
         )
 
+    @staticmethod
+    def _format_currency(amount: float | None, currency: str | None) -> str:
+        if amount is None:
+            return ""
+        symbol = CURRENCY_SYMBOL_BY_CODE.get(currency or "USD", "$")
+        return f"{symbol}{abs(amount):,.2f}"
+
+    def _format_price_point_label(self, point: PricePoint) -> str:
+        dt = self._parse_iso_datetime(point.captured_at)
+        if not dt:
+            return point.captured_at.split("T")[0]
+        return dt.strftime("%b %d, %Y")
+
     def _product_card(self, product: Product) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
         image = html.escape(product.image or "")
@@ -2268,11 +2785,6 @@ input.addEventListener('input', (event) => {
             if product.price
             else ""
         )
-        amazon_cta = ""
-        if product.link:
-            amazon_cta = (
-                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">Shop on Amazon</a>'
-            )
         rating_html = ""
         if product.rating and product.total_reviews:
             rating_html = (
@@ -2280,27 +2792,56 @@ input.addEventListener('input', (event) => {
                 '<svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>'
                 f'{product.rating:.1f}<span class="card-rating-count">({product.total_reviews:,})</span></span>'
             )
-        meta_parts = [part for part in (price_html, rating_html) if part]
+        retailer_html = ""
+        if product.retailer_name:
+            retailer_html = f'<span class="card-retailer">{html.escape(product.retailer_name)}</span>'
+        highlight_badge = ""
+        latest_point = product.latest_price_point
+        drop_amount = product.price_drop_amount()
+        percent_drop = product.price_drop_percent()
+        price_change = product.price_change_amount()
+        if latest_point:
+            currency_symbol = CURRENCY_SYMBOL_BY_CODE.get((latest_point.currency or "USD"), "$")
+            if drop_amount is not None:
+                drop_text = f"{currency_symbol}{drop_amount:,.2f}"
+                if percent_drop is not None:
+                    drop_text = f"{drop_text} ({percent_drop:.0f}% off)"
+                highlight_badge = f'<span class="card-deal">↓ {html.escape(drop_text + " since last check")}</span>'
+            elif price_change is not None and price_change > 0:
+                increase_text = f"{currency_symbol}{abs(price_change):,.2f}"
+                highlight_badge = f'<span class="card-deal card-deal--up">↑ {html.escape(increase_text + " since last check")}</span>'
+        meta_parts = [part for part in (price_html, rating_html, retailer_html) if part]
         meta_html = (
             f'<div class="card-meta">{"".join(meta_parts)}</div>'
             if meta_parts
             else ""
         )
+        highlight_html = (
+            f'<div class="card-highlight">{highlight_badge}</div>'
+            if highlight_badge
+            else ""
+        )
+        outbound_cta = ""
+        if product.link:
+            cta_copy = product.call_to_action or f"Shop on {product.retailer_name}"
+            outbound_cta = (
+                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">{html.escape(cta_copy)}</a>'
+            )
         return f"""
-<article class=\"card\">
-  <a class=\"card-media\" href=\"/{self._product_path(product)}\">
-    <img src=\"{image}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" />
+<article class="card">
+  <a class="card-media" href="/{self._product_path(product)}">
+    <img src="{image}" alt="{html.escape(product.title)}" loading="lazy" decoding="async" />
     {category_badge}
   </a>
-  <div class=\"card-content\">
-    <h3><a href=\"/{self._product_path(product)}\">{html.escape(product.title)}</a></h3>
+  <div class="card-content">
+    <h3><a href="/{self._product_path(product)}">{html.escape(product.title)}</a></h3>
     <p>{description}</p>
     {meta_html}
-    <div class=\"card-actions\"><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a>{amazon_cta}</div>
+    {highlight_html}
+    <div class="card-actions"><a class="button-link" href="/{self._product_path(product)}">Read the hype</a>{outbound_cta}</div>
   </div>
 </article>
 """
-
     def _category_card(self, category: Category) -> str:
         return f"""
 <article class=\"card\">
