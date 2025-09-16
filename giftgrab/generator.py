@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List
 
@@ -756,6 +756,8 @@ footer {
 }
 """
 
+DEFAULT_SOCIAL_IMAGE = "https://source.unsplash.com/1200x630/?gifts"
+
 
 @dataclass
 class PageContext:
@@ -765,6 +767,10 @@ class PageContext:
     body: str
     og_image: str | None = None
     structured_data: List[dict] | None = None
+    og_type: str = "website"
+    og_image_alt: str | None = None
+    updated_time: str | None = None
+    published_time: str | None = None
     extra_head: str = ""
     noindex: bool = False
 
@@ -829,6 +835,14 @@ class SiteGenerator:
         meta_description = html.escape(context.description)
         meta_title = html.escape(context.title)
         canonical = html.escape(context.canonical_url)
+        language_value = (self.settings.language or "en").strip()
+        language = html.escape(language_value or "en")
+        locale_value = (self.settings.locale or "en_US").strip()
+        locale = html.escape(locale_value or "en_US")
+        og_type_value = (context.og_type or "website").strip()
+        if not og_type_value:
+            og_type_value = "website"
+        og_type = html.escape(og_type_value)
         nav_links = "".join(
             f"<a href=\"/{self._category_path(slug)}\">{html.escape(name)}</a>"
             for slug, name in self._navigation_links()
@@ -861,27 +875,60 @@ class SiteGenerator:
         feed_link = (
             f'<link rel="alternate" type="application/rss+xml" title="{html.escape(self.settings.site_name)} RSS" href="/feed.xml" />'
         )
+        favicon_link = ""
+        if self.settings.favicon_url:
+            favicon_link = (
+                f'<link rel="icon" href="{html.escape(self.settings.favicon_url)}" />'
+            )
         og_image_meta = ""
         if context.og_image:
             image = html.escape(context.og_image)
-            og_image_meta = (
-                f'<meta property="og:image" content="{image}" />\n'
-                f'    <meta name="twitter:image" content="{image}" />'
-            )
-        twitter_meta = '<meta name="twitter:card" content="summary_large_image" />'
+            og_parts = [
+                f'<meta property="og:image" content="{image}" />',
+                f'<meta name="twitter:image" content="{image}" />',
+            ]
+            if context.og_image_alt:
+                alt = html.escape(context.og_image_alt)
+                og_parts.append(f'<meta property="og:image:alt" content="{alt}" />')
+                og_parts.append(f'<meta name="twitter:image:alt" content="{alt}" />')
+            og_image_meta = "\n    ".join(og_parts)
+        twitter_meta_lines = [
+            '<meta name="twitter:card" content="summary_large_image" />',
+            f'<meta name="twitter:title" content="{meta_title}" />',
+            f'<meta name="twitter:description" content="{meta_description}" />',
+        ]
         if self.settings.twitter_handle:
             handle = self.settings.twitter_handle
             if not handle.startswith("@"):
                 handle = f"@{handle}"
             safe_handle = html.escape(handle)
-            twitter_meta += (
-                f'\n    <meta name="twitter:site" content="{safe_handle}" />\n'
-                f'    <meta name="twitter:creator" content="{safe_handle}" />'
+            twitter_meta_lines.append(
+                f'<meta name="twitter:site" content="{safe_handle}" />'
             )
+            twitter_meta_lines.append(
+                f'<meta name="twitter:creator" content="{safe_handle}" />'
+            )
+        twitter_meta = "\n    ".join(twitter_meta_lines)
         facebook_meta = ""
         if self.settings.facebook_page:
             facebook_meta = (
                 f'<meta property="article:publisher" content="{html.escape(self.settings.facebook_page)}" />'
+            )
+        updated_meta = ""
+        if context.updated_time:
+            updated = html.escape(context.updated_time)
+            updated_parts = [
+                f'<meta property="og:updated_time" content="{updated}" />'
+            ]
+            if og_type_value != "website":
+                updated_parts.append(
+                    f'<meta property="article:modified_time" content="{updated}" />'
+                )
+            updated_meta = "\n    ".join(updated_parts)
+        published_meta = ""
+        if context.published_time and og_type_value != "website":
+            published_meta = (
+                f'<meta property="article:published_time" content="{html.escape(context.published_time)}" />'
             )
         adsense_slot = ""
         if self.settings.adsense_client_id and self.settings.adsense_slot:
@@ -917,7 +964,7 @@ class SiteGenerator:
         if footer_links_parts:
             footer_links = f"<div class=\"footer-links\">{' '.join(footer_links_parts)}</div>"
         return f"""<!DOCTYPE html>
-<html lang=\"en\">
+<html lang=\"{language}\">
   <head>
     <meta charset=\"utf-8\" />
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
@@ -927,15 +974,18 @@ class SiteGenerator:
     <link rel=\"canonical\" href=\"{canonical}\" />
     {feed_link}
     <link rel=\"stylesheet\" href=\"/assets/styles.css\" />
+    {favicon_link}
     {adsense}
     {keywords_meta}
-    <meta property=\"og:type\" content=\"website\" />
+    <meta property=\"og:type\" content=\"{og_type}\" />
     <meta property=\"og:title\" content=\"{meta_title}\" />
     <meta property=\"og:description\" content=\"{meta_description}\" />
     <meta property=\"og:url\" content=\"{canonical}\" />
     <meta property=\"og:site_name\" content=\"{html.escape(self.settings.site_name)}\" />
-    <meta property=\"og:locale\" content=\"en_US\" />
+    <meta property=\"og:locale\" content=\"{locale}\" />
     {og_image_meta}
+    {updated_meta}
+    {published_meta}
     {twitter_meta}
     {facebook_meta}{structured_block}{extra_head_block}
   </head>
@@ -1037,19 +1087,24 @@ class SiteGenerator:
 """
         newsletter_banner = self._newsletter_banner()
         body = f"{hero}{category_section}{featured_section}{newsletter_banner}{value_props}"
-        structured_data = [
-            {
-                "@context": "https://schema.org",
-                "@type": "WebSite",
-                "name": self.settings.site_name,
-                "url": self.settings.base_url,
-                "description": self.settings.description,
-                "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": f"{self.settings.base_url.rstrip('/')}/search.html?q={{search_term_string}}",
-                    "query-input": "required name=search_term_string",
-                },
+        organization_data = self._organization_structured_data()
+        website_schema = {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": self.settings.site_name,
+            "url": self.settings.base_url,
+            "description": self.settings.description,
+            "inLanguage": self.settings.language,
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": f"{self.settings.base_url.rstrip('/')}/search.html?q={{search_term_string}}",
+                "query-input": "required name=search_term_string",
             },
+        }
+        if organization_data:
+            website_schema["publisher"] = organization_data
+        structured_data = [
+            website_schema,
             self._item_list_structured_data(
                 "Featured gift ideas",
                 [
@@ -1058,11 +1113,19 @@ class SiteGenerator:
                 ],
             ),
         ]
+        if organization_data:
+            structured_data.append(organization_data)
         og_image = None
         for product in featured_products:
             if product.image:
                 og_image = product.image
                 break
+        if og_image is None:
+            if self.settings.logo_url:
+                og_image = self.settings.logo_url
+            else:
+                og_image = DEFAULT_SOCIAL_IMAGE
+        latest_site_update = self._latest_updated_datetime(all_products)
         context = PageContext(
             title=f"{self.settings.site_name} — Daily curated Amazon gift ideas",
             description=self.settings.description,
@@ -1070,6 +1133,8 @@ class SiteGenerator:
             body=body,
             og_image=og_image,
             structured_data=structured_data,
+            og_image_alt=self.settings.site_name,
+            updated_time=self._format_iso8601(latest_site_update),
         )
         self._write_page(self.output_dir / "index.html", context)
 
@@ -1123,6 +1188,7 @@ class SiteGenerator:
                 ],
             ),
         ]
+        category_last_updated = self._latest_updated_datetime(products)
         context = PageContext(
             title=f"{category.name} — {self.settings.site_name}",
             description=category.blurb,
@@ -1130,6 +1196,8 @@ class SiteGenerator:
             body=body,
             og_image=og_image,
             structured_data=structured_data,
+            og_image_alt=category.name,
+            updated_time=self._format_iso8601(category_last_updated),
         )
         path = self.categories_dir / category.slug / "index.html"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1154,11 +1222,30 @@ class SiteGenerator:
         breadcrumbs_html = f"""
 <div class=\"breadcrumbs\"><a href=\"/index.html\">Home</a> &rsaquo; <a href=\"/{self._category_path(category.slug)}\">{html.escape(category.name)}</a></div>
 """
+        image_url = product.image or f"https://source.unsplash.com/1200x630/?{category.slug}"
+        updated_dt = self._parse_iso_datetime(product.updated_at)
+        published_dt = self._parse_iso_datetime(product.created_at)
+        price_value, price_currency = self._extract_price_components(product.price)
+        currency_code = price_currency or "USD"
+        extra_head_parts = [
+            f'<meta property="product:retailer_item_id" content="{html.escape(product.asin)}" />',
+        ]
+        if price_value:
+            extra_head_parts.append(
+                f'<meta property="product:price:amount" content="{html.escape(price_value)}" />'
+            )
+            extra_head_parts.append(
+                f'<meta property="product:price:currency" content="{html.escape(currency_code)}" />'
+            )
+        extra_head_parts.append(
+            '<meta property="product:availability" content="in stock" />'
+        )
+        extra_head = "\n    ".join(extra_head_parts)
         body = f"""
 {breadcrumbs_html}
 <div class=\"product-page\">
   <div>
-    <img src=\"{html.escape(product.image or '')}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" />
+    <img src=\"{html.escape(image_url)}\" alt=\"{html.escape(product.title)}\" loading=\"lazy\" decoding=\"async\" />
   </div>
   <div class=\"product-meta\">
     <h1>{html.escape(product.title)}</h1>
@@ -1185,8 +1272,13 @@ class SiteGenerator:
             description=product.summary or self.settings.description,
             canonical_url=f"{self.settings.base_url.rstrip('/')}/{self._product_path(product)}",
             body=body,
-            og_image=product.image,
+            og_image=image_url,
             structured_data=structured_data,
+            og_type="product",
+            og_image_alt=product.title,
+            updated_time=self._format_iso8601(updated_dt),
+            published_time=self._format_iso8601(published_dt),
+            extra_head=extra_head,
         )
         path = self.products_dir / product.slug / "index.html"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1218,6 +1310,12 @@ class SiteGenerator:
             if product.image:
                 og_image = product.image
                 break
+        if og_image is None:
+            if self.settings.logo_url:
+                og_image = self.settings.logo_url
+            else:
+                og_image = DEFAULT_SOCIAL_IMAGE
+        latest_update = self._latest_updated_datetime(products)
         context = PageContext(
             title=f"Latest gift drops — {self.settings.site_name}",
             description="The newest curated Amazon gift ideas, refreshed automatically for maximum conversion potential.",
@@ -1225,6 +1323,8 @@ class SiteGenerator:
             body=body,
             og_image=og_image,
             structured_data=structured_data,
+            og_image_alt="Latest gift drops",
+            updated_time=self._format_iso8601(latest_update),
         )
         self._write_page(self.output_dir / "latest.html", context)
 
@@ -1388,11 +1488,72 @@ input.addEventListener('input', (event) => {
         (self.output_dir / "feed.xml").write_text(rss.strip(), encoding="utf-8")
 
     def _write_sitemap(self, categories: List[Category], products: List[Product]) -> None:
-        urls = [self._absolute_url("index.html"), self._absolute_url("latest.html")]
-        urls.extend(self._absolute_url(self._category_path(category.slug)) for category in categories)
-        urls.extend(self._absolute_url(self._product_path(product)) for product in products)
+        latest_site_update = self._latest_updated_datetime(products)
+        if latest_site_update is None:
+            latest_site_update = datetime.now(timezone.utc)
+        product_lastmods: dict[str, datetime | None] = {}
+        category_lastmods: dict[str, datetime | None] = {}
+        for product in products:
+            product_dt = self._parse_iso_datetime(product.updated_at)
+            product_lastmods[product.slug] = product_dt
+            if product_dt is None:
+                continue
+            existing = category_lastmods.get(product.category_slug)
+            if existing is None or product_dt > existing:
+                category_lastmods[product.category_slug] = product_dt
+        entries: List[dict[str, str | None]] = [
+            {
+                "loc": self._absolute_url("index.html"),
+                "lastmod": self._format_iso8601(latest_site_update),
+                "changefreq": "daily",
+                "priority": "1.0",
+            },
+            {
+                "loc": self._absolute_url("latest.html"),
+                "lastmod": self._format_iso8601(latest_site_update),
+                "changefreq": "daily",
+                "priority": "0.8",
+            },
+        ]
+        for category in categories:
+            category_dt = category_lastmods.get(category.slug, latest_site_update)
+            entries.append(
+                {
+                    "loc": self._absolute_url(self._category_path(category.slug)),
+                    "lastmod": self._format_iso8601(category_dt),
+                    "changefreq": "weekly",
+                    "priority": "0.7",
+                }
+            )
+        for product in products:
+            entries.append(
+                {
+                    "loc": self._absolute_url(self._product_path(product)),
+                    "lastmod": self._format_iso8601(product_lastmods.get(product.slug)),
+                    "changefreq": "weekly",
+                    "priority": "0.6",
+                }
+            )
         url_tags = "".join(
-            f"<url><loc>{html.escape(url)}</loc></url>" for url in urls
+            "<url>"
+            f"<loc>{html.escape(entry['loc'])}</loc>"
+            + (
+                f"<lastmod>{html.escape(entry['lastmod'])}</lastmod>"
+                if entry.get("lastmod")
+                else ""
+            )
+            + (
+                f"<changefreq>{entry['changefreq']}</changefreq>"
+                if entry.get("changefreq")
+                else ""
+            )
+            + (
+                f"<priority>{entry['priority']}</priority>"
+                if entry.get("priority")
+                else ""
+            )
+            + "</url>"
+            for entry in entries
         )
         xml = f"""
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -1401,6 +1562,29 @@ input.addEventListener('input', (event) => {
 </urlset>
 """
         (self.output_dir / "sitemap.xml").write_text(xml.strip(), encoding="utf-8")
+
+    def _organization_structured_data(self) -> dict | None:
+        same_as: List[str] = []
+        if self.settings.twitter_handle:
+            handle = self.settings.twitter_handle.lstrip("@")
+            if handle:
+                same_as.append(f"https://twitter.com/{handle}")
+        if self.settings.facebook_page:
+            same_as.append(self.settings.facebook_page)
+        data: dict[str, object] = {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": self.settings.site_name,
+            "url": self.settings.base_url,
+        }
+        if self.settings.logo_url:
+            data["logo"] = {
+                "@type": "ImageObject",
+                "url": self.settings.logo_url,
+            }
+        if same_as:
+            data["sameAs"] = same_as
+        return data
 
     def _newsletter_banner(self) -> str:
         if not getattr(self.settings, "newsletter_url", None):
@@ -1430,6 +1614,14 @@ input.addEventListener('input', (event) => {
             ],
         }
 
+    def _latest_updated_datetime(self, products: Iterable[Product]) -> datetime | None:
+        latest: datetime | None = None
+        for product in products:
+            dt = self._parse_iso_datetime(getattr(product, "updated_at", None))
+            if dt and (latest is None or dt > latest):
+                latest = dt
+        return latest
+
     def _breadcrumb_structured_data(self, crumbs: List[tuple[str, str]]) -> dict:
         return {
             "@context": "https://schema.org",
@@ -1456,7 +1648,10 @@ input.addEventListener('input', (event) => {
             "category": category.name,
         }
         if product.image:
-            data["image"] = [product.image]
+            image_url = product.image
+        else:
+            image_url = f"https://source.unsplash.com/1200x630/?{category.slug}"
+        data["image"] = [image_url]
         price_value, currency = self._extract_price_components(product.price)
         if price_value:
             data["offers"] = {
@@ -1499,6 +1694,29 @@ input.addEventListener('input', (event) => {
             head, *tail = numeric.split(".")
             numeric = head + "." + "".join(tail)
         return numeric, currency
+
+    @staticmethod
+    def _parse_iso_datetime(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    @staticmethod
+    def _format_iso8601(value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        return (
+            value.astimezone(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
 
     def _product_card(self, product: Product) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
