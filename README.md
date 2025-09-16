@@ -8,6 +8,8 @@ An automated static site generator that pulls trending gift ideas from Amazon's 
 - **Daily automation pipeline** that fetches fresh products per category, generates long-form promotional copy, and rebuilds the static HTML site.
 - **Affiliate-ready links** that enforce your Amazon partner tag on every product card and category deep-link.
 - **AdSense support** baked into the base layout so ads render on each page once you provide your client and slot IDs.
+- **Conversion-focused cards** that surface Amazon star ratings and add a direct “Shop on Amazon” button alongside internal hype links.
+- **Analytics and audience growth ready** with GA4 snippet injection plus an inline newsletter form that posts straight to your ESP.
 - **SEO-friendly pages** with dynamic metadata, schema.org markup, RSS feed, and sitemaps that advertise last-modified times.
 - **No external dependencies** – the tooling runs entirely on Python’s standard library so it can execute in constrained hosting environments.
 
@@ -62,6 +64,35 @@ The CLI reads configuration from environment variables so you can keep secrets o
 | `SITE_LOCALE` | No | Locale value used for Open Graph metadata |
 | `SITE_LOGO_URL` | No | Absolute URL for your logo used in structured data and Open Graph fallbacks |
 | `SITE_FAVICON_URL` | No | Absolute URL for the favicon referenced in page `<head>` |
+| `SITE_ANALYTICS_ID` | No | GA4 Measurement ID used to auto-inject the gtag loader |
+| `SITE_ANALYTICS_SNIPPET` | No | Full analytics snippet (overrides `SITE_ANALYTICS_ID` when set) |
+| `SITE_NEWSLETTER_FORM_ACTION` | No | Endpoint that receives email submissions for the inline banner |
+| `SITE_NEWSLETTER_FORM_METHOD` | No | HTTP method for the signup form (defaults to `post`) |
+| `SITE_NEWSLETTER_EMAIL_FIELD` | No | The `name` attribute applied to the email input (default `email`) |
+| `SITE_NEWSLETTER_HIDDEN_INPUTS` | No | Extra hidden inputs encoded as a query string (e.g. `u=123&id=abc`) |
+| `SITE_NEWSLETTER_CTA_COPY` | No | Custom label for the newsletter button/submit action |
+
+If both `SITE_ANALYTICS_ID` and `SITE_ANALYTICS_SNIPPET` are present, the raw snippet takes precedence. Hidden newsletter inputs are supplied as a URL query string so you can include provider-specific fields (e.g. `u`, `id`, `form` IDs) without editing templates.
+
+### Newsletter form wiring
+
+Set `SITE_NEWSLETTER_FORM_ACTION` to the endpoint provided by your ESP to transform the homepage banner into an inline signup form. The email input name defaults to `email`, but you can override it with `SITE_NEWSLETTER_EMAIL_FIELD`. Any additional provider requirements (tags, list IDs, etc.) go into `SITE_NEWSLETTER_HIDDEN_INPUTS` as a query string.
+
+Example configuration for two common providers:
+
+```bash
+# ConvertKit
+export SITE_NEWSLETTER_FORM_ACTION=https://app.convertkit.com/forms/1234567/subscriptions
+export SITE_NEWSLETTER_HIDDEN_INPUTS=form=1234567
+
+# Mailchimp (requires GET)
+export SITE_NEWSLETTER_FORM_ACTION=https://example.us14.list-manage.com/subscribe/post
+export SITE_NEWSLETTER_FORM_METHOD=get
+export SITE_NEWSLETTER_EMAIL_FIELD=EMAIL
+export SITE_NEWSLETTER_HIDDEN_INPUTS="u=abcd1234&id=efgh5678"
+```
+
+When a form action is configured the navigation “Newsletter” link jumps to the inline banner; otherwise it links to `SITE_NEWSLETTER_URL`.
 
 ## Usage
 

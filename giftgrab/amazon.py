@@ -127,6 +127,8 @@ class AmazonProductClient:
                 "ItemInfo.ProductInfo",
                 "ItemInfo.TechnicalInfo",
                 "Offers.Listings.Price",
+                "CustomerReviews.Count",
+                "CustomerReviews.StarRating",
             ],
             "ItemCount": item_count,
             "ItemPage": 1,
@@ -188,6 +190,33 @@ class AmazonProductClient:
             feature_info = info.get("Features") if isinstance(info, dict) else None
             if isinstance(feature_info, dict):
                 features = list(feature_info.get("DisplayValues") or [])
+            reviews = item.get("CustomerReviews")
+            rating = None
+            total_reviews = None
+            if isinstance(reviews, dict):
+                star_rating = reviews.get("StarRating")
+                count = reviews.get("Count")
+
+                def _extract_value(value):
+                    if isinstance(value, dict):
+                        if "DisplayValue" in value:
+                            return value.get("DisplayValue")
+                        if "Value" in value:
+                            return value.get("Value")
+                    return value
+
+                star_rating = _extract_value(star_rating)
+                count = _extract_value(count)
+                if star_rating is not None:
+                    try:
+                        rating = float(str(star_rating).replace(",", ""))
+                    except (TypeError, ValueError):
+                        rating = None
+                if count is not None:
+                    try:
+                        total_reviews = int(float(str(count).replace(",", "")))
+                    except (TypeError, ValueError):
+                        total_reviews = None
             parsed.append(
                 {
                     "asin": asin,
@@ -196,6 +225,8 @@ class AmazonProductClient:
                     "image_url": image_url,
                     "price": price,
                     "features": features,
+                    "rating": rating,
+                    "total_reviews": total_reviews,
                 }
             )
         return parsed

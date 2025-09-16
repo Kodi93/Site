@@ -32,6 +32,13 @@ class SiteSettings:
     locale: str = "en_US"
     logo_url: str | None = None
     favicon_url: str | None = None
+    analytics_measurement_id: str | None = None
+    analytics_snippet: str | None = None
+    newsletter_form_action: str | None = None
+    newsletter_form_method: str = "post"
+    newsletter_form_email_field: str = "email"
+    newsletter_form_hidden_inputs: tuple[tuple[str, str], ...] = ()
+    newsletter_cta_copy: str | None = None
 
 
 @dataclass(frozen=True)

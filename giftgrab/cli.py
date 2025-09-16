@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Optional
+from urllib.parse import parse_qsl
 
 from .amazon import AmazonCredentials
 from .config import DEFAULT_CATEGORIES, DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
@@ -66,6 +67,28 @@ def load_site_settings() -> SiteSettings:
             return None
         value = value.strip()
         return value or None
+
+    analytics_snippet_env = os.getenv("SITE_ANALYTICS_SNIPPET")
+    analytics_snippet = None
+    if analytics_snippet_env and analytics_snippet_env.strip():
+        analytics_snippet = analytics_snippet_env
+
+    hidden_inputs_env = os.getenv("SITE_NEWSLETTER_HIDDEN_INPUTS")
+    hidden_inputs: tuple[tuple[str, str], ...] = ()
+    if hidden_inputs_env:
+        pairs = [
+            (name, value)
+            for name, value in parse_qsl(hidden_inputs_env, keep_blank_values=True)
+            if name
+        ]
+        hidden_inputs = tuple(pairs)
+
+    raw_method = optional_env("SITE_NEWSLETTER_FORM_METHOD")
+    newsletter_method = (raw_method or "post").lower()
+    if newsletter_method not in {"get", "post"}:
+        newsletter_method = "post"
+
+    email_field = optional_env("SITE_NEWSLETTER_EMAIL_FIELD") or "email"
     return SiteSettings(
         site_name=os.getenv("SITE_NAME", "Curated Gift Radar"),
         base_url=os.getenv("SITE_BASE_URL", "https://example.com"),
@@ -85,6 +108,13 @@ def load_site_settings() -> SiteSettings:
         locale=optional_env("SITE_LOCALE") or "en_US",
         logo_url=optional_env("SITE_LOGO_URL"),
         favicon_url=optional_env("SITE_FAVICON_URL"),
+        analytics_measurement_id=optional_env("SITE_ANALYTICS_ID"),
+        analytics_snippet=analytics_snippet,
+        newsletter_form_action=optional_env("SITE_NEWSLETTER_FORM_ACTION"),
+        newsletter_form_method=newsletter_method,
+        newsletter_form_email_field=email_field,
+        newsletter_form_hidden_inputs=hidden_inputs,
+        newsletter_cta_copy=optional_env("SITE_NEWSLETTER_CTA_COPY"),
     )
 
 

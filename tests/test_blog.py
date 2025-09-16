@@ -29,6 +29,11 @@ class BlogTests(unittest.TestCase):
         self.assertIn("cta-button", blog.html)
         self.assertTrue("Check it out" in blog.html or "See the latest price" in blog.html)
 
+    def test_generate_blog_post_includes_review_callout(self) -> None:
+        product = sample_product()
+        blog = generate_blog_post(product, "Home & Kitchen", [])
+        self.assertIn("Rated 4.7 stars by 1,280 shoppers.", blog.html)
+
 
 if __name__ == "__main__":
     unittest.main()
