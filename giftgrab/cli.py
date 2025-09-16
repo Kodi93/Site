@@ -60,6 +60,12 @@ def load_site_settings() -> SiteSettings:
             for keyword in keywords_env.split(",")
             if keyword.strip()
         )
+    def optional_env(name: str) -> str | None:
+        value = os.getenv(name)
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
     return SiteSettings(
         site_name=os.getenv("SITE_NAME", "Curated Gift Radar"),
         base_url=os.getenv("SITE_BASE_URL", "https://example.com"),
@@ -75,6 +81,10 @@ def load_site_settings() -> SiteSettings:
         keywords=keywords,
         newsletter_url=os.getenv("SITE_NEWSLETTER_URL"),
         contact_email=os.getenv("SITE_CONTACT_EMAIL"),
+        language=optional_env("SITE_LANGUAGE") or "en",
+        locale=optional_env("SITE_LOCALE") or "en_US",
+        logo_url=optional_env("SITE_LOGO_URL"),
+        favicon_url=optional_env("SITE_FAVICON_URL"),
     )
 
 

@@ -28,6 +28,10 @@ class SiteSettings:
     keywords: tuple[str, ...] = ()
     newsletter_url: str | None = None
     contact_email: str | None = None
+    language: str = "en"
+    locale: str = "en_US"
+    logo_url: str | None = None
+    favicon_url: str | None = None
 
 
 @dataclass(frozen=True)

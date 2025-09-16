@@ -8,7 +8,7 @@ An automated static site generator that pulls trending gift ideas from Amazon's 
 - **Daily automation pipeline** that fetches fresh products per category, generates long-form promotional copy, and rebuilds the static HTML site.
 - **Affiliate-ready links** that enforce your Amazon partner tag on every product card and category deep-link.
 - **AdSense support** baked into the base layout so ads render on each page once you provide your client and slot IDs.
-- **SEO-friendly pages** including RSS feed and sitemap, plus rich internal linking between categories and products.
+- **SEO-friendly pages** with dynamic metadata, schema.org markup, RSS feed, and sitemaps that advertise last-modified times.
 - **No external dependencies** – the tooling runs entirely on Python’s standard library so it can execute in constrained hosting environments.
 
 ## Project layout
@@ -58,6 +58,10 @@ The CLI reads configuration from environment variables so you can keep secrets o
 | `ADSENSE_CLIENT_ID` | No | Google AdSense client ID (format `ca-pub-XXXXXXXX`) |
 | `ADSENSE_SLOT` | No | Optional AdSense slot for in-content ads |
 | `SITE_TWITTER` / `SITE_FACEBOOK` | No | Social handles exposed in structured data |
+| `SITE_LANGUAGE` | No | Language code applied to the `<html lang>` attribute |
+| `SITE_LOCALE` | No | Locale value used for Open Graph metadata |
+| `SITE_LOGO_URL` | No | Absolute URL for your logo used in structured data and Open Graph fallbacks |
+| `SITE_FAVICON_URL` | No | Absolute URL for the favicon referenced in page `<head>` |
 
 ## Usage
 
