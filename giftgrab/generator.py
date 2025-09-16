@@ -1230,15 +1230,21 @@ class SiteGenerator:
 
     def _write_search_page(self, categories: List[Category], products: List[Product]) -> None:
         category_lookup = {category.slug: category.name for category in categories}
-        index_entries = [
-            {
-                "title": product.title,
-                "summary": product.summary or "",
-                "url": f"/{self._product_path(product)}",
-                "category": category_lookup.get(product.category_slug, ""),
-            }
-            for product in products
-        ]
+        index_entries = []
+        for product in products:
+            raw_keywords = product.keywords or []
+            keywords = [keyword.strip() for keyword in raw_keywords if keyword and keyword.strip()]
+            keyword_blob = " ".join(keyword.lower() for keyword in keywords)
+            index_entries.append(
+                {
+                    "title": product.title,
+                    "summary": product.summary or "",
+                    "url": f"/{self._product_path(product)}",
+                    "category": category_lookup.get(product.category_slug, ""),
+                    "keywords": keywords,
+                    "keywordBlob": keyword_blob,
+                }
+            )
         dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\\/")
         body = f"""
 <section class=\"search-page\">
@@ -1251,7 +1257,7 @@ class SiteGenerator:
       <svg aria-hidden=\"true\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><line x1=\"20\" y1=\"20\" x2=\"16.65\" y2=\"16.65\"></line></svg>
     </button>
   </form>
-  <div id=\"search-feedback\" class=\"search-empty\">Start typing to reveal the latest gift ideas.</div>
+  <div id=\"search-feedback\" class=\"search-empty\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">Start typing to reveal the latest gift ideas.</div>
   <ol id=\"search-results\" class=\"search-results\" aria-live=\"polite\"></ol>
 </section>
 <script>
@@ -1268,9 +1274,24 @@ function renderResults(query) {
   }
   const normalized = query.toLowerCase();
   const matches = PRODUCT_INDEX.filter((item) => {
-    return item.title.toLowerCase().includes(normalized) ||
-      item.summary.toLowerCase().includes(normalized) ||
-      (item.category && item.category.toLowerCase().includes(normalized));
+    if (item.title.toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if (item.summary.toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if (item.category && item.category.toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if (item.keywordBlob && item.keywordBlob.includes(normalized)) {
+      return true;
+    }
+    if (Array.isArray(item.keywords)) {
+      return item.keywords.some((keyword) => {
+        return (keyword || '').toLowerCase().includes(normalized);
+      });
+    }
+    return false;
   }).slice(0, 30);
   if (!matches.length) {
     feedback.textContent = 'No matching gifts yet — try a different keyword.';
