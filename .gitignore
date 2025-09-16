@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+public/
+data/products.json
+.idea/
+.vscode/
+.DS_Store
