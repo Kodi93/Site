@@ -52,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_site_settings() -> SiteSettings:
+    keywords_env = os.getenv("SITE_KEYWORDS")
+    keywords: tuple[str, ...] = ()
+    if keywords_env:
+        keywords = tuple(
+            keyword.strip()
+            for keyword in keywords_env.split(",")
+            if keyword.strip()
+        )
     return SiteSettings(
         site_name=os.getenv("SITE_NAME", "Curated Gift Radar"),
         base_url=os.getenv("SITE_BASE_URL", "https://example.com"),
@@ -64,6 +72,9 @@ def load_site_settings() -> SiteSettings:
         amazon_partner_tag=os.getenv("AMAZON_ASSOCIATE_TAG"),
         twitter_handle=os.getenv("SITE_TWITTER"),
         facebook_page=os.getenv("SITE_FACEBOOK"),
+        keywords=keywords,
+        newsletter_url=os.getenv("SITE_NEWSLETTER_URL"),
+        contact_email=os.getenv("SITE_CONTACT_EMAIL"),
     )
 
 

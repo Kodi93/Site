@@ -25,6 +25,9 @@ class SiteSettings:
     amazon_partner_tag: str | None = None
     twitter_handle: str | None = None
     facebook_page: str | None = None
+    keywords: tuple[str, ...] = ()
+    newsletter_url: str | None = None
+    contact_email: str | None = None
 
 
 @dataclass(frozen=True)
