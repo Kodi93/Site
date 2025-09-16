@@ -44,6 +44,35 @@ class RepositoryTests(unittest.TestCase):
         stored = self.repo.load_products()
         self.assertEqual(stored[0].title, "Updated Title")
 
+    def test_price_history_tracks_changes(self) -> None:
+        product = make_product("ASIN003")
+        product.price = "$19.99"
+        self.repo.upsert_products([product])
+        product.price = "$17.99"
+        self.repo.upsert_products([product])
+        stored = self.repo.load_products()[0]
+        self.assertGreaterEqual(len(stored.price_history), 2)
+        latest = stored.price_history[-1]
+        self.assertAlmostEqual(latest.amount, 17.99, places=2)
+        self.assertEqual(latest.display, "$17.99")
+
+    def test_separate_records_for_each_retailer(self) -> None:
+        amazon_product = make_product("ASIN004")
+        amazon_product.price = "$49.00"
+        other_product = make_product("ASIN004")
+        other_product.retailer_slug = "walmart"
+        other_product.retailer_name = "Walmart"
+        other_product.link = "https://www.walmart.com/ip/example"
+        other_product.price = "$45.00"
+        self.repo.upsert_products([amazon_product, other_product])
+        stored = sorted(
+            self.repo.load_products(), key=lambda item: item.retailer_slug
+        )
+        self.assertEqual(len(stored), 2)
+        self.assertEqual(stored[0].retailer_slug, "amazon")
+        self.assertEqual(stored[1].retailer_slug, "walmart")
+        self.assertEqual(stored[1].price_history[-1].display, "$45.00")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -44,10 +44,21 @@ class ProductRepository:
         dump_json(self.data_file, payload)
 
     def upsert_products(self, products: Iterable[Product]) -> List[Product]:
-        existing = {product.asin: product for product in self.load_products()}
+        existing = {
+            (product.retailer_slug, product.asin): product
+            for product in self.load_products()
+        }
         for product in products:
-            product.touch()
-            existing[product.asin] = product
+            key = (product.retailer_slug, product.asin)
+            if not product.price_history and product.price:
+                product.record_price(product.price)
+            stored = existing.get(key)
+            if stored:
+                stored.merge_from(product)
+                existing[key] = stored
+            else:
+                product.touch()
+                existing[key] = product
         merged = list(existing.values())
         self.save_products(merged)
         return merged

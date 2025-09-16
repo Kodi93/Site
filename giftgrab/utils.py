@@ -7,7 +7,8 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -54,3 +55,70 @@ def env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+PRICE_CURRENCY_SYMBOLS: Dict[str, str] = {
+    "C$": "CAD",
+    "A$": "AUD",
+    "£": "GBP",
+    "€": "EUR",
+    "¥": "JPY",
+    "$": "USD",
+}
+
+
+def parse_price_string(price: str | None) -> Tuple[float, str | None] | None:
+    """Extract a numeric value and ISO currency code from a price string."""
+
+    if not price:
+        return None
+    currency = None
+    for symbol, code in PRICE_CURRENCY_SYMBOLS.items():
+        if symbol in price:
+            currency = code
+            break
+    match = re.search(r"(\d+[\d.,]*)", price)
+    if not match:
+        return None
+    numeric = match.group(1).replace(" ", "")
+    if "." in numeric and "," in numeric:
+        if numeric.rfind(",") > numeric.rfind("."):
+            numeric = numeric.replace(".", "").replace(",", ".")
+        else:
+            numeric = numeric.replace(",", "")
+    elif "," in numeric:
+        decimals = numeric.split(",")[-1]
+        if len(decimals) in {2, 3}:
+            numeric = numeric.replace(",", ".")
+        else:
+            numeric = numeric.replace(",", "")
+    else:
+        numeric = numeric.replace(",", "")
+    try:
+        value = float(numeric)
+    except ValueError:
+        return None
+    return value, currency
+
+
+def apply_partner_tag(url: str | None, partner_tag: str | None) -> str:
+    """Ensure the provided URL contains the given Amazon partner tag."""
+
+    if not url:
+        return "https://www.amazon.com/"
+    if not partner_tag:
+        return url
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query))
+    query["tag"] = partner_tag
+    new_query = urlencode(query)
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment,
+        )
+    )
