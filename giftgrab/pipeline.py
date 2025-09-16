@@ -82,6 +82,27 @@ class GiftPipeline:
         image = item.get("image_url")
         price = item.get("price")
         features = item.get("features") or []
+        rating_value = item.get("rating")
+        total_reviews_value = item.get("total_reviews")
+
+        def _as_float(value):
+            if value is None:
+                return None
+            try:
+                return float(str(value).replace(",", ""))
+            except (TypeError, ValueError):
+                return None
+
+        def _as_int(value):
+            if value is None:
+                return None
+            try:
+                return int(float(str(value).replace(",", "")))
+            except (TypeError, ValueError):
+                return None
+
+        rating = _as_float(rating_value)
+        total_reviews = _as_int(total_reviews_value)
         keywords = list(definition.keywords)
         for feature in features:
             if feature and feature not in keywords:
@@ -92,8 +113,8 @@ class GiftPipeline:
             link=link,
             image=image,
             price=price,
-            rating=None,
-            total_reviews=None,
+            rating=rating,
+            total_reviews=total_reviews,
             category_slug=definition.slug,
             keywords=keywords[:12],
         )

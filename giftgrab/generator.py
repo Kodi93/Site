@@ -464,16 +464,19 @@ main {
 
 .card-actions {
   margin-top: auto;
+  display: grid;
+  gap: 0.75rem;
 }
 
-.card-actions .button-link {
+.card-actions .button-link,
+.card-actions .cta-secondary {
   width: 100%;
   justify-content: center;
 }
 
 @media (min-width: 640px) {
-  .card-actions .button-link {
-    width: auto;
+  .card-actions {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   }
 }
 
@@ -513,6 +516,52 @@ main {
 .newsletter-banner p {
   color: var(--muted);
   margin-bottom: 1.1rem;
+}
+
+.newsletter-form {
+  margin-top: 1.25rem;
+}
+
+.newsletter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.newsletter-fields input[type="email"] {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.newsletter-fields input[type="email"]::placeholder {
+  color: var(--muted);
+}
+
+.newsletter-fields button {
+  flex: 0 0 auto;
+  padding: 0.8rem 1.4rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(255, 90, 95, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.newsletter-fields button:hover,
+.newsletter-fields button:focus {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 18px 30px rgba(224, 72, 80, 0.35);
 }
 
 .value-prop {
@@ -832,6 +881,25 @@ class SiteGenerator:
                 "<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client="
                 f"{self.settings.adsense_client_id}\" crossorigin=\"anonymous\"></script>"
             )
+        analytics_snippet = ""
+        if getattr(self.settings, "analytics_snippet", None):
+            analytics_snippet = self.settings.analytics_snippet or ""
+        elif getattr(self.settings, "analytics_measurement_id", None):
+            raw_measurement = self.settings.analytics_measurement_id or ""
+            safe_attr_id = html.escape(raw_measurement)
+            js_measurement = raw_measurement.replace("\\", "\\\\").replace("'", "\\'")
+            analytics_snippet = (
+                f'<script async src="https://www.googletagmanager.com/gtag/js?id={safe_attr_id}"></script>'
+                "\n"
+                "<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}"
+                "gtag('js', new Date());"
+                f"gtag('config', '{js_measurement}');</script>"
+            )
+        analytics_block = (
+            "\n    " + analytics_snippet.replace("\n", "\n    ")
+            if analytics_snippet
+            else ""
+        )
         meta_description = html.escape(context.description)
         meta_title = html.escape(context.title)
         canonical = html.escape(context.canonical_url)
@@ -848,10 +916,16 @@ class SiteGenerator:
             for slug, name in self._navigation_links()
         )
         nav_action_links = ['<a href="/latest.html">Latest</a>']
+        newsletter_link = None
+        newsletter_attrs = ""
         if getattr(self.settings, "newsletter_url", None):
-            newsletter_url = html.escape(self.settings.newsletter_url)
+            newsletter_link = html.escape(self.settings.newsletter_url)
+            newsletter_attrs = ' target="_blank" rel="noopener"'
+        elif getattr(self.settings, "newsletter_form_action", None):
+            newsletter_link = "#newsletter"
+        if newsletter_link:
             nav_action_links.append(
-                f'<a class="pill-link" href="{newsletter_url}" target="_blank" rel="noopener">Newsletter</a>'
+                f'<a class="pill-link" href="{newsletter_link}"{newsletter_attrs}>Newsletter</a>'
             )
         search_form = (
             "<form class=\"search-form\" action=\"/search.html\" method=\"get\" role=\"search\">"
@@ -956,6 +1030,8 @@ class SiteGenerator:
             footer_links_parts.append(
                 f'<a href="{newsletter_url}" target="_blank" rel="noopener">Newsletter</a>'
             )
+        elif getattr(self.settings, "newsletter_form_action", None):
+            footer_links_parts.append('<a href="#newsletter">Newsletter</a>')
         if getattr(self.settings, "contact_email", None):
             footer_links_parts.append(
                 f'<a href="mailto:{html.escape(self.settings.contact_email)}">Contact</a>'
@@ -975,7 +1051,7 @@ class SiteGenerator:
     {feed_link}
     <link rel=\"stylesheet\" href=\"/assets/styles.css\" />
     {favicon_link}
-    {adsense}
+    {adsense}{analytics_block}
     {keywords_meta}
     <meta property=\"og:type\" content=\"{og_type}\" />
     <meta property=\"og:title\" content=\"{meta_title}\" />
@@ -1587,16 +1663,49 @@ input.addEventListener('input', (event) => {
         return data
 
     def _newsletter_banner(self) -> str:
-        if not getattr(self.settings, "newsletter_url", None):
-            return ""
-        url = html.escape(self.settings.newsletter_url)
-        return f"""
-<section class=\"newsletter-banner\">
+        cta_copy = getattr(self.settings, "newsletter_cta_copy", None) or "Join the newsletter"
+        form_action = getattr(self.settings, "newsletter_form_action", None)
+        if form_action:
+            action = html.escape(form_action)
+            method = getattr(self.settings, "newsletter_form_method", "post") or "post"
+            method = method.lower()
+            if method not in {"get", "post"}:
+                method = "post"
+            method_attr = html.escape(method)
+            email_field = (
+                getattr(self.settings, "newsletter_form_email_field", "email") or "email"
+            )
+            email_field = html.escape(email_field)
+            hidden_inputs = getattr(self.settings, "newsletter_form_hidden_inputs", ())
+            hidden_inputs_html = "".join(
+                f"\n    <input type=\"hidden\" name=\"{html.escape(name)}\" value=\"{html.escape(value)}\" />"
+                for name, value in hidden_inputs
+            )
+            button_label = html.escape(cta_copy)
+            return f"""
+<section class=\"newsletter-banner\" id=\"newsletter\">
   <h3>Steal our weekly bestseller intel</h3>
   <p>Subscribe to receive high-performing gift drops, category insights, and seasonal launch reminders.</p>
-  <a class=\"button-link\" href=\"{url}\" target=\"_blank\" rel=\"noopener\">Join the newsletter</a>
+  <form class=\"newsletter-form\" action=\"{action}\" method=\"{method_attr}\" target=\"_blank\">
+    <label class=\"sr-only\" for=\"newsletter-email\">Email address</label>
+    <div class=\"newsletter-fields\">
+      <input id=\"newsletter-email\" type=\"email\" name=\"{email_field}\" placeholder=\"you@example.com\" autocomplete=\"email\" required />
+      <button type=\"submit\">{button_label}</button>
+    </div>{hidden_inputs_html}
+  </form>
 </section>
 """
+        if getattr(self.settings, "newsletter_url", None):
+            url = html.escape(self.settings.newsletter_url)
+            button_label = html.escape(cta_copy)
+            return f"""
+<section class=\"newsletter-banner\" id=\"newsletter\">
+  <h3>Steal our weekly bestseller intel</h3>
+  <p>Subscribe to receive high-performing gift drops, category insights, and seasonal launch reminders.</p>
+  <a class=\"button-link\" href=\"{url}\" target=\"_blank\" rel=\"noopener\">{button_label}</a>
+</section>
+"""
+        return ""
 
     def _item_list_structured_data(self, name: str, items: List[tuple[str, str]]) -> dict:
         return {
@@ -1730,6 +1839,11 @@ input.addEventListener('input', (event) => {
             if product.price
             else ""
         )
+        amazon_cta = ""
+        if product.link:
+            amazon_cta = (
+                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">Shop on Amazon</a>'
+            )
         rating_html = ""
         if product.rating and product.total_reviews:
             rating_html = (
@@ -1753,7 +1867,7 @@ input.addEventListener('input', (event) => {
     <h3><a href=\"/{self._product_path(product)}\">{html.escape(product.title)}</a></h3>
     <p>{description}</p>
     {meta_html}
-    <div class=\"card-actions\"><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a></div>
+    <div class=\"card-actions\"><a class=\"button-link\" href=\"/{self._product_path(product)}\">Read the hype</a>{amazon_cta}</div>
   </div>
 </article>
 """
