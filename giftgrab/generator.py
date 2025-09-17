@@ -1878,7 +1878,7 @@ class SiteGenerator:
         theme_bootstrap = (
             "<script>"
             "(function(){"
-            "var storageKey='giftgrab-theme';"
+            "var storageKey='grabgifts-theme';"
             "var root=document.documentElement;"
             "if(!root){return;}"
             "var stored=null;"
@@ -2043,7 +2043,7 @@ class SiteGenerator:
     </footer>
     <script>
       (function() {{
-        var storageKey = 'giftgrab-theme';
+        var storageKey = 'grabgifts-theme';
         var root = document.documentElement;
         var toggle = document.getElementById('theme-switch');
         var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -2701,7 +2701,7 @@ class SiteGenerator:
         wishlist_script = f"""
 <script>
 (function() {{
-  const STORAGE_KEY = 'giftgrab-wishlist';
+  const STORAGE_KEY = 'grabgifts-wishlist';
   const productId = {js_slug};
   const link = {js_link};
   const title = {js_title};
