@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from .utils import parse_price_string, slugify, timestamp
@@ -242,3 +242,48 @@ class Category:
 class SiteState:
     products: List[Product]
     last_updated: datetime
+
+
+@dataclass
+class CooldownEntry:
+    """Represents a product that is temporarily suppressed from re-posting."""
+
+    retailer_slug: str
+    asin: str
+    added_at: str = field(default_factory=timestamp)
+    category_slug: str | None = None
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.retailer_slug, self.asin)
+
+    def to_dict(self) -> dict:
+        return {
+            "retailer_slug": self.retailer_slug,
+            "asin": self.asin,
+            "added_at": self.added_at,
+            "category_slug": self.category_slug,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CooldownEntry":
+        return cls(
+            retailer_slug=data.get("retailer_slug", "amazon"),
+            asin=data.get("asin", ""),
+            added_at=data.get("added_at", timestamp()),
+            category_slug=data.get("category_slug"),
+        )
+
+    def added_at_datetime(self) -> datetime:
+        raw = self.added_at or timestamp()
+        try:
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            return datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    def is_active(self, cooldown_days: int, now: datetime | None = None) -> bool:
+        reference = now or datetime.now(timezone.utc)
+        return reference - self.added_at_datetime() < timedelta(days=cooldown_days)

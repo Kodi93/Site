@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from giftgrab.models import Product
+from giftgrab.models import CooldownEntry, Product
 from giftgrab.repository import ProductRepository
 
 
@@ -72,6 +73,27 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(stored[0].retailer_slug, "amazon")
         self.assertEqual(stored[1].retailer_slug, "walmart")
         self.assertEqual(stored[1].price_history[-1].display, "$45.00")
+
+    def test_cooldown_update_and_prune(self) -> None:
+        now = datetime.now(timezone.utc)
+        stale = CooldownEntry(
+            retailer_slug="amazon",
+            asin="STALE",
+            added_at=(now - timedelta(days=31)).isoformat(),
+        )
+        fresh = CooldownEntry(
+            retailer_slug="amazon",
+            asin="FRESH",
+            added_at=(now - timedelta(days=5)).isoformat(),
+        )
+        self.repo.save_cooldowns([stale, fresh])
+        remaining = self.repo.prune_cooldowns(30, now=now)
+        self.assertEqual([entry.asin for entry in remaining], ["FRESH"])
+        new_entry = CooldownEntry(retailer_slug="amazon", asin="NEW")
+        updated = self.repo.update_cooldowns([new_entry], retention_days=30, now=now)
+        asins = {entry.asin for entry in updated}
+        self.assertIn("NEW", asins)
+        self.assertIn("FRESH", asins)
 
 
 if __name__ == "__main__":

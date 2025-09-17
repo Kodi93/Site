@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import List, Sequence
 from .amazon import AmazonCredentials
 from .blog import generate_blog_post
 from .config import CategoryDefinition
-from .models import Category, Product
+from .models import Category, CooldownEntry, Product
 from .retailers import AmazonRetailerAdapter, RetailerAdapter
 from .repository import ProductRepository
 
@@ -31,6 +32,9 @@ class GiftPipeline:
         categories: Sequence[CategoryDefinition],
         credentials: AmazonCredentials | None = None,
         retailers: Sequence[RetailerAdapter] | None = None,
+        cooldown_days: int = 15,
+        cooldown_retention_days: int = 30,
+        minimum_daily_posts: int = 5,
     ) -> None:
         self.repository = repository
         self.generator = generator
@@ -42,6 +46,9 @@ class GiftPipeline:
             self.retailers = [AmazonRetailerAdapter(credentials)]
         else:
             self.retailers = []
+        self.cooldown_days = max(0, cooldown_days)
+        self.cooldown_retention_days = max(0, cooldown_retention_days)
+        self.minimum_daily_posts = max(0, minimum_daily_posts)
 
     def run(self, *, item_count: int = 6, regenerate_only: bool = False) -> PipelineResult:
         logger.info("Starting pipeline regenerate_only=%s", regenerate_only)
@@ -56,11 +63,29 @@ class GiftPipeline:
             for definition in self.categories_config
         ]
         new_products: List[Product] = []
+        new_cooldowns: List[CooldownEntry] = []
+        now = datetime.now(timezone.utc)
+        active_cooldown_keys: set[tuple[str, str]] = set()
         if not regenerate_only:
             if not self.retailers:
                 raise RuntimeError(
                     "At least one retailer adapter is required when fetching new products."
                 )
+            if self.minimum_daily_posts and item_count < self.minimum_daily_posts:
+                logger.info(
+                    "Requested item_count %s below minimum %s; adjusting.",
+                    item_count,
+                    self.minimum_daily_posts,
+                )
+                item_count = self.minimum_daily_posts
+            cooldown_entries = self.repository.prune_cooldowns(
+                self.cooldown_retention_days, now=now
+            )
+            active_cooldown_keys = {
+                entry.key
+                for entry in cooldown_entries
+                if entry.is_active(self.cooldown_days, now)
+            }
             for retailer in self.retailers:
                 for definition in self.categories_config:
                     items = retailer.search_items(
@@ -74,7 +99,35 @@ class GiftPipeline:
                     )
                     for item in items:
                         product = self._build_product(item, definition, retailer)
+                        key = (product.retailer_slug, product.asin)
+                        if key in active_cooldown_keys:
+                            logger.debug(
+                                "Skipping %s from %s due to active cooldown",
+                                product.asin,
+                                product.retailer_slug,
+                            )
+                            continue
                         new_products.append(product)
+                        new_entry = CooldownEntry(
+                            retailer_slug=product.retailer_slug,
+                            asin=product.asin,
+                            category_slug=product.category_slug,
+                        )
+                        new_cooldowns.append(new_entry)
+                        active_cooldown_keys.add(key)
+            if new_cooldowns:
+                self.repository.update_cooldowns(
+                    new_cooldowns,
+                    retention_days=self.cooldown_retention_days,
+                    now=now,
+                )
+            unique_new = len({(product.retailer_slug, product.asin) for product in new_products})
+            if self.minimum_daily_posts and unique_new < self.minimum_daily_posts:
+                logger.warning(
+                    "Only %s new products added (minimum target is %s).",
+                    unique_new,
+                    self.minimum_daily_posts,
+                )
         combined = self.repository.upsert_products(new_products) if new_products else existing_products
         logger.info("Total products stored: %s", len(combined))
         self.generator.build(categories, combined)
