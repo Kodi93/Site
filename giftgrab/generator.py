@@ -2276,11 +2276,13 @@ class SiteGenerator:
             feed_grid = (
                 "<p class=\"feed-empty\">More gift ideas are on the way. Check back after the next refresh.</p>"
             )
+        feed_dom_id = "news-feed-grid"
         sentinel_html = ""
         if feed_cards:
             sentinel_html = (
-                "<div class=\"feed-sentinel\" data-feed-sentinel>"
-                "<button type=\"button\" class=\"feed-more\" data-feed-more>Show more gift ideas</button>"
+                "<div class=\"feed-sentinel\" data-feed-sentinel aria-live=\"polite\">"
+                "<button type=\"button\" class=\"feed-more\" data-feed-more aria-expanded=\"false\" "
+                f"aria-controls=\"{feed_dom_id}\">Show more gift ideas</button>"
                 "</div>"
             )
         surprise_json = json.dumps(surprise_pool, ensure_ascii=False).replace("</", "<\\/")
@@ -2298,7 +2300,7 @@ class SiteGenerator:
       <button type=\"button\" class=\"feed-sort\" data-feed-sort=\"trending\" aria-pressed=\"false\">Trending</button>
     </div>
   </div>
-  <div class=\"feed-grid\" data-feed>{feed_grid}</div>
+  <div class=\"feed-grid\" id=\"{feed_dom_id}\" data-feed>{feed_grid}</div>
   {sentinel_html}
 </section>
 """
@@ -2342,9 +2344,12 @@ class SiteGenerator:
     }}
     if (!cards.length || visibleCount >= cards.length) {{
       sentinel.setAttribute('hidden', 'hidden');
+      sentinel.setAttribute('aria-hidden', 'true');
     }} else {{
       sentinel.removeAttribute('hidden');
+      sentinel.removeAttribute('aria-hidden');
     }}
+    updateButtonState();
   }}
 
   function applyVisibility() {{
@@ -2360,6 +2365,15 @@ class SiteGenerator:
     }});
     updateAds();
     updateSentinel();
+  }}
+
+  function updateButtonState() {{
+    if (!moreButton) {{
+      return;
+    }}
+    const hasMore = cards.length > visibleCount;
+    moreButton.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
+    moreButton.disabled = cards.length === 0;
   }}
 
   function applySort(key, resetCount) {{
@@ -2383,6 +2397,7 @@ class SiteGenerator:
       visibleCount = Math.min(cards.length, visibleCount + BATCH_SIZE);
       applyVisibility();
     }}
+    updateButtonState();
   }}
 
   sortButtons.forEach(function (button) {{
@@ -2406,6 +2421,7 @@ class SiteGenerator:
     moreButton.addEventListener('click', function () {{
       revealMore();
     }});
+    updateButtonState();
   }}
 
   if ('IntersectionObserver' in window && sentinel) {{
