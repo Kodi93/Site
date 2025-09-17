@@ -164,3 +164,45 @@ def test_rich_directory_items_survive_pointer_overrides(monkeypatch, tmp_path):
     assert item["category_slug"] == "home-and-kitchen"
     assert sorted(item["features"]) == ["immersive lighting", "smart home"]
     assert sorted(item["keywords"]) == ["lighting", "party"]
+
+
+def test_placeholder_title_replaced_by_shorter_curated_value(monkeypatch, tmp_path):
+    retailers_dir = tmp_path / "retailers"
+    retailers_dir.mkdir()
+    resources_dir = tmp_path / "resources"
+    resources_dir.mkdir()
+
+    pointer_path = retailers_dir / "curated.json"
+    curated_file = resources_dir / "curated-item.json"
+
+    curated_payload = {
+        "id": "asin777",
+        "title": "Cozy Mug",
+        "url": "https://example.com/products/asin777",
+        "image": "https://cdn.example.com/mug.jpg",
+    }
+    curated_file.write_text(json.dumps(curated_payload), encoding="utf-8")
+
+    pointer_payload = {
+        "items": [
+            {
+                "id": "asin777",
+                "url": "https://example.com/pointer/asin777",
+            }
+        ],
+        "items_file": "../resources/curated-item.json",
+    }
+    pointer_path.write_text(json.dumps(pointer_payload), encoding="utf-8")
+
+    monkeypatch.setenv("STATIC_RETAILER_DIR", str(retailers_dir))
+    adapters = load_static_retailers()
+    monkeypatch.delenv("STATIC_RETAILER_DIR", raising=False)
+
+    assert len(adapters) == 1
+    adapter = adapters[0]
+    items = adapter.search_items(keywords=[], item_count=5)
+
+    assert len(items) == 1
+    item = items[0]
+    assert item["title"] == "Cozy Mug"
+    assert item["title"] != "Grab Gifts marketplace find"
