@@ -2211,7 +2211,8 @@ class SiteGenerator:
             if url not in seen_urls:
                 seen_urls.add(url)
                 surprise_pool.append(url)
-        for product in feed_products:
+        ads_enabled = self._adsense_inline_enabled()
+        for index, product in enumerate(feed_products, start=1):
             updated_score, popularity_score, trending_score = self._news_feed_metrics(
                 product, now
             )
@@ -2229,6 +2230,14 @@ class SiteGenerator:
                     extra_classes="feed-card",
                 )
             )
+            if ads_enabled and index % 5 == 0:
+                ad_card = self._adsense_card()
+                if ad_card:
+                    if "card card--ad" in ad_card:
+                        ad_card = ad_card.replace(
+                            "card card--ad", "card card--ad feed-card", 1
+                        )
+                    feed_cards.append(ad_card)
         feed_grid = "".join(feed_cards)
         if not feed_cards:
             feed_grid = (
