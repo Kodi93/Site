@@ -107,3 +107,60 @@ def test_directory_feed_without_index(monkeypatch, tmp_path):
     assert adapter.name == "Directory Meta Only"
     assert adapter.cta_label == "Shop this drop"
     assert adapter.homepage == "https://example.com/amazon"
+
+
+def test_rich_directory_items_survive_pointer_overrides(monkeypatch, tmp_path):
+    retailers_dir = tmp_path / "retailers"
+    pointer_path = retailers_dir / "curated.json"
+    items_dir = retailers_dir / "curated" / "items"
+    items_dir.mkdir(parents=True)
+
+    detailed_payload = {
+        "id": "asin555",
+        "title": "Aurora Skyline Projector",
+        "url": "https://example.com/products/asin555",
+        "price": "$88.00",
+        "image": "https://cdn.example.com/aurora.jpg",
+        "features": ["immersive lighting", "smart home"],
+        "rating": 4.9,
+        "total_reviews": 420,
+        "keywords": ["lighting", "party"],
+        "category_slug": "home-and-kitchen",
+        "category": "Homebody Upgrades",
+    }
+    (items_dir / "asin555.json").write_text(
+        json.dumps(detailed_payload), encoding="utf-8"
+    )
+
+    pointer_payload = {
+        "name": "Curated Feed",
+        "homepage": "https://example.com",
+        "items": [
+            {
+                "id": "asin555",
+                "title": "Generic Pointer",
+                "url": "https://example.com/pointer/asin555",
+            }
+        ],
+    }
+    pointer_path.write_text(json.dumps(pointer_payload), encoding="utf-8")
+
+    monkeypatch.setenv("STATIC_RETAILER_DIR", str(retailers_dir))
+    adapters = load_static_retailers()
+    monkeypatch.delenv("STATIC_RETAILER_DIR", raising=False)
+
+    assert len(adapters) == 1
+    adapter = adapters[0]
+    assert adapter.slug == "curated"
+
+    items = adapter.search_items(keywords=[], item_count=5)
+    assert len(items) == 1
+    item = items[0]
+    assert item["title"] == "Aurora Skyline Projector"
+    assert item["image"] == "https://cdn.example.com/aurora.jpg"
+    assert item["price"] == "$88.00"
+    assert item["rating"] == 4.9
+    assert item["url"] == "https://example.com/products/asin555"
+    assert item["category_slug"] == "home-and-kitchen"
+    assert sorted(item["features"]) == ["immersive lighting", "smart home"]
+    assert sorted(item["keywords"]) == ["lighting", "party"]
