@@ -100,10 +100,9 @@ When a form action is configured the navigation “Newsletter” link jumps to t
 
 ### Adding additional retailers
 
- codex/find-workaround-for-amazon-associates-api-access-95zosq
-The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new products without touching earlier entries. For directories, drop a `meta.json` file alongside the item files to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy. The loader now walks directories automatically, so you can skip the extra `<slug>.json` pointer file entirely; if you still keep one for compatibility with other tooling, set `items_dir` (or `items_path`) to the folder containing your per-item JSON blobs so the loader can pull everything together without touching the large feed again.
+The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). A feed can be a single JSON file or a directory containing multiple JSON fragments, letting you append new products without touching existing files. For directory-based feeds, include a `meta.json` (or `metadata.json`) file alongside the item blobs to override the display name, CTA label, or homepage URL.
 
-The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new batches without creating merge conflicts. For directories, drop a `meta.json` file alongside your item batches to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
+Each JSON entry should mirror the built-in Amazon adapter keys: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional per-item fields such as `category_slug` and `category` keep curated products labeled correctly across the generated site. Pointer files may also reference nested folders using `items_dir`, `items_path`, `items_file`, or `items_files`; the loader resolves those references automatically and de-duplicates products by `id`/`asin`.
 
 
 Example feed (`data/retailers/handmade.json`):
@@ -136,24 +135,17 @@ Directory-backed feed layout:
 ```
 data/retailers/amazon-sitestripe/
 ├── meta.json            # optional retailer display overrides
-codex/find-workaround-for-amazon-associates-api-access-95zosq
-└── items/
-    ├── amzn-3I1wmJZ.json  # single product JSON blobs
-    └── amzn-3I2aKND.json  # drop new files for additional URLs
+├── items/
+│   ├── amzn-3I1wmJZ.json  # single product JSON blobs
+│   └── amzn-3I2aKND.json  # drop new files for additional URLs
+└── batches/
+    ├── batch-0001.json    # { "items": [ ... ] }
+    └── batch-0002.json    # append new URLs in additional batches
 ```
 
 Each JSON file is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.
 
 If you already know which on-site category an item belongs to, include `category_slug` (matching one of the slugs listed in `giftgrab.config.DEFAULT_CATEGORIES`) and `category` (the friendly display name). Those fields keep per-item landing pages and search results labeled correctly even when a curated feed skips the automated keyword matching step.
-
-└── batches/
-    ├── batch-0001.json  # { "items": [ ... ] }
-    └── batch-0002.json  # append new URLs in additional batches
-```
-
-Each batch is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.
-
-
 Every retailer feed is merged alongside Amazon data, producing separate product cards with the correct outbound CTA, retailer badge, and inclusion in the site-wide search filters.
 
 ## Usage

@@ -85,112 +85,113 @@ class StaticRetailerAdapter:
     def _load(self) -> List[dict]:
         if self._items is None:
             merged: dict[str, dict] = {}
-< codex/find-workaround-for-amazon-associates-api-access-95zosq
             seen_paths: set[Path] = set()
 
-            def iter_entries(source: Path) -> Iterable[dict]:
-                source = Path(source)
-                if source.is_dir():
-                    for child in sorted(source.iterdir()):
-                        yield from iter_entries(child)
-                    return
+            def normalize_sequence(value: object) -> list[str]:
+                if isinstance(value, (list, tuple, set)):
+                    return [str(item) for item in value if item not in (None, "")]
+                if value in (None, ""):
+                    return []
+                return [str(value)]
 
-                resolved = source.resolve()
-                if resolved in seen_paths:
+            def apply_metadata(payload: object) -> None:
+                if not isinstance(payload, dict):
                     return
-                seen_paths.add(resolved)
+                name = payload.get("name")
+                if name:
+                    self.name = str(name)
+                homepage = payload.get("homepage")
+                if homepage:
+                    self.homepage = homepage
+                cta_label = payload.get("cta_label")
+                if cta_label:
+                    self.cta_label = str(cta_label)
 
-                raw = load_json(source, default={}) or {}
-                if isinstance(raw, list):
-                    for entry in raw:
+            def add_entry(entry: dict) -> None:
+                product_id = entry.get("id") or entry.get("asin")
+                if not product_id:
+                    return
+                normalized = {
+                    "id": str(product_id),
+                    "title": entry.get("title") or "Curated marketplace find",
+                    "url": entry.get("url"),
+                    "image": entry.get("image"),
+                    "price": entry.get("price"),
+                    "features": normalize_sequence(entry.get("features")),
+                    "rating": entry.get("rating"),
+                    "total_reviews": entry.get("total_reviews"),
+                    "keywords": normalize_sequence(entry.get("keywords")),
+                    "category_slug": entry.get("category_slug"),
+                    "category": entry.get("category"),
+                }
+                merged[normalized["id"]] = normalized
+
+            def handle_payload(payload: object, source: Path) -> None:
+                if isinstance(payload, list):
+                    for entry in payload:
                         if isinstance(entry, dict):
-                            yield entry
+                            add_entry(entry)
                     return
-                if not isinstance(raw, dict):
+                if not isinstance(payload, dict):
                     return
+                apply_metadata(payload)
 
-                if raw.get("name"):
-                    self.name = str(raw["name"])
-                if raw.get("homepage"):
-                    self.homepage = raw.get("homepage")
-                if raw.get("cta_label"):
-                    self.cta_label = str(raw["cta_label"])
-
-                raw_items = raw.get("items")
+                raw_items = payload.get("items")
                 if isinstance(raw_items, dict):
                     raw_items = [raw_items]
                 if isinstance(raw_items, list):
                     for entry in raw_items:
                         if isinstance(entry, dict):
-                            yield entry
-                elif any(raw.get(key) for key in ("id", "asin")):
-                    yield raw
+                            add_entry(entry)
+                elif payload.get("id") or payload.get("asin"):
+                    add_entry(payload)
 
+                base = Path(source).parent
                 nested: list[Path] = []
                 for key in ("items_dir", "items_path"):
-                    value = raw.get(key)
+                    value = payload.get(key)
                     if not value:
                         continue
                     values = value if isinstance(value, list) else [value]
                     for candidate in values:
-                        candidate_path = (source.parent / str(candidate)).resolve()
-                        if candidate_path.is_dir() or candidate_path.is_file():
+                        candidate_path = (base / str(candidate)).resolve()
+                        if candidate_path.exists():
                             nested.append(candidate_path)
                 for key in ("items_file", "items_files"):
-                    value = raw.get(key)
+                    value = payload.get(key)
                     if not value:
                         continue
                     values = value if isinstance(value, list) else [value]
                     for candidate in values:
-                        candidate_path = (source.parent / str(candidate)).resolve()
-                        if candidate_path.is_file():
+                        candidate_path = (base / str(candidate)).resolve()
+                        if candidate_path.exists():
                             nested.append(candidate_path)
-
                 for candidate in nested:
-                    yield from iter_entries(candidate)
+                    walk(candidate)
+
+            def walk(source: Path) -> None:
+                path = Path(source)
+                resolved = path.resolve()
+                if resolved in seen_paths or not resolved.exists():
+                    return
+                seen_paths.add(resolved)
+                if resolved.is_dir():
+                    for meta_name in ("meta.json", "metadata.json"):
+                        meta_path = resolved / meta_name
+                        if meta_path.exists():
+                            handle_payload(load_json(meta_path, default={}) or {}, meta_path)
+                            break
+                    for child in sorted(resolved.iterdir()):
+                        if child.name.lower() in {"meta.json", "metadata.json"}:
+                            continue
+                        walk(child)
+                    return
+                if resolved.is_file() and resolved.suffix.lower() == ".json":
+                    handle_payload(load_json(resolved, default={}) or {}, resolved)
 
             for source in self._sources:
-                for entry in iter_entries(source):
+                walk(source)
 
-            for source in self._sources:
-                raw = load_json(source, default={}) or {}
-                items: list
-                if isinstance(raw, dict) and any(raw.get(key) for key in ("id", "asin")):
-                    items = [raw]
-                elif isinstance(raw, dict):
-                    if raw.get("name"):
-                        self.name = str(raw["name"])
-                    if not self.homepage and raw.get("homepage"):
-                        self.homepage = raw.get("homepage")
-                    if raw.get("cta_label"):
-                        self.cta_label = str(raw["cta_label"])
-                    raw_items = raw.get("items", [])
-                    items = raw_items if isinstance(raw_items, list) else []
-                elif isinstance(raw, list):
-                    items = raw
-                else:
-                    items = []
-                for entry in items:
- main
-                    if not isinstance(entry, dict):
-                        continue
-                    product_id = entry.get("id") or entry.get("asin")
-                    if not product_id:
-                        continue
-                    normalized = {
-                        "id": str(product_id),
-                        "title": entry.get("title", "Curated marketplace find"),
-                        "url": entry.get("url"),
-                        "image": entry.get("image"),
-                        "price": entry.get("price"),
-                        "features": entry.get("features") or entry.get("keywords") or [],
-                        "rating": entry.get("rating"),
-                        "total_reviews": entry.get("total_reviews"),
-                        "keywords": entry.get("keywords") or [],
-                        "category_slug": entry.get("category_slug"),
-                        "category": entry.get("category"),
-                    }
-                    merged[normalized["id"]] = normalized
             self._items = [merged[key] for key in sorted(merged)]
         return self._items
 

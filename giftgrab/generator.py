@@ -2263,28 +2263,19 @@ class SiteGenerator:
             )
             if ads_enabled and index % 5 == 0:
                 ad_card = self._adsense_card()
-                if ad_card: codex/find-workaround-for-amazon-associates-api-access-95zosq
-                    if "card card--ad" in ad_card:
-
-                    if '<article class="card card--ad"' in ad_card:
+                if ad_card:
+                    if "<article" in ad_card:
                         ad_card = ad_card.replace(
-                            '<article class="card card--ad"',
-                            f'<article class="card card--ad feed-card" data-feed-ad-after="{index}"',
+                            "<article",
+                            f'<article data-feed-ad-after="{index}" aria-hidden="true"',
                             1,
                         )
- codex/find-workaround-for-amazon-associates-api-access-95zosq
-
-                    elif "card card--ad" in ad_card:
+                    if 'class="card card--ad"' in ad_card:
                         ad_card = ad_card.replace(
-                            "card card--ad", "card card--ad feed-card", 1
+                            'class="card card--ad"',
+                            'class="card card--ad feed-card is-hidden"',
+                            1,
                         )
-                        if "<article" in ad_card:
-                            ad_card = ad_card.replace(
-                                "<article",
-                                f'<article data-feed-ad-after="{index}"',
-                                1,
-                            )
-ain
                     feed_cards.append(ad_card)
         feed_grid = "".join(feed_cards)
         if not feed_cards:
@@ -2327,12 +2318,11 @@ ain
     return;
   }}
   const sortButtons = Array.from(document.querySelectorAll('[data-feed-sort]'));
- codex/find-workaround-for-amazon-associates-api-access-95zosq
-  let cards = Array.from(feed.querySelectorAll('[data-updated]'));
   const sentinel = document.querySelector('[data-feed-sentinel]');
   const moreButton = sentinel ? sentinel.querySelector('[data-feed-more]') : null;
   const INITIAL_BATCH = 10;
   const BATCH_SIZE = 10;
+  let cards = Array.from(feed.querySelectorAll('[data-updated]'));
   let visibleCount = Math.min(INITIAL_BATCH, cards.length);
 
   function refreshCards() {{
@@ -2344,38 +2334,45 @@ ain
     adCards.forEach(function (ad) {{
       const threshold = Number(ad.dataset.feedAdAfter || '0');
       const isVisible = visibleCount >= threshold;
+      ad.classList.toggle('is-hidden', !isVisible);
       if (isVisible) {{
-        ad.classList.remove('is-hidden');
         ad.removeAttribute('aria-hidden');
       }} else {{
-        ad.classList.add('is-hidden');
         ad.setAttribute('aria-hidden', 'true');
       }}
     }});
+  }}
+
+  function updateButtonState(hasMore) {{
+    if (!moreButton) {{
+      return;
+    }}
+    moreButton.disabled = cards.length === 0;
+    moreButton.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
   }}
 
   function updateSentinel() {{
     if (!sentinel) {{
       return;
     }}
-    if (!cards.length || visibleCount >= cards.length) {{
+    const hasMore = cards.length > visibleCount;
+    if (hasMore) {{
+      sentinel.removeAttribute('hidden');
+      sentinel.setAttribute('aria-hidden', 'false');
+    }} else {{
       sentinel.setAttribute('hidden', 'hidden');
       sentinel.setAttribute('aria-hidden', 'true');
-    }} else {{
-      sentinel.removeAttribute('hidden');
-      sentinel.removeAttribute('aria-hidden');
     }}
-    updateButtonState();
+    updateButtonState(hasMore);
   }}
 
   function applyVisibility() {{
     cards.forEach(function (card, index) {{
       const isVisible = index < visibleCount;
+      card.classList.toggle('is-hidden', !isVisible);
       if (isVisible) {{
-        card.classList.remove('is-hidden');
         card.removeAttribute('aria-hidden');
       }} else {{
-        card.classList.add('is-hidden');
         card.setAttribute('aria-hidden', 'true');
       }}
     }});
@@ -2383,53 +2380,31 @@ ain
     updateSentinel();
   }}
 
-  function updateButtonState() {{
-    if (!moreButton) {{
-      return;
-    }}
-    const hasMore = cards.length > visibleCount;
-    moreButton.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
-    moreButton.disabled = cards.length === 0;
-  }}
-
   function applySort(key, resetCount) {{
-
-  const cards = Array.from(feed.children).filter(function (element) {{
-    return element.dataset && element.dataset.updated;
-  }});
-  const adCards = Array.from(feed.children).filter(function (element) {{
-    return element.dataset && element.dataset.feedAdAfter;
-  }});
-  const adSlots = {{}};
-  adCards.forEach(function (ad) {{
-    const afterValue = parseInt(ad.dataset.feedAdAfter || '', 10);
-    if (Number.isNaN(afterValue)) {{
-      return;
-    }}
-    if (!adSlots[afterValue]) {{
-      adSlots[afterValue] = [];
-    }}
-    adSlots[afterValue].push(ad);
-  }});
-  function applySort(key) {{
-in
-    const sorted = cards.slice().sort(function (a, b) {{
+    const sortable = cards.slice().sort(function (a, b) {{
       return Number(b.dataset[key] || 0) - Number(a.dataset[key] || 0);
     }});
     const fragment = document.createDocumentFragment();
-    const insertedAds = new Set();
-    sorted.forEach(function (card, index) {{
+    const adCards = Array.from(feed.querySelectorAll('[data-feed-ad-after]'));
+    const inserted = new Set();
+    sortable.forEach(function (card, index) {{
       fragment.appendChild(card);
       const position = index + 1;
-      const adsForPosition = adSlots[position];
-      if (adsForPosition) {{
-        adsForPosition.forEach(function (ad) {{
-          insertedAds.add(ad);
+      adCards.forEach(function (ad) {{
+        const after = Number(ad.dataset.feedAdAfter || '0');
+        if (!inserted.has(ad) && after === position) {{
+          inserted.add(ad);
           fragment.appendChild(ad);
-        }});
+        }}
+      }});
+    }});
+    adCards.forEach(function (ad) {{
+      if (!inserted.has(ad)) {{
+        fragment.appendChild(ad);
       }}
     }});
-codex/find-workaround-for-amazon-associates-api-access-95zosq
+    feed.textContent = '';
+    feed.appendChild(fragment);
     refreshCards();
     if (resetCount) {{
       visibleCount = Math.min(INITIAL_BATCH, cards.length);
@@ -2444,19 +2419,6 @@ codex/find-workaround-for-amazon-associates-api-access-95zosq
       visibleCount = Math.min(cards.length, visibleCount + BATCH_SIZE);
       applyVisibility();
     }}
-    updateButtonState();
-
-    adCards.forEach(function (ad) {{
-      if (!insertedAds.has(ad)) {{
-        fragment.appendChild(ad);
-      }}
-    }});
-    feed.textContent = '';
-    feed.appendChild(fragment);
-    if (typeof window !== 'undefined' && typeof window.updateAds === 'function') {{
-      window.updateAds();
-    }}
-ain
   }}
 
   sortButtons.forEach(function (button) {{
@@ -2480,7 +2442,6 @@ ain
     moreButton.addEventListener('click', function () {{
       revealMore();
     }});
-    updateButtonState();
   }}
 
   if ('IntersectionObserver' in window && sentinel) {{
