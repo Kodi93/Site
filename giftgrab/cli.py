@@ -21,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Automate the curated Amazon gift site generation.",
+        description="Automate the Grab Gifts static site generation pipeline.",
     )
     parser.add_argument(
         "command",
@@ -92,11 +92,11 @@ def load_site_settings() -> SiteSettings:
 
     email_field = optional_env("SITE_NEWSLETTER_EMAIL_FIELD") or "email"
     return SiteSettings(
-        site_name=os.getenv("SITE_NAME", "Curated Gift Radar"),
-        base_url=os.getenv("SITE_BASE_URL", "https://example.com"),
+        site_name=os.getenv("SITE_NAME", "Grab Gifts"),
+        base_url=os.getenv("SITE_BASE_URL", "https://grabgifts.net"),
         description=os.getenv(
             "SITE_DESCRIPTION",
-            "Automated daily feed of the coolest Amazon gifts, organized for effortless browsing.",
+            "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation.",
         ),
         adsense_client_id=os.getenv("ADSENSE_CLIENT_ID"),
         adsense_slot=os.getenv("ADSENSE_SLOT"),

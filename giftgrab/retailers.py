@@ -113,7 +113,7 @@ class StaticRetailerAdapter:
                     return
                 normalized = {
                     "id": str(product_id),
-                    "title": entry.get("title") or "Curated marketplace find",
+                    "title": entry.get("title") or "Grab Gifts marketplace find",
                     "url": entry.get("url"),
                     "image": entry.get("image"),
                     "price": entry.get("price"),

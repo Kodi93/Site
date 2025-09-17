@@ -1,6 +1,6 @@
-# Curated Gift Radar
+# Grab Gifts
 
-An automated static site generator that pulls trending gift ideas from Amazon's Product Advertising API, writes hype-heavy blurbs for each item, and publishes them into ten easy-to-browse categories (think "Gifts for Him", "Tech & Gadgets", and more). The build also injects Google AdSense placements and your Amazon affiliate links so the site can monetize from day one.
+Grab Gifts powers [grabgifts.net](https://grabgifts.net) — an automated static site generator that hunts trending gift ideas from Amazon's Product Advertising API, layers on conversion-primed storytelling, and publishes them into ten high-intent shopping vibes (think "Gifts for Him", "Tech & Gadgets", and more). The build also injects Google AdSense placements and your Amazon affiliate links so the site can monetize from day one.
 
 ## Features
 
