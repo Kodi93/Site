@@ -1774,70 +1774,70 @@ class SiteGenerator:
       {footer_links}
     </footer>
     <script>
-      (function() {
+      (function() {{
         var storageKey = 'giftgrab-theme';
         var root = document.documentElement;
         var toggle = document.getElementById('theme-switch');
         var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-        function setToggleState(theme) {
-          if (!toggle) {
+        function setToggleState(theme) {{
+          if (!toggle) {{
             return;
-          }
+          }}
           var isDark = theme === 'dark';
           toggle.checked = isDark;
           toggle.setAttribute('aria-checked', String(isDark));
-        }
+        }}
 
-        function applyTheme(next) {
+        function applyTheme(next) {{
           var theme = next === 'dark' ? 'dark' : 'light';
           root.setAttribute('data-theme', theme);
           setToggleState(theme);
-        }
+        }}
 
-        function readPreference() {
-          try {
+        function readPreference() {{
+          try {{
             return window.localStorage.getItem(storageKey);
-          } catch (error) {
+          }} catch (error) {{
             return null;
-          }
-        }
+          }}
+        }}
 
-        function storePreference(value) {
-          try {
+        function storePreference(value) {{
+          try {{
             window.localStorage.setItem(storageKey, value);
-          } catch (error) {
+          }} catch (error) {{
             return;
-          }
-        }
+          }}
+        }}
 
         var saved = readPreference();
-        if (saved === 'dark' || saved === 'light') {
+        if (saved === 'dark' || saved === 'light') {{
           applyTheme(saved);
-        } else {
+        }} else {{
           applyTheme(mediaQuery.matches ? 'dark' : 'light');
-        }
+        }}
 
-        mediaQuery.addEventListener('change', function (event) {
-          if (!readPreference()) {
+        mediaQuery.addEventListener('change', function (event) {{
+          if (!readPreference()) {{
             applyTheme(event.matches ? 'dark' : 'light');
-          }
-        });
+          }}
+        }});
 
-        if (toggle) {
-          toggle.addEventListener('change', function (event) {
+        if (toggle) {{
+          toggle.addEventListener('change', function (event) {{
             var mode = event.target.checked ? 'dark' : 'light';
             applyTheme(mode);
             storePreference(mode);
-          });
-        }
+          }});
+        }}
 
-        window.addEventListener('storage', function (event) {
-          if (event.key === storageKey) {
+        window.addEventListener('storage', function (event) {{
+          if (event.key === storageKey) {{
             applyTheme(event.newValue === 'dark' ? 'dark' : 'light');
-          }
-        });
-      })();
+          }}
+        }});
+      }})();
     </script>
   </body>
 </html>
@@ -1970,11 +1970,12 @@ class SiteGenerator:
 
     def _write_category_page(self, category: Category, products: List[Product]) -> None:
         cards = "".join(self._product_card(product) for product in products)
-        amazon_url = (
-            f"https://www.amazon.com/s?k={html.escape('+'.join(category.keywords))}"
-        )
+        keyword_query = quote_plus(" ".join(category.keywords))
+        amazon_url = f"https://www.amazon.com/s?k={keyword_query}"
         if self.settings.amazon_partner_tag:
-            amazon_url = f"{amazon_url}&tag={html.escape(self.settings.amazon_partner_tag)}"
+            partner_tag = quote_plus(self.settings.amazon_partner_tag)
+            amazon_url = f"{amazon_url}&tag={partner_tag}"
+        amazon_url = html.escape(amazon_url, quote=True)
         newsletter_banner = self._newsletter_banner()
         body = f"""
 <div class=\"breadcrumbs\"><a href=\"/index.html\">Home</a> &rsaquo; {html.escape(category.name)}</div>
@@ -2034,9 +2035,13 @@ class SiteGenerator:
         self._write_page(path, context)
 
     def _write_product_page(self, product: Product, category: Category, related: List[Product]) -> None:
-        price_line = f"<p class="price-callout">{html.escape(product.price)}</p>" if product.price else ""
+        price_line = (
+            f'<p class="price-callout">{html.escape(product.price)}</p>'
+            if product.price
+            else ""
+        )
         rating_line = (
-            f"<p class="review-callout">{product.rating:.1f} / 5.0 ({product.total_reviews:,} reviews)</p>"
+            f'<p class="review-callout">{product.rating:.1f} / 5.0 ({product.total_reviews:,} reviews)</p>'
             if product.rating and product.total_reviews
             else ""
         )
@@ -2063,14 +2068,20 @@ class SiteGenerator:
                 detail = drop_text
                 if percent_drop is not None:
                     detail = f"{detail} ({percent_drop:.0f}% drop)"
-                deal_line = f"<p class="deal-callout">Price dropped {html.escape(detail)} since {html.escape(prev_label)}.</p>"
+                deal_line = (
+                    f'<p class="deal-callout">Price dropped {html.escape(detail)} since {html.escape(prev_label)}.</p>'
+                )
             elif price_change is not None and price_change > 0 and latest_point and previous_point:
                 increase_text = self._format_currency(price_change, latest_point.currency)
                 prev_label = self._format_price_point_label(previous_point)
-                deal_line = f"<p class="deal-callout deal-callout--up">Price climbed {html.escape(increase_text)} since {html.escape(prev_label)}.</p>"
+                deal_line = (
+                    f'<p class="deal-callout deal-callout--up">Price climbed {html.escape(increase_text)} since {html.escape(prev_label)}.</p>'
+                )
             elif product.price_history:
                 first_label = self._format_price_point_label(product.price_history[0])
-                deal_line = f"<p class="deal-callout">Tracking this listing since {html.escape(first_label)} for quick deal alerts.</p>"
+                deal_line = (
+                    f'<p class="deal-callout">Tracking this listing since {html.escape(first_label)} for quick deal alerts.</p>'
+                )
         related_section = ""
         if related:
             related_cards = "".join(self._product_card(item) for item in related)
@@ -2099,8 +2110,7 @@ class SiteGenerator:
                 f'<meta property="product:price:currency" content="{html.escape(currency_code)}" />'
             )
         extra_head_parts.append('<meta property="product:availability" content="in stock" />')
-        extra_head = "
-    ".join(extra_head_parts)
+        extra_head = "\n    ".join(extra_head_parts)
         canonical_url = self._absolute_url(self._product_path(product))
         encoded_url = quote_plus(canonical_url)
         encoded_title = quote_plus(product.title)
@@ -2140,9 +2150,10 @@ class SiteGenerator:
             for point in reversed(history_points):
                 label = self._format_price_point_label(point)
                 display = html.escape(point.display or product.price or "")
-                history_rows.append(f"    <li><span>{html.escape(label)}</span><strong>{display}</strong></li>")
-            rows_html = "
-".join(history_rows)
+                history_rows.append(
+                    f"    <li><span>{html.escape(label)}</span><strong>{display}</strong></li>"
+                )
+            rows_html = "\n".join(history_rows)
             price_history_section = f"""
 <section class="price-insights">
   <h2>Price pulse</h2>
@@ -2484,14 +2495,14 @@ function renderResults(query, filters) {{
     return;
   }}
   const normalized = query.toLowerCase();
-  const matches = PRODUCT_INDEX.filter((item) => {
+  const matches = PRODUCT_INDEX.filter((item) => {{
     return matchesQuery(item, normalized, hasQuery) && matchesFilters(item, filters);
-  }).slice(0, 60);
+  }}).slice(0, 60);
   if (!matches.length) {{
     feedback.textContent = 'No matching gifts yet — try a different keyword or adjust the filters.';
     return;
   }}
-  feedback.textContent = `Showing ${matches.length} conversion-ready picks.`;
+  feedback.textContent = `Showing ${{matches.length}} conversion-ready picks.`;
   const frag = document.createDocumentFragment();
   for (const match of matches) {{
     const li = document.createElement('li');
@@ -2510,7 +2521,7 @@ function renderResults(query, filters) {{
       metaParts.push(match.priceDisplay);
     }}
     if (typeof match.rating === 'number') {{
-      metaParts.push(`${match.rating.toFixed(1)}★`);
+      metaParts.push(`${{match.rating.toFixed(1)}}★`);
     }}
     if (match.retailerName) {{
       metaParts.push(match.retailerName);
