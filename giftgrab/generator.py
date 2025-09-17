@@ -781,6 +781,37 @@ main > section + section {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
+.is-hidden {
+  display: none !important;
+}
+
+.feed-sentinel {
+  margin: 2rem auto 0;
+  text-align: center;
+}
+
+.feed-sentinel[hidden] {
+  display: none !important;
+}
+
+.feed-more {
+  border: none;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(34, 211, 238, 0.18));
+  color: var(--brand);
+  font-weight: 600;
+  padding: 0.85rem 2.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 18px 38px rgba(58, 34, 94, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feed-more:hover,
+.feed-more:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 44px rgba(58, 34, 94, 0.22);
+}
+
 .feed-card {
   position: relative;
 }
@@ -2200,7 +2231,7 @@ class SiteGenerator:
 
     def _news_feed_section(self, products: List[Product]) -> str:
         now = datetime.now(timezone.utc)
-        feed_limit = 30
+        feed_limit = len(products)
         feed_products = products[:feed_limit]
         feed_cards: List[str] = []
         pool_limit = min(len(products), 60)
@@ -2211,7 +2242,8 @@ class SiteGenerator:
             if url not in seen_urls:
                 seen_urls.add(url)
                 surprise_pool.append(url)
-        for product in feed_products:
+        ads_enabled = self._adsense_inline_enabled()
+        for index, product in enumerate(feed_products, start=1):
             updated_score, popularity_score, trending_score = self._news_feed_metrics(
                 product, now
             )
@@ -2229,10 +2261,27 @@ class SiteGenerator:
                     extra_classes="feed-card",
                 )
             )
+            if ads_enabled and index % 5 == 0:
+                ad_card = self._adsense_card()
+                if ad_card:
+                    if "card card--ad" in ad_card:
+                        ad_card = ad_card.replace(
+                            '<article class="card card--ad"',
+                            f'<article class="card card--ad feed-card" data-feed-ad-after="{index}"',
+                            1,
+                        )
+                    feed_cards.append(ad_card)
         feed_grid = "".join(feed_cards)
         if not feed_cards:
             feed_grid = (
                 "<p class=\"feed-empty\">More gift ideas are on the way. Check back after the next refresh.</p>"
+            )
+        sentinel_html = ""
+        if feed_cards:
+            sentinel_html = (
+                "<div class=\"feed-sentinel\" data-feed-sentinel>"
+                "<button type=\"button\" class=\"feed-more\" data-feed-more>Show more gift ideas</button>"
+                "</div>"
             )
         surprise_json = json.dumps(surprise_pool, ensure_ascii=False).replace("</", "<\\/")
         section = f"""
@@ -2250,6 +2299,7 @@ class SiteGenerator:
     </div>
   </div>
   <div class=\"feed-grid\" data-feed>{feed_grid}</div>
+  {sentinel_html}
 </section>
 """
         script = f"""
@@ -2260,17 +2310,81 @@ class SiteGenerator:
     return;
   }}
   const sortButtons = Array.from(document.querySelectorAll('[data-feed-sort]'));
-  const cards = Array.from(feed.children).filter(function (element) {{
-    return element.dataset && element.dataset.updated;
-  }});
-  function applySort(key) {{
+  let cards = Array.from(feed.querySelectorAll('[data-updated]'));
+  const sentinel = document.querySelector('[data-feed-sentinel]');
+  const moreButton = sentinel ? sentinel.querySelector('[data-feed-more]') : null;
+  const INITIAL_BATCH = 10;
+  const BATCH_SIZE = 10;
+  let visibleCount = Math.min(INITIAL_BATCH, cards.length);
+
+  function refreshCards() {{
+    cards = Array.from(feed.querySelectorAll('[data-updated]'));
+  }}
+
+  function updateAds() {{
+    const adCards = Array.from(feed.querySelectorAll('[data-feed-ad-after]'));
+    adCards.forEach(function (ad) {{
+      const threshold = Number(ad.dataset.feedAdAfter || '0');
+      const isVisible = visibleCount >= threshold;
+      if (isVisible) {{
+        ad.classList.remove('is-hidden');
+        ad.removeAttribute('aria-hidden');
+      }} else {{
+        ad.classList.add('is-hidden');
+        ad.setAttribute('aria-hidden', 'true');
+      }}
+    }});
+  }}
+
+  function updateSentinel() {{
+    if (!sentinel) {{
+      return;
+    }}
+    if (!cards.length || visibleCount >= cards.length) {{
+      sentinel.setAttribute('hidden', 'hidden');
+    }} else {{
+      sentinel.removeAttribute('hidden');
+    }}
+  }}
+
+  function applyVisibility() {{
+    cards.forEach(function (card, index) {{
+      const isVisible = index < visibleCount;
+      if (isVisible) {{
+        card.classList.remove('is-hidden');
+        card.removeAttribute('aria-hidden');
+      }} else {{
+        card.classList.add('is-hidden');
+        card.setAttribute('aria-hidden', 'true');
+      }}
+    }});
+    updateAds();
+    updateSentinel();
+  }}
+
+  function applySort(key, resetCount) {{
     const sorted = cards.slice().sort(function (a, b) {{
       return Number(b.dataset[key] || 0) - Number(a.dataset[key] || 0);
     }});
     sorted.forEach(function (card) {{
       feed.appendChild(card);
     }});
+    refreshCards();
+    if (resetCount) {{
+      visibleCount = Math.min(INITIAL_BATCH, cards.length);
+    }} else {{
+      visibleCount = Math.min(visibleCount, cards.length);
+    }}
+    applyVisibility();
   }}
+
+  function revealMore() {{
+    if (visibleCount < cards.length) {{
+      visibleCount = Math.min(cards.length, visibleCount + BATCH_SIZE);
+      applyVisibility();
+    }}
+  }}
+
   sortButtons.forEach(function (button) {{
     button.addEventListener('click', function () {{
       const key = button.getAttribute('data-feed-sort');
@@ -2282,10 +2396,29 @@ class SiteGenerator:
         item.classList.toggle('is-active', isActive);
         item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       }});
-      applySort(key);
+      applySort(key, true);
     }});
   }});
-  applySort('updated');
+
+  applySort('updated', true);
+
+  if (moreButton) {{
+    moreButton.addEventListener('click', function () {{
+      revealMore();
+    }});
+  }}
+
+  if ('IntersectionObserver' in window && sentinel) {{
+    const observer = new IntersectionObserver(function (entries) {{
+      entries.forEach(function (entry) {{
+        if (entry.isIntersecting) {{
+          revealMore();
+        }}
+      }});
+    }}, {{ rootMargin: '0px 0px 320px 0px' }});
+    observer.observe(sentinel);
+  }}
+
   const surpriseButtons = Array.from(document.querySelectorAll('[data-surprise]'));
   const surpriseTargets = {surprise_json};
   if (surpriseButtons.length && surpriseTargets.length) {{

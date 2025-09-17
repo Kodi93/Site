@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Protocol
+from typing import Iterable, List, Protocol, Sequence
 
 from .amazon import AmazonCredentials, AmazonProductClient
 from .utils import apply_partner_tag, load_json
@@ -67,42 +67,50 @@ class AmazonRetailerAdapter:
 
 @dataclass
 class StaticRetailerAdapter:
-    """Adapter that reads pre-curated items from a JSON file on disk."""
+    """Adapter that reads pre-curated items from JSON datasets on disk."""
 
     slug: str
     name: str
-    dataset: Path
+    dataset: Path | Sequence[Path]
     cta_label: str = "Shop now"
     homepage: str | None = None
 
     def __post_init__(self) -> None:
+        if isinstance(self.dataset, Path):
+            self._sources: List[Path] = [self.dataset]
+        else:
+            self._sources = [Path(source) for source in self.dataset]
         self._items: List[dict] | None = None
 
     def _load(self) -> List[dict]:
         if self._items is None:
-            raw = load_json(self.dataset, default={}) or {}
-            if isinstance(raw, dict):
-                if raw.get("name"):
-                    self.name = str(raw["name"])
-                if not self.homepage and raw.get("homepage"):
-                    self.homepage = raw.get("homepage")
-                if raw.get("cta_label"):
-                    self.cta_label = str(raw["cta_label"])
-                items = raw.get("items", [])
-            elif isinstance(raw, list):
-                items = raw
-            else:
-                items = []
-            normalized: List[dict] = []
-            for entry in items:
-                if not isinstance(entry, dict):
-                    continue
-                product_id = entry.get("id") or entry.get("asin")
-                if not product_id:
-                    continue
-                normalized.append(
-                    {
-                        "id": product_id,
+            merged: dict[str, dict] = {}
+            for source in self._sources:
+                raw = load_json(source, default={}) or {}
+                items: list
+                if isinstance(raw, dict) and any(raw.get(key) for key in ("id", "asin")):
+                    items = [raw]
+                elif isinstance(raw, dict):
+                    if raw.get("name"):
+                        self.name = str(raw["name"])
+                    if not self.homepage and raw.get("homepage"):
+                        self.homepage = raw.get("homepage")
+                    if raw.get("cta_label"):
+                        self.cta_label = str(raw["cta_label"])
+                    raw_items = raw.get("items", [])
+                    items = raw_items if isinstance(raw_items, list) else []
+                elif isinstance(raw, list):
+                    items = raw
+                else:
+                    items = []
+                for entry in items:
+                    if not isinstance(entry, dict):
+                        continue
+                    product_id = entry.get("id") or entry.get("asin")
+                    if not product_id:
+                        continue
+                    normalized = {
+                        "id": str(product_id),
                         "title": entry.get("title", "Curated marketplace find"),
                         "url": entry.get("url"),
                         "image": entry.get("image"),
@@ -112,8 +120,8 @@ class StaticRetailerAdapter:
                         "total_reviews": entry.get("total_reviews"),
                         "keywords": entry.get("keywords") or [],
                     }
-                )
-            self._items = normalized
+                    merged[normalized["id"]] = normalized
+            self._items = [merged[key] for key in sorted(merged)]
         return self._items
 
     def search_items(
@@ -122,6 +130,8 @@ class StaticRetailerAdapter:
         dataset = self._load()
         needle = [keyword.lower() for keyword in keywords if keyword]
         if not needle:
+            if item_count <= 0:
+                return list(dataset)
             return dataset[:item_count]
         matches: List[dict] = []
         for entry in dataset:
@@ -134,12 +144,11 @@ class StaticRetailerAdapter:
             ).lower()
             if all(fragment in haystack for fragment in needle):
                 matches.append(entry)
-            if len(matches) >= item_count:
-                break
-        if len(matches) < item_count:
-            remainder = [item for item in dataset if item not in matches]
-            matches.extend(remainder[: item_count - len(matches)])
-        return matches[:item_count]
+        if matches:
+            return matches
+        if item_count <= 0:
+            return list(dataset)
+        return dataset[:item_count]
 
     def decorate_url(self, url: str | None) -> str:
         if url:
