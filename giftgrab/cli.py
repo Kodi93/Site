@@ -18,15 +18,28 @@ from .utils import load_json
 
 LOGGER = logging.getLogger(__name__)
 
+COMMAND_CHOICES: tuple[str, ...] = ("update", "generate")
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Automate the Grab Gifts static site generation pipeline.",
     )
+
+    default_command_env = os.getenv("GIFTGRAB_DEFAULT_COMMAND")
+    default_command = default_command_env.strip().lower() if default_command_env else "generate"
+    if default_command not in COMMAND_CHOICES:
+        default_command = "generate"
+
     parser.add_argument(
         "command",
-        choices=["update", "generate"],
-        help="Use 'update' to fetch new products and rebuild, or 'generate' to rebuild from stored data.",
+        choices=COMMAND_CHOICES,
+        nargs="?",
+        default=default_command,
+        help=(
+            "Use 'update' to fetch new products and rebuild, or 'generate' to rebuild from stored data. "
+            f"Defaults to '{default_command}' when omitted."
+        ),
     )
     parser.add_argument(
         "--item-count",
