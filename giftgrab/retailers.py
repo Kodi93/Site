@@ -95,6 +95,37 @@ class StaticRetailerAdapter:
                     return []
                 return [str(value)]
 
+            placeholder_title_values = {
+                "grab gifts marketplace find",
+                "generic pointer",
+                "placeholder",
+                "placeholder title",
+                "untitled",
+            }
+
+            placeholder_title_keywords = (
+                "marketplace find",
+                "placeholder",
+                "lorem ipsum",
+                "generic pointer",
+                "coming soon",
+                "tbd",
+            )
+
+            def looks_like_placeholder(value: object) -> bool:
+                if value in (None, ""):
+                    return True
+                text = str(value).strip()
+                if not text:
+                    return True
+                normalized = text.casefold()
+                if normalized in placeholder_title_values:
+                    return True
+                for keyword in placeholder_title_keywords:
+                    if keyword in normalized:
+                        return True
+                return False
+
             def apply_metadata(payload: object) -> None:
                 if not isinstance(payload, dict):
                     return
@@ -138,7 +169,11 @@ class StaticRetailerAdapter:
                     new_text = str(new_value).strip()
                     if not new_text:
                         return
-                    current_text = str(existing.get(key) or "").strip()
+                    current_value = existing.get(key)
+                    current_text = str(current_value or "").strip()
+                    if key == "title" and looks_like_placeholder(current_value):
+                        existing[key] = new_text
+                        return
                     if not current_text or len(new_text) > len(current_text):
                         existing[key] = new_text
 
