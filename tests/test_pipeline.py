@@ -57,6 +57,7 @@ def make_item(index: int) -> dict:
         "features": ["feature"],
         "rating": 4.5,
         "total_reviews": 120,
+        "brand": f"Brand {index}",
     }
 
 
@@ -87,6 +88,8 @@ class PipelineCooldownTests(unittest.TestCase):
         first_cooldowns = self.repo.load_cooldowns()
         self.assertEqual(len(first_cooldowns), 1)
         first_added_at = first_cooldowns[0].added_at
+        stored_products = self.repo.load_products()
+        self.assertEqual(stored_products[0].brand, "Brand 1")
 
         pipeline.run(item_count=1, regenerate_only=False)
         products = self.repo.load_products()

@@ -190,6 +190,24 @@ class AmazonProductClient:
             feature_info = info.get("Features") if isinstance(info, dict) else None
             if isinstance(feature_info, dict):
                 features = list(feature_info.get("DisplayValues") or [])
+            brand = None
+            byline = info.get("ByLineInfo") if isinstance(info, dict) else None
+            if isinstance(byline, dict):
+                brand_info = byline.get("Brand")
+                if isinstance(brand_info, dict):
+                    brand = (
+                        brand_info.get("DisplayValue")
+                        or brand_info.get("Label")
+                        or brand_info.get("Value")
+                    )
+                if not brand:
+                    manufacturer = byline.get("Manufacturer")
+                    if isinstance(manufacturer, dict):
+                        brand = (
+                            manufacturer.get("DisplayValue")
+                            or manufacturer.get("Label")
+                            or manufacturer.get("Value")
+                        )
             reviews = item.get("CustomerReviews")
             rating = None
             total_reviews = None
@@ -227,6 +245,7 @@ class AmazonProductClient:
                     "features": features,
                     "rating": rating,
                     "total_reviews": total_reviews,
+                    "brand": brand,
                 }
             )
         return parsed
