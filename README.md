@@ -100,7 +100,7 @@ When a form action is configured the navigation “Newsletter” link jumps to t
 
 ### Adding additional retailers
 
-The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new products without touching earlier entries. For directories, drop a `meta.json` file alongside the item files to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
+The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new products without touching earlier entries. For directories, drop a `meta.json` file alongside the item files to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy. If you also keep a lightweight `<slug>.json` file next to the directory, set `items_dir` (or `items_path`) to the folder containing your per-item JSON blobs so the loader can pull everything together without touching the large feed again.
 
 Example feed (`data/retailers/handmade.json`):
 
@@ -135,6 +135,17 @@ data/retailers/amazon-sitestripe/
 └── items/
     ├── amzn-3I1wmJZ.json  # single product JSON blobs
     └── amzn-3I2aKND.json  # drop new files for additional URLs
+```
+
+Example index file that points at the directory above (`data/retailers/amazon-sitestripe.json`):
+
+```json
+{
+  "name": "Amazon SiteStripe Picks",
+  "homepage": "https://www.amazon.com/",
+  "cta_label": "Shop on Amazon",
+  "items_dir": "./amazon-sitestripe/items"
+}
 ```
 
 Each JSON file is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.

@@ -145,34 +145,45 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
     base_path = Path(directory_override).expanduser() if directory_override else DATA_DIR / "retailers"
     if not base_path.exists():
         return adapters
+
+    grouped: dict[str, dict[str, Path]] = {}
     for entry in sorted(base_path.iterdir()):
         if entry.is_file() and entry.suffix.lower() == ".json":
             slug = entry.stem.lower().replace("_", "-")
-            display = " ".join(part.capitalize() for part in slug.split("-")) or slug
-            adapters.append(StaticRetailerAdapter(slug=slug, name=display, dataset=entry))
-            continue
-        if not entry.is_dir():
-            continue
-        slug = entry.name.lower().replace("_", "-")
-        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+            grouped.setdefault(slug, {})["file"] = entry
+        elif entry.is_dir():
+            slug = entry.name.lower().replace("_", "-")
+            grouped.setdefault(slug, {})["dir"] = entry
+
+    for slug in sorted(grouped):
+        info = grouped[slug]
+        sources: List[Path] = []
         metadata: dict = {}
-        for meta_name in ("meta.json", "metadata.json"):
-            meta_path = entry / meta_name
-            if meta_path.exists():
-                metadata = load_json(meta_path, default={}) or {}
-                break
-        item_paths = sorted(
-            path
-            for path in entry.rglob("*.json")
-            if path.is_file() and path.name not in {"meta.json", "metadata.json"}
-        )
-        if not item_paths:
+        directory = info.get("dir")
+        if directory:
+            for meta_name in ("meta.json", "metadata.json"):
+                meta_path = directory / meta_name
+                if meta_path.exists():
+                    metadata = load_json(meta_path, default={}) or {}
+                    break
+        if directory:
+            sources.append(directory)
+        file_path = info.get("file")
+        if file_path:
+            sources.append(file_path)
+            file_meta = load_json(file_path, default={}) or {}
+            if isinstance(file_meta, dict):
+                metadata = {**metadata, **file_meta}
+
+        if not sources:
             continue
+
+        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
         adapters.append(
             StaticRetailerAdapter(
                 slug=slug,
                 name=str(metadata.get("name") or display),
-                dataset=item_paths,
+                dataset=sources if len(sources) > 1 else sources[0],
                 cta_label=str(metadata.get("cta_label") or "Shop now"),
                 homepage=metadata.get("homepage"),
             )

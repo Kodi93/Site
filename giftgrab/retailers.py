@@ -85,25 +85,71 @@ class StaticRetailerAdapter:
     def _load(self) -> List[dict]:
         if self._items is None:
             merged: dict[str, dict] = {}
-            for source in self._sources:
+            seen_paths: set[Path] = set()
+
+            def iter_entries(source: Path) -> Iterable[dict]:
+                source = Path(source)
+                if source.is_dir():
+                    for child in sorted(source.iterdir()):
+                        yield from iter_entries(child)
+                    return
+
+                resolved = source.resolve()
+                if resolved in seen_paths:
+                    return
+                seen_paths.add(resolved)
+
                 raw = load_json(source, default={}) or {}
-                items: list
-                if isinstance(raw, dict) and any(raw.get(key) for key in ("id", "asin")):
-                    items = [raw]
-                elif isinstance(raw, dict):
-                    if raw.get("name"):
-                        self.name = str(raw["name"])
-                    if not self.homepage and raw.get("homepage"):
-                        self.homepage = raw.get("homepage")
-                    if raw.get("cta_label"):
-                        self.cta_label = str(raw["cta_label"])
-                    raw_items = raw.get("items", [])
-                    items = raw_items if isinstance(raw_items, list) else []
-                elif isinstance(raw, list):
-                    items = raw
-                else:
-                    items = []
-                for entry in items:
+                if isinstance(raw, list):
+                    for entry in raw:
+                        if isinstance(entry, dict):
+                            yield entry
+                    return
+                if not isinstance(raw, dict):
+                    return
+
+                if raw.get("name"):
+                    self.name = str(raw["name"])
+                if raw.get("homepage"):
+                    self.homepage = raw.get("homepage")
+                if raw.get("cta_label"):
+                    self.cta_label = str(raw["cta_label"])
+
+                raw_items = raw.get("items")
+                if isinstance(raw_items, dict):
+                    raw_items = [raw_items]
+                if isinstance(raw_items, list):
+                    for entry in raw_items:
+                        if isinstance(entry, dict):
+                            yield entry
+                elif any(raw.get(key) for key in ("id", "asin")):
+                    yield raw
+
+                nested: list[Path] = []
+                for key in ("items_dir", "items_path"):
+                    value = raw.get(key)
+                    if not value:
+                        continue
+                    values = value if isinstance(value, list) else [value]
+                    for candidate in values:
+                        candidate_path = (source.parent / str(candidate)).resolve()
+                        if candidate_path.is_dir() or candidate_path.is_file():
+                            nested.append(candidate_path)
+                for key in ("items_file", "items_files"):
+                    value = raw.get(key)
+                    if not value:
+                        continue
+                    values = value if isinstance(value, list) else [value]
+                    for candidate in values:
+                        candidate_path = (source.parent / str(candidate)).resolve()
+                        if candidate_path.is_file():
+                            nested.append(candidate_path)
+
+                for candidate in nested:
+                    yield from iter_entries(candidate)
+
+            for source in self._sources:
+                for entry in iter_entries(source):
                     if not isinstance(entry, dict):
                         continue
                     product_id = entry.get("id") or entry.get("asin")
