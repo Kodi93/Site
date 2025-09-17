@@ -147,6 +147,13 @@ class GiftPipeline:
         rating_value = item.get("rating")
         total_reviews_value = item.get("total_reviews")
         extra_keywords = item.get("keywords") or []
+        explicit_slug = (item.get("category_slug") or "").strip()
+        if explicit_slug and explicit_slug != definition.slug:
+            for candidate in self.categories_config:
+                if candidate.slug == explicit_slug:
+                    definition = candidate
+                    break
+        explicit_category_name = (item.get("category") or "").strip()
 
         def _as_float(value):
             if value is None:
@@ -173,6 +180,10 @@ class GiftPipeline:
         for keyword in extra_keywords:
             if keyword and keyword not in keywords:
                 keywords.append(keyword)
+        if explicit_category_name:
+            normalized_name = explicit_category_name.lower()
+            if normalized_name not in (kw.lower() for kw in keywords):
+                keywords.append(explicit_category_name)
         cta_label = getattr(retailer, "cta_label", None) or f"Shop on {retailer.name}"
         product = Product(
             asin=str(product_id),

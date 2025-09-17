@@ -100,7 +100,7 @@ When a form action is configured the navigation “Newsletter” link jumps to t
 
 ### Adding additional retailers
 
-The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed should export a list of product dictionaries or an object with an `items` array. Supported keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
+The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new products without touching earlier entries. For directories, drop a `meta.json` file alongside the item files to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy. The loader now walks directories automatically, so you can skip the extra `<slug>.json` pointer file entirely; if you still keep one for compatibility with other tooling, set `items_dir` (or `items_path`) to the folder containing your per-item JSON blobs so the loader can pull everything together without touching the large feed again.
 
 Example feed (`data/retailers/handmade.json`):
 
@@ -119,11 +119,27 @@ Example feed (`data/retailers/handmade.json`):
       "rating": 4.8,
       "total_reviews": 112,
       "features": ["walnut", "handmade"],
-      "keywords": ["coffee", "pour over"]
+      "keywords": ["coffee", "pour over"],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     }
   ]
 }
 ```
+
+Directory-backed feed layout:
+
+```
+data/retailers/amazon-sitestripe/
+├── meta.json            # optional retailer display overrides
+└── items/
+    ├── amzn-3I1wmJZ.json  # single product JSON blobs
+    └── amzn-3I2aKND.json  # drop new files for additional URLs
+```
+
+Each JSON file is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.
+
+If you already know which on-site category an item belongs to, include `category_slug` (matching one of the slugs listed in `giftgrab.config.DEFAULT_CATEGORIES`) and `category` (the friendly display name). Those fields keep per-item landing pages and search results labeled correctly even when a curated feed skips the automated keyword matching step.
 
 Every retailer feed is merged alongside Amazon data, producing separate product cards with the correct outbound CTA, retailer badge, and inclusion in the site-wide search filters.
 
