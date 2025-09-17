@@ -21,24 +21,35 @@ LOGGER = logging.getLogger(__name__)
 COMMAND_CHOICES: tuple[str, ...] = ("update", "generate")
 
 
+def get_configured_default_command() -> str:
+    """Return the default command configured via environment variables."""
+
+    default_command_env = os.getenv("GIFTGRAB_DEFAULT_COMMAND")
+    default_command = (
+        default_command_env.strip().lower() if default_command_env else "generate"
+    )
+    if default_command not in COMMAND_CHOICES:
+        default_command = "generate"
+    return default_command
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Automate the Grab Gifts static site generation pipeline.",
     )
 
-    default_command_env = os.getenv("GIFTGRAB_DEFAULT_COMMAND")
-    default_command = default_command_env.strip().lower() if default_command_env else "generate"
-    if default_command not in COMMAND_CHOICES:
-        default_command = "generate"
+    default_command = get_configured_default_command()
+
+    parser.set_defaults(command=None, _default_command=default_command)
 
     parser.add_argument(
         "command",
         choices=COMMAND_CHOICES,
         nargs="?",
-        default=default_command,
         help=(
             "Use 'update' to fetch new products and rebuild, or 'generate' to rebuild from stored data. "
-            f"Defaults to '{default_command}' when omitted."
+            f"When omitted, defaults to '{default_command}' once stored data exists; "
+            "if no products have been stored yet, the update command runs automatically."
         ),
     )
     parser.add_argument(
@@ -256,7 +267,22 @@ def main(argv: Optional[list[str]] = None) -> None:
     repository = ProductRepository(data_file=args.data_file)
     generator = SiteGenerator(settings, output_dir=args.output_dir)
 
-    if args.command == "update":
+    has_products = bool(repository.load_products())
+    default_command = getattr(args, "_default_command", get_configured_default_command())
+
+    if args.command is None:
+        if not has_products:
+            LOGGER.info("No stored products found; defaulting to 'update' command.")
+            command = "update"
+        else:
+            command = default_command
+    else:
+        command = args.command
+
+    if command == "generate" and not has_products:
+        parser.error("No stored products available. Run 'update' first to fetch data.")
+
+    if command == "update":
         credentials = load_credentials()
         static_retailers = load_static_retailers()
         if credentials is None and not static_retailers:
