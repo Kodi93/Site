@@ -206,3 +206,74 @@ def test_placeholder_title_replaced_by_shorter_curated_value(monkeypatch, tmp_pa
     item = items[0]
     assert item["title"] == "Cozy Mug"
     assert item["title"] != "Grab Gifts marketplace find"
+
+
+def test_amazon_placeholder_images_are_resolved(monkeypatch, tmp_path):
+    retailers_dir = tmp_path / "retailers"
+    items_dir = retailers_dir / "amazon-sitestripe" / "items"
+    items_dir.mkdir(parents=True)
+
+    item_payload = {
+        "id": "amzn-abc123",
+        "title": "Placeholder Gadget",
+        "url": "https://amzn.to/abc123",
+        "image": "/assets/amazon-sitestripe/amzn-abc123.svg",
+    }
+    (items_dir / "amzn-abc123.json").write_text(
+        json.dumps(item_payload), encoding="utf-8"
+    )
+
+    resolved_url = "https://m.media-amazon.com/images/I/placeholder.jpg"
+
+    def fake_resolver(url: str, *, timeout: int = 15) -> str | None:  # pragma: no cover - deterministic stub
+        assert url == "https://amzn.to/abc123"
+        return resolved_url
+
+    monkeypatch.setattr(
+        "giftgrab.retailers.resolve_amazon_image_url", fake_resolver
+    )
+    monkeypatch.setenv("STATIC_RETAILER_DIR", str(retailers_dir))
+
+    adapters = load_static_retailers()
+
+    monkeypatch.delenv("STATIC_RETAILER_DIR", raising=False)
+
+    assert len(adapters) == 1
+    items = adapters[0].search_items(keywords=[], item_count=5)
+    assert len(items) == 1
+    assert items[0]["image"] == resolved_url
+
+
+def test_amazon_placeholder_entries_are_dropped_when_image_unresolved(
+    monkeypatch, tmp_path
+):
+    retailers_dir = tmp_path / "retailers"
+    items_dir = retailers_dir / "amazon-sitestripe" / "items"
+    items_dir.mkdir(parents=True)
+
+    item_payload = {
+        "id": "amzn-dropme",
+        "title": "Unresolvable Placeholder",
+        "url": "https://amzn.to/dropme",
+        "image": "/assets/amazon-sitestripe/amzn-dropme.svg",
+    }
+    (items_dir / "amzn-dropme.json").write_text(
+        json.dumps(item_payload), encoding="utf-8"
+    )
+
+    def fake_resolver(url: str, *, timeout: int = 15) -> str | None:
+        assert url == "https://amzn.to/dropme"
+        return None
+
+    monkeypatch.setattr(
+        "giftgrab.retailers.resolve_amazon_image_url", fake_resolver
+    )
+    monkeypatch.setenv("STATIC_RETAILER_DIR", str(retailers_dir))
+
+    adapters = load_static_retailers()
+
+    monkeypatch.delenv("STATIC_RETAILER_DIR", raising=False)
+
+    assert len(adapters) == 1
+    items = adapters[0].search_items(keywords=[], item_count=5)
+    assert items == []
