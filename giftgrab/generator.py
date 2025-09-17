@@ -3644,9 +3644,12 @@ retailerSelect.addEventListener('change', () => {{
         extra_classes: str = "",
     ) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
-        image = html.escape(product.image or "")
-        category_badge = ""
         category = self._category_lookup.get(product.category_slug)
+        fallback_seed = (category.slug if category else product.category_slug) or "gifts"
+        fallback_image = f"https://source.unsplash.com/600x400/?{fallback_seed}"
+        image_url = product.image or fallback_image
+        image = html.escape(image_url)
+        category_badge = ""
         if category:
             category_badge = f'<span class="card-badge">{html.escape(category.name)}</span>'
         classes = "card"
