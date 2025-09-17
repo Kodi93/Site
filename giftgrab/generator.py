@@ -498,16 +498,59 @@ nav {
 }
 
 main {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2.5rem 2rem 4rem;
   flex: 1;
   width: 100%;
   transition: color 0.35s ease;
 }
 
+.page-shell {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+}
+
+.page-main {
+  flex: 1;
+  min-width: 0;
+}
+
 main > section + section {
   margin-top: 3.5rem;
+}
+
+.ad-rail {
+  background: linear-gradient(180deg, var(--card-sheen) 0%, var(--card) 100%);
+  border: 1px solid rgba(124, 58, 237, 0.16);
+  border-radius: 24px;
+  box-shadow: var(--shadow-card);
+  padding: 1.5rem;
+  width: 100%;
+}
+
+:root[data-theme='dark'] .ad-rail {
+  border-color: rgba(34, 211, 238, 0.25);
+}
+
+.ad-rail-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.ad-rail-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--pill-bg);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
 }
 
 .hero {
@@ -747,6 +790,31 @@ main > section + section {
   flex: 1;
   position: relative;
   z-index: 1;
+}
+
+.card--ad .card-content {
+  align-items: center;
+  text-align: center;
+}
+
+.card-content--ad {
+  gap: 1.35rem;
+  justify-content: center;
+}
+
+.card-ad-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--pill-bg);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+}
+
+:root[data-theme='dark'] .card-ad-label {
+  border-color: rgba(34, 211, 238, 0.28);
 }
 
 .card-content h3 {
@@ -1262,6 +1330,24 @@ main > section + section {
   text-align: center;
 }
 
+.adsense-slot--inline {
+  margin: 0;
+  width: 100%;
+  min-height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adsense-slot--footer {
+  max-width: 728px;
+}
+
+.adsense-slot--rail {
+  margin: 0;
+  width: 100%;
+}
+
 .breadcrumbs {
   font-size: 0.9rem;
   margin-bottom: 1.6rem;
@@ -1364,6 +1450,20 @@ footer {
   }
 }
 
+@media (min-width: 1100px) {
+  .page-shell {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .ad-rail {
+    flex: 0 0 300px;
+    position: sticky;
+    top: 6.5rem;
+    max-height: calc(100vh - 7rem);
+  }
+}
+
 @media (max-width: 900px) {
   nav {
     flex-direction: column;
@@ -1426,7 +1526,7 @@ footer {
     font-size: 1.15rem;
   }
 
-  main {
+  .page-shell {
     padding: 2rem 1.25rem 3rem;
   }
 
@@ -1498,13 +1598,21 @@ class SiteGenerator:
         self.products_dir.mkdir(parents=True, exist_ok=True)
         self._nav_cache: List[Category] = []
         self._category_lookup: dict[str, Category] = {}
+        self._has_deals_page = False
+        self._deals_products: List[Product] = []
 
     def build(self, categories: List[Category], products: List[Product]) -> None:
         logger.info("Generating site with %s products", len(products))
         self._write_assets()
         self.preload_navigation(categories)
         self._category_lookup = {category.slug: category for category in categories}
+        self._has_deals_page = False
+        self._deals_products = []
         products_sorted = sorted(products, key=lambda p: p.updated_at, reverse=True)
+        self._deals_products = self._select_deals_products(products_sorted)
+        self._has_deals_page = bool(self._deals_products)
+        if self._has_deals_page:
+            self._write_deals_page(self._deals_products)
         self._write_index(categories, products_sorted[:12], products_sorted)
         self._write_latest_page(products_sorted)
         self._write_search_page(categories, products_sorted)
@@ -1569,6 +1677,8 @@ class SiteGenerator:
             for slug, name in self._navigation_links()
         )
         nav_action_links = ['<a href="/latest.html">Latest</a>']
+        if self._has_deals_page:
+            nav_action_links.append('<a href="/deals.html">Deals</a>')
         newsletter_link = None
         newsletter_attrs = ""
         if getattr(self.settings, "newsletter_url", None):
@@ -1692,14 +1802,27 @@ class SiteGenerator:
                 f'<meta property="article:published_time" content="{html.escape(context.published_time)}" />'
             )
         adsense_slot = ""
-        if self.settings.adsense_client_id and self.settings.adsense_slot:
-            adsense_slot = (
-                "<div class=\"adsense-slot\">"
-                f"<ins class=\"adsbygoogle\" style=\"display:block\" data-ad-client=\"{self.settings.adsense_client_id}\" "
-                f"data-ad-slot=\"{self.settings.adsense_slot}\" data-ad-format=\"auto\" data-full-width-responsive=\"true\"></ins>"
-                "<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>"
-                "</div>"
+        if self._adsense_inline_enabled():
+            adsense_slot = self._adsense_unit(
+                self.settings.adsense_slot or "",
+                extra_class="adsense-slot--footer",
             )
+        rail_html = ""
+        rail_slot_id = getattr(self.settings, "adsense_rail_slot", None)
+        if self.settings.adsense_client_id and rail_slot_id:
+            rail_unit = self._adsense_unit(
+                rail_slot_id,
+                extra_class="adsense-slot--rail",
+            )
+            if rail_unit:
+                rail_html = (
+                    "\n      <aside class=\"ad-rail\" role=\"complementary\" aria-label=\"Sponsored placements\">"
+                    "\n        <div class=\"ad-rail-inner\">"
+                    "\n          <span class=\"ad-rail-label\">Advertisement</span>"
+                    f"\n          {rail_unit}"
+                    "\n        </div>"
+                    "\n      </aside>"
+                )
         structured_json = ""
         if context.structured_data:
             scripts = []
@@ -1712,6 +1835,8 @@ class SiteGenerator:
         extra_head_block = f"\n    {extra_head}" if extra_head else ""
         now = datetime.utcnow()
         footer_links_parts = ['<a href="/index.html">Home</a>', '<a href="/latest.html">Latest finds</a>']
+        if self._has_deals_page:
+            footer_links_parts.append('<a href="/deals.html">Deals</a>')
         if getattr(self.settings, "newsletter_url", None):
             newsletter_url = html.escape(self.settings.newsletter_url)
             footer_links_parts.append(
@@ -1764,10 +1889,12 @@ class SiteGenerator:
         </div>
       </nav>
     </header>
-    <main id=\"main-content\">
-      {context.body}
-      {adsense_slot}
-    </main>
+    <div class=\"page-shell\">
+      <main id=\"main-content\" class=\"page-main\">
+        {context.body}
+        {adsense_slot}
+      </main>{rail_html}
+    </div>
     <footer>
       <p>&copy; {now.year} {html.escape(self.settings.site_name)}. Updated {html.escape(now.strftime('%b %d, %Y'))}.</p>
       <p>As an Amazon Associate we earn from qualifying purchases. Links may generate affiliate revenue.</p>
@@ -1868,9 +1995,7 @@ class SiteGenerator:
         category_cards = "".join(
             self._category_card(category) for category in categories
         )
-        featured_cards = "".join(
-            self._product_card(product) for product in featured_products
-        )
+        featured_cards = self._product_cards_with_ads(featured_products)
         category_section = f"""
 <section>
   <div class=\"section-heading\">
@@ -1969,7 +2094,7 @@ class SiteGenerator:
         self._write_page(self.output_dir / "index.html", context)
 
     def _write_category_page(self, category: Category, products: List[Product]) -> None:
-        cards = "".join(self._product_card(product) for product in products)
+        cards = self._product_cards_with_ads(products)
         keyword_query = quote_plus(" ".join(category.keywords))
         amazon_url = f"https://www.amazon.com/s?k={keyword_query}"
         if self.settings.amazon_partner_tag:
@@ -2303,7 +2428,7 @@ class SiteGenerator:
         self._write_page(path, context)
 
     def _write_latest_page(self, products: List[Product]) -> None:
-        cards = "".join(self._product_card(product) for product in products[:60])
+        cards = self._product_cards_with_ads(products[:60])
         body = f"""
 <section class=\"latest-intro\">
   <div class=\"section-heading\">
@@ -2345,6 +2470,62 @@ class SiteGenerator:
             updated_time=self._format_iso8601(latest_update),
         )
         self._write_page(self.output_dir / "latest.html", context)
+
+    def _write_deals_page(self, products: List[Product]) -> None:
+        if not products:
+            return
+        top_products = products[:60]
+        cards = self._product_cards_with_ads(top_products)
+        body = f"""
+<section class=\"latest-intro deals-hero\">
+  <div class=\"section-heading\">
+    <h1>Today's best gift deals</h1>
+    <p>Track the steepest price drops in our catalog and surface high-converting offers while they're hot.</p>
+  </div>
+  <div class=\"grid\">{cards}</div>
+</section>
+{self._newsletter_banner()}
+"""
+        structured_data = [
+            self._breadcrumb_structured_data(
+                [
+                    ("Home", self._absolute_url("index.html")),
+                    ("Deals", self._absolute_url("deals.html")),
+                ]
+            ),
+            self._item_list_structured_data(
+                "Top gift deals",
+                [
+                    (product.title, self._absolute_url(self._product_path(product)))
+                    for product in top_products[:30]
+                ],
+            ),
+        ]
+        organization_data = self._organization_structured_data()
+        if organization_data:
+            structured_data.append(organization_data)
+        og_image = None
+        for product in top_products:
+            if product.image:
+                og_image = product.image
+                break
+        if og_image is None:
+            if self.settings.logo_url:
+                og_image = self.settings.logo_url
+            else:
+                og_image = DEFAULT_SOCIAL_IMAGE
+        latest_update = self._latest_updated_datetime(top_products)
+        context = PageContext(
+            title=f"Gift deals — {self.settings.site_name}",
+            description="See the biggest price drops on curated Amazon gift ideas, refreshed daily.",
+            canonical_url=f"{self.settings.base_url.rstrip('/')}/deals.html",
+            body=body,
+            og_image=og_image,
+            structured_data=structured_data,
+            og_image_alt="Featured gift deals",
+            updated_time=self._format_iso8601(latest_update),
+        )
+        self._write_page(self.output_dir / "deals.html", context)
 
     def _write_search_page(self, categories: List[Category], products: List[Product]) -> None:
         category_lookup = {category.slug: category.name for category in categories}
@@ -2625,7 +2806,25 @@ retailerSelect.addEventListener('change', () => {{
         self._write_page(self.output_dir / "search.html", context)
 
     def _write_feed(self, products: List[Product]) -> None:
-        items = "".join(
+        item_blocks: List[str] = []
+        if self._has_deals_page and self._deals_products:
+            first_deal = self._deals_products[0]
+            description = "Spot today's top price drops on curated gift finds."
+            if first_deal.title:
+                description = f"Spot today's top price drops including {first_deal.title}."
+            deals_pub = getattr(first_deal, "updated_at", "") or ""
+            item_blocks.append(
+                f"""
+    <item>
+      <title>Today's gift deals</title>
+      <link>{html.escape(self._absolute_url('deals.html'))}</link>
+      <guid>{html.escape('deals')}</guid>
+      <description>{html.escape(description)}</description>
+      <pubDate>{html.escape(deals_pub)}</pubDate>
+    </item>
+"""
+            )
+        item_blocks.extend(
             f"""
     <item>
       <title>{html.escape(product.title)}</title>
@@ -2637,6 +2836,7 @@ retailerSelect.addEventListener('change', () => {{
 """
             for product in products[:30]
         )
+        items = "".join(item_blocks)
         rss = f"""
 <?xml version=\"1.0\" encoding=\"UTF-8\" ?>
 <rss version=\"2.0\">
@@ -2678,6 +2878,16 @@ retailerSelect.addEventListener('change', () => {{
                 "priority": "0.8",
             },
         ]
+        if self._has_deals_page and self._deals_products:
+            deals_update = self._latest_updated_datetime(self._deals_products) or latest_site_update
+            entries.append(
+                {
+                    "loc": self._absolute_url("deals.html"),
+                    "lastmod": self._format_iso8601(deals_update),
+                    "changefreq": "daily",
+                    "priority": "0.75",
+                }
+            )
         for category in categories:
             category_dt = category_lastmods.get(category.slug, latest_site_update)
             entries.append(
@@ -2725,6 +2935,22 @@ retailerSelect.addEventListener('change', () => {{
 </urlset>
 """
         (self.output_dir / "sitemap.xml").write_text(xml.strip(), encoding="utf-8")
+
+    def _select_deals_products(self, products: Iterable[Product], limit: int = 60) -> List[Product]:
+        deals: List[tuple[Product, float, float, datetime]] = []
+        for product in products:
+            drop_amount = product.price_drop_amount()
+            latest_point = product.latest_price_point
+            previous_point = product.previous_price_point
+            if drop_amount is None or not latest_point or not previous_point:
+                continue
+            percent_drop = product.price_drop_percent() or 0.0
+            updated = self._parse_iso_datetime(getattr(product, "updated_at", None))
+            if updated is None:
+                updated = datetime(1970, 1, 1, tzinfo=timezone.utc)
+            deals.append((product, percent_drop, drop_amount, updated))
+        deals.sort(key=lambda item: (item[1], item[2], item[3]), reverse=True)
+        return [item[0] for item in deals[:limit]]
 
     def _organization_structured_data(self) -> dict | None:
         same_as: List[str] = []
@@ -2914,6 +3140,54 @@ retailerSelect.addEventListener('change', () => {{
         if not dt:
             return point.captured_at.split("T")[0]
         return dt.strftime("%b %d, %Y")
+
+    def _adsense_inline_enabled(self) -> bool:
+        return bool(self.settings.adsense_client_id and self.settings.adsense_slot)
+
+    def _adsense_unit(self, slot: str, *, extra_class: str = "") -> str:
+        if not self.settings.adsense_client_id or not slot:
+            return ""
+        client = html.escape(self.settings.adsense_client_id, quote=True)
+        slot_attr = html.escape(slot, quote=True)
+        classes = "adsense-slot"
+        if extra_class:
+            classes = f"{classes} {extra_class}"
+        return (
+            f'<div class="{classes}">'
+            f"\n  <ins class=\"adsbygoogle\" style=\"display:block\" data-ad-client=\"{client}\" "
+            f"data-ad-slot=\"{slot_attr}\" data-ad-format=\"auto\" data-full-width-responsive=\"true\"></ins>"
+            "\n  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>"
+            "\n</div>"
+        )
+
+    def _adsense_card(self) -> str:
+        if not self._adsense_inline_enabled():
+            return ""
+        unit = self._adsense_unit(
+            self.settings.adsense_slot or "",
+            extra_class="adsense-slot--inline",
+        )
+        if not unit:
+            return ""
+        return (
+            "<article class=\"card card--ad\" aria-label=\"Advertisement\">"
+            "\n  <div class=\"card-content card-content--ad\">"
+            "\n    <span class=\"card-ad-label\">Advertisement</span>"
+            f"\n    {unit}"
+            "\n  </div>"
+            "\n</article>"
+        )
+
+    def _product_cards_with_ads(self, products: Iterable[Product]) -> str:
+        cards: List[str] = []
+        ads_enabled = self._adsense_inline_enabled()
+        for index, product in enumerate(products, start=1):
+            cards.append(self._product_card(product))
+            if ads_enabled and index % 5 == 0:
+                ad_card = self._adsense_card()
+                if ad_card:
+                    cards.append(ad_card)
+        return "".join(cards)
 
     def _product_card(self, product: Product) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
