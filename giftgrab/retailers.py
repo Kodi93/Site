@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import html
 import json
+import gzip
 import logging
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Protocol, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 from .amazon import AmazonCredentials, AmazonProductClient
 from .utils import apply_partner_tag, load_json
@@ -48,7 +50,8 @@ _PLACEHOLDER_IMAGE_PREFIXES = (
 )
 
 _AMAZON_IMAGE_USER_AGENT = (
-    "Mozilla/5.0 (compatible; GiftGrabBot/1.0; +https://giftgrab.example)"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
 _AMAZON_META_PATTERNS = [
@@ -72,6 +75,10 @@ _AMAZON_ATTRIBUTE_PATTERNS = [
     re.compile(r'"large"\s*:\s*\{\s*"url"\s*:\s*"([^"\']+)"', re.IGNORECASE),
     re.compile(r'"mainUrl"\s*:\s*"([^"\']+)"', re.IGNORECASE),
     re.compile(r'"displayImageUri"\s*:\s*"([^"\']+)"', re.IGNORECASE),
+    re.compile(r'"imageUrl"\s*:\s*"([^"\']+)"', re.IGNORECASE),
+    re.compile(r'"mainImageUrl"\s*:\s*"([^"\']+)"', re.IGNORECASE),
+    re.compile(r'"largeImageUrl"\s*:\s*"([^"\']+)"', re.IGNORECASE),
+    re.compile(r'"imageLocation"\s*:\s*"([^"\']+)"', re.IGNORECASE),
 ]
 
 _AMAZON_DYNAMIC_IMAGE_PATTERN = re.compile(
@@ -81,6 +88,21 @@ _AMAZON_DYNAMIC_IMAGE_PATTERN = re.compile(
 _AMAZON_DIRECT_IMAGE_PATTERN = re.compile(
     r'https?://[^"\']+m\.media-amazon\.com/images/[^"\']+', re.IGNORECASE
 )
+
+_AMAZON_IMAGE_TAG_PATTERNS = [
+    re.compile(
+        r'<img[^>]+id=["\']landingImage["\'][^>]+src=["\']([^"\']+)["\']',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'<img[^>]+class=["\'][^"\']*frontImage[^"\']*["\'][^>]+src=["\']([^"\']+)["\']',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'<img[^>]+data-image-latency=["\']s-product-image["\'][^>]+src=["\']([^"\']+)["\']',
+        re.IGNORECASE,
+    ),
+]
 
 
 def _normalize_sequence(value: object) -> list[str]:
@@ -165,6 +187,14 @@ def _extract_amazon_image_candidates(body: str, base_url: str) -> list[str]:
             candidate = urljoin(base_url, candidate)
             if candidate not in candidates and _looks_like_amazon_link(candidate):
                 candidates.append(candidate)
+    for pattern in _AMAZON_IMAGE_TAG_PATTERNS:
+        for match in pattern.finditer(body):
+            candidate = html.unescape(match.group(1).strip())
+            if not candidate:
+                continue
+            candidate = urljoin(base_url, candidate)
+            if candidate not in candidates and _looks_like_amazon_link(candidate):
+                candidates.append(candidate)
     for match in _AMAZON_DYNAMIC_IMAGE_PATTERN.finditer(body):
         raw = html.unescape(match.group(1))
         try:
@@ -199,29 +229,88 @@ def resolve_amazon_image_url(url: str, *, timeout: int = 15) -> str | None:
         url,
         headers={
             "User-Agent": _AMAZON_IMAGE_USER_AGENT,
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9," "image/avif,image/webp"
+            ),
             "Accept-Language": "en-US,en;q=0.9",
         },
     )
-    try:
-        with urlopen(request, timeout=timeout) as response:
+
+    def _decode_payload(payload: bytes, *, content_type: str, encoding: str) -> str:
+        if "gzip" in encoding:
+            try:
+                payload = gzip.decompress(payload)
+            except OSError:
+                logger.debug("Failed to gunzip Amazon response from %s", url)
+        elif "br" in encoding:
+            try:  # pragma: no cover - optional dependency
+                import brotli  # type: ignore
+            except ModuleNotFoundError:  # pragma: no cover - brotli not installed
+                logger.debug("Brotli support unavailable while decoding Amazon response")
+            else:  # pragma: no cover - optional dependency
+                try:
+                    payload = brotli.decompress(payload)
+                except Exception:
+                    logger.debug("Failed to brotli-decompress Amazon response from %s", url)
+        charset = ""
+        if "charset=" in content_type:
+            charset = content_type.split("charset=", 1)[1].split(";", 1)[0].strip()
+        for candidate in filter(None, [charset, "utf-8", "latin-1"]):
+            try:
+                return payload.decode(candidate, errors="ignore")
+            except LookupError:
+                continue
+        return payload.decode("utf-8", errors="ignore")
+
+    def _attempt_open(open_func) -> str | None:
+        with open_func(request, timeout=timeout) as response:
             final_url = response.geturl() or url
             content_type = (response.headers.get("Content-Type") or "").lower()
             if content_type.startswith("image/") and _looks_like_amazon_link(final_url):
-                return final_url
+                if not _looks_like_placeholder_image(final_url):
+                    return final_url
             payload = response.read(1_500_000)
-    except (HTTPError, URLError, TimeoutError) as exc:
-        logger.warning("Unable to resolve Amazon image from %s: %s", url, exc)
+            body = _decode_payload(
+                payload,
+                content_type=content_type,
+                encoding=(response.headers.get("Content-Encoding") or "").lower(),
+            )
+        for candidate in _extract_amazon_image_candidates(body, final_url):
+            if not _looks_like_placeholder_image(candidate):
+                return candidate
         return None
+
+    def _proxies_configured() -> bool:
+        for key in ("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY"):
+            if os.getenv(key):
+                return True
+        return False
+
+    last_error: Exception | None = None
+    try:
+        result = _attempt_open(urlopen)
+        if result:
+            return result
+    except (HTTPError, URLError, TimeoutError) as exc:
+        last_error = exc
     except Exception as exc:  # pragma: no cover - unexpected network errors
         logger.exception("Unexpected error while resolving Amazon image from %s", url, exc)
         return None
-    try:
-        body = payload.decode("utf-8", errors="ignore")
-    except Exception:
-        body = payload.decode("latin-1", errors="ignore")
-    for candidate in _extract_amazon_image_candidates(body, final_url):
-        if not _looks_like_placeholder_image(candidate):
-            return candidate
+
+    if _proxies_configured():
+        opener = build_opener(ProxyHandler({}))
+        try:
+            result = _attempt_open(opener.open)
+            if result:
+                return result
+        except (HTTPError, URLError, TimeoutError) as exc:
+            last_error = exc
+        except Exception as exc:  # pragma: no cover - unexpected network errors
+            logger.exception("Unexpected error while resolving Amazon image from %s", url, exc)
+            return None
+
+    if last_error:
+        logger.warning("Unable to resolve Amazon image from %s: %s", url, last_error)
     return None
 
 
@@ -377,9 +466,9 @@ class StaticRetailerAdapter:
                 if existing is None:
                     if placeholder_detected and not has_image:
                         logger.warning(
-                            "Skipping %s because Amazon imagery could not be resolved", product_id
+                            "Amazon imagery could not be resolved for %s; keeping metadata without image",
+                            product_id,
                         )
-                        return
                     if _looks_like_placeholder_image(normalized.get("image")):
                         normalized["image"] = None
                     merged[normalized["id"]] = normalized
