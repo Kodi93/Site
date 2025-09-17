@@ -1,6 +1,8 @@
 import json
+from urllib.error import URLError
 
 from giftgrab.cli import load_static_retailers
+from giftgrab.retailers import resolve_amazon_image_url
 
 
 def test_directory_feed_with_index(monkeypatch, tmp_path):
@@ -244,7 +246,7 @@ def test_amazon_placeholder_images_are_resolved(monkeypatch, tmp_path):
     assert items[0]["image"] == resolved_url
 
 
-def test_amazon_placeholder_entries_are_dropped_when_image_unresolved(
+def test_amazon_placeholder_entries_are_retained_when_image_unresolved(
     monkeypatch, tmp_path
 ):
     retailers_dir = tmp_path / "retailers"
@@ -276,4 +278,88 @@ def test_amazon_placeholder_entries_are_dropped_when_image_unresolved(
 
     assert len(adapters) == 1
     items = adapters[0].search_items(keywords=[], item_count=5)
-    assert items == []
+    assert len(items) == 1
+    item = items[0]
+    assert item["id"] == "amzn-dropme"
+    assert item["image"] is None
+
+
+def test_resolve_amazon_image_url_extracts_landing_image(monkeypatch):
+    html = """
+    <html>
+        <body>
+            <img id=\"landingImage\" src=\"https://m.media-amazon.com/images/I/example._AC_.jpg\" />
+        </body>
+    </html>
+    """
+
+    class DummyResponse:
+        def __init__(self):
+            self.headers = {"Content-Type": "text/html; charset=utf-8"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, *_):
+            return html.encode("utf-8")
+
+        def geturl(self):
+            return "https://www.amazon.com/example"
+
+    def fake_urlopen(request, timeout=15):  # pragma: no cover - deterministic stub
+        assert request.full_url == "https://amzn.to/sample"
+        return DummyResponse()
+
+    for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr("giftgrab.retailers.urlopen", fake_urlopen)
+
+    resolved = resolve_amazon_image_url("https://amzn.to/sample")
+    assert resolved == "https://m.media-amazon.com/images/I/example._AC_.jpg"
+
+
+def test_resolve_amazon_image_url_falls_back_without_proxy(monkeypatch):
+    html = "<html><img id=\"landingImage\" src=\"https://m.media-amazon.com/images/I/fallback.jpg\" /></html>"
+
+    class DummyResponse:
+        def __init__(self):
+            self.headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, *_):
+            return html.encode("utf-8")
+
+        def geturl(self):
+            return "https://www.amazon.com/fallback"
+
+    def failing_urlopen(request, timeout=15):  # pragma: no cover - deterministic stub
+        raise URLError("proxy blocked")
+
+    fallback_called = {"value": False}
+
+    class DummyOpener:
+        def open(self, request, timeout=15):
+            fallback_called["value"] = True
+            return DummyResponse()
+
+    def fake_build_opener(handler):  # pragma: no cover - deterministic stub
+        assert handler.proxies == {}
+        return DummyOpener()
+
+    for key in ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"):
+        monkeypatch.setenv(key, "http://proxy:8080")
+
+    monkeypatch.setattr("giftgrab.retailers.urlopen", failing_urlopen)
+    monkeypatch.setattr("giftgrab.retailers.build_opener", fake_build_opener)
+
+    resolved = resolve_amazon_image_url("https://amzn.to/fallback")
+    assert fallback_called["value"] is True
+    assert resolved == "https://m.media-amazon.com/images/I/fallback.jpg"
