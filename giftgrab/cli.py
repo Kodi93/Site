@@ -104,6 +104,12 @@ def load_site_settings() -> SiteSettings:
         newsletter_method = "post"
 
     email_field = optional_env("SITE_NEWSLETTER_EMAIL_FIELD") or "email"
+
+    defaults = SiteSettings()
+    adsense_client_id = optional_env("ADSENSE_CLIENT_ID")
+    adsense_slot = optional_env("ADSENSE_SLOT")
+    adsense_rail_slot = optional_env("ADSENSE_RAIL_SLOT")
+
     return SiteSettings(
         site_name=os.getenv("SITE_NAME", "Grab Gifts"),
         base_url=os.getenv("SITE_BASE_URL", "https://grabgifts.net"),
@@ -111,8 +117,13 @@ def load_site_settings() -> SiteSettings:
             "SITE_DESCRIPTION",
             "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation.",
         ),
-        adsense_client_id=os.getenv("ADSENSE_CLIENT_ID"),
-        adsense_slot=os.getenv("ADSENSE_SLOT"),
+        adsense_client_id=(
+            adsense_client_id if adsense_client_id is not None else defaults.adsense_client_id
+        ),
+        adsense_slot=adsense_slot if adsense_slot is not None else defaults.adsense_slot,
+        adsense_rail_slot=(
+            adsense_rail_slot if adsense_rail_slot is not None else defaults.adsense_rail_slot
+        ),
         amazon_partner_tag=os.getenv("AMAZON_ASSOCIATE_TAG"),
         twitter_handle=os.getenv("SITE_TWITTER"),
         facebook_page=os.getenv("SITE_FACEBOOK"),
