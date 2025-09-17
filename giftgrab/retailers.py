@@ -126,6 +126,19 @@ class StaticRetailerAdapter:
                         return True
                 return False
 
+            def looks_like_placeholder_image(value: object) -> bool:
+                if not value:
+                    return True
+                text = str(value)
+                lowered = text.lower()
+                placeholder_hosts = (
+                    "source.unsplash.com",
+                    "images.unsplash.com",
+                    "picsum.photos",
+                    "placekitten.com",
+                )
+                return any(host in lowered for host in placeholder_hosts)
+
             def apply_metadata(payload: object) -> None:
                 if not isinstance(payload, dict):
                     return
@@ -159,6 +172,8 @@ class StaticRetailerAdapter:
                 }
                 existing = merged.get(normalized["id"])
                 if existing is None:
+                    if looks_like_placeholder_image(normalized.get("image")):
+                        normalized["image"] = None
                     merged[normalized["id"]] = normalized
                     return
 
@@ -197,8 +212,15 @@ class StaticRetailerAdapter:
 
                 prefer_longer_string("title")
                 prefer_when_missing("url")
-                if normalized.get("image"):
-                    existing["image"] = normalized["image"]
+                new_image = normalized.get("image")
+                if new_image:
+                    if looks_like_placeholder_image(new_image):
+                        if not existing.get("image") or looks_like_placeholder_image(
+                            existing.get("image")
+                        ):
+                            existing["image"] = new_image
+                    else:
+                        existing["image"] = new_image
                 if normalized.get("price"):
                     existing["price"] = normalized["price"]
                 for key in ("rating", "total_reviews"):
