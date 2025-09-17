@@ -126,7 +126,55 @@ class StaticRetailerAdapter:
                     "category": entry.get("category"),
                     "brand": entry.get("brand"),
                 }
-                merged[normalized["id"]] = normalized
+                existing = merged.get(normalized["id"])
+                if existing is None:
+                    merged[normalized["id"]] = normalized
+                    return
+
+                def prefer_longer_string(key: str) -> None:
+                    new_value = normalized.get(key)
+                    if new_value is None:
+                        return
+                    new_text = str(new_value).strip()
+                    if not new_text:
+                        return
+                    current_text = str(existing.get(key) or "").strip()
+                    if not current_text or len(new_text) > len(current_text):
+                        existing[key] = new_text
+
+                def prefer_when_missing(key: str) -> None:
+                    new_value = normalized.get(key)
+                    if new_value in (None, ""):
+                        return
+                    if not existing.get(key):
+                        existing[key] = new_value
+
+                def merge_sequence(key: str) -> None:
+                    combined: list[str] = []
+                    for value in (existing.get(key) or []) + (normalized.get(key) or []):
+                        if value in (None, ""):
+                            continue
+                        text = str(value)
+                        if text not in combined:
+                            combined.append(text)
+                    if combined:
+                        existing[key] = combined
+
+                prefer_longer_string("title")
+                prefer_when_missing("url")
+                if normalized.get("image"):
+                    existing["image"] = normalized["image"]
+                if normalized.get("price"):
+                    existing["price"] = normalized["price"]
+                for key in ("rating", "total_reviews"):
+                    value = normalized.get(key)
+                    if value is not None:
+                        existing[key] = value
+                prefer_when_missing("category_slug")
+                prefer_longer_string("category")
+                prefer_longer_string("brand")
+                merge_sequence("features")
+                merge_sequence("keywords")
 
             def handle_payload(payload: object, source: Path) -> None:
                 if isinstance(payload, list):
