@@ -47,6 +47,7 @@ class Product:
     rating: Optional[float]
     total_reviews: Optional[int]
     category_slug: str
+    brand: str | None = None
     keywords: List[str] = field(default_factory=list)
     summary: str | None = None
     blog_content: str | None = None
@@ -72,6 +73,7 @@ class Product:
             "rating": self.rating,
             "total_reviews": self.total_reviews,
             "category_slug": self.category_slug,
+            "brand": self.brand,
             "keywords": self.keywords,
             "summary": self.summary,
             "blog_content": self.blog_content,
@@ -95,6 +97,7 @@ class Product:
             rating=data.get("rating"),
             total_reviews=data.get("total_reviews"),
             category_slug=data["category_slug"],
+            brand=data.get("brand"),
             keywords=list(data.get("keywords") or []),
             summary=data.get("summary"),
             blog_content=data.get("blog_content"),
@@ -156,6 +159,8 @@ class Product:
             self.summary = other.summary
         if other.blog_content:
             self.blog_content = other.blog_content
+        if other.brand:
+            self.brand = other.brand
         if other.retailer_slug:
             self.retailer_slug = other.retailer_slug
         if other.retailer_name:

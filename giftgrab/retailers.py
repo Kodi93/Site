@@ -57,6 +57,7 @@ class AmazonRetailerAdapter:
                     "features": item.get("features") or [],
                     "rating": item.get("rating"),
                     "total_reviews": item.get("total_reviews"),
+                    "brand": item.get("brand"),
                 }
             )
         return normalized
@@ -123,6 +124,7 @@ class StaticRetailerAdapter:
                     "keywords": normalize_sequence(entry.get("keywords")),
                     "category_slug": entry.get("category_slug"),
                     "category": entry.get("category"),
+                    "brand": entry.get("brand"),
                 }
                 merged[normalized["id"]] = normalized
 

@@ -154,6 +154,12 @@ class GiftPipeline:
                     definition = candidate
                     break
         explicit_category_name = (item.get("category") or "").strip()
+        raw_brand = item.get("brand")
+        brand = None
+        if raw_brand not in (None, ""):
+            brand = str(raw_brand).strip()
+            if not brand:
+                brand = None
 
         def _as_float(value):
             if value is None:
@@ -194,6 +200,7 @@ class GiftPipeline:
             rating=rating,
             total_reviews=total_reviews,
             category_slug=definition.slug,
+            brand=brand,
             keywords=keywords[:12],
             retailer_slug=getattr(retailer, "slug", "marketplace"),
             retailer_name=getattr(retailer, "name", "Marketplace"),

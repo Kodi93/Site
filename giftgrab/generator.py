@@ -1770,6 +1770,7 @@ class SiteGenerator:
                 self._write_product_page(product, category, related)
         self._write_feed(products_sorted)
         self._write_sitemap(categories, products_sorted)
+        self._write_robots()
 
     # ------------------------------------------------------------------
     # Rendering helpers
@@ -2510,21 +2511,26 @@ class SiteGenerator:
                 break
         if og_image is None:
             og_image = f"https://source.unsplash.com/1200x630/?{category.slug}"
-        structured_data = [
-            self._breadcrumb_structured_data(
-                [
-                    ("Home", self._absolute_url("index.html")),
-                    (category.name, self._absolute_url(self._category_path(category.slug))),
-                ]
-            ),
-            self._item_list_structured_data(
-                f"{category.name} gift ideas",
-                [
-                    (product.title, self._absolute_url(self._product_path(product)))
-                    for product in products
-                ],
-            ),
-        ]
+        breadcrumb_data = self._breadcrumb_structured_data(
+            [
+                ("Home", self._absolute_url("index.html")),
+                (category.name, self._absolute_url(self._category_path(category.slug))),
+            ]
+        )
+        item_list_data = self._item_list_structured_data(
+            f"{category.name} gift ideas",
+            [
+                (product.title, self._absolute_url(self._product_path(product)))
+                for product in products
+            ],
+        )
+        collection_page_data = self._collection_page_structured_data(
+            name=f"{category.name} gift ideas",
+            description=category.blurb or self.settings.description,
+            url=self._absolute_url(self._category_path(category.slug)),
+            item_list=item_list_data,
+        )
+        structured_data = [breadcrumb_data, item_list_data, collection_page_data]
         category_last_updated = self._latest_updated_datetime(products)
         context = PageContext(
             title=f"{category.name} — {self.settings.site_name}",
@@ -2820,15 +2826,20 @@ class SiteGenerator:
 </section>
 {self._newsletter_banner()}
 """
-        structured_data = [
-            self._item_list_structured_data(
-                "Latest gift ideas",
-                [
-                    (product.title, self._absolute_url(self._product_path(product)))
-                    for product in products[:30]
-                ],
-            )
-        ]
+        item_list_data = self._item_list_structured_data(
+            "Latest gift ideas",
+            [
+                (product.title, self._absolute_url(self._product_path(product)))
+                for product in products[:30]
+            ],
+        )
+        collection_page_data = self._collection_page_structured_data(
+            name="Latest gift drops",
+            description="The newest Grab Gifts drops from Amazon and partners, refreshed automatically for maximum conversion potential.",
+            url=self._absolute_url("latest.html"),
+            item_list=item_list_data,
+        )
+        structured_data = [item_list_data, collection_page_data]
         og_image = None
         for product in products:
             if product.image:
@@ -2867,21 +2878,27 @@ class SiteGenerator:
 </section>
 {self._newsletter_banner()}
 """
-        structured_data = [
-            self._breadcrumb_structured_data(
-                [
-                    ("Home", self._absolute_url("index.html")),
-                    ("Deals", self._absolute_url("deals.html")),
-                ]
-            ),
-            self._item_list_structured_data(
-                "Top gift deals",
-                [
-                    (product.title, self._absolute_url(self._product_path(product)))
-                    for product in top_products[:30]
-                ],
-            ),
-        ]
+        breadcrumb_data = self._breadcrumb_structured_data(
+            [
+                ("Home", self._absolute_url("index.html")),
+                ("Deals", self._absolute_url("deals.html")),
+            ]
+        )
+        item_list_data = self._item_list_structured_data(
+            "Top gift deals",
+            [
+                (product.title, self._absolute_url(self._product_path(product)))
+                for product in top_products[:30]
+            ],
+        )
+        deals_description = "See the biggest price drops across Grab Gifts' Amazon finds, refreshed daily."
+        collection_page_data = self._collection_page_structured_data(
+            name="Today's best gift deals",
+            description=deals_description,
+            url=self._absolute_url("deals.html"),
+            item_list=item_list_data,
+        )
+        structured_data = [breadcrumb_data, item_list_data, collection_page_data]
         organization_data = self._organization_structured_data()
         if organization_data:
             structured_data.append(organization_data)
@@ -2898,7 +2915,7 @@ class SiteGenerator:
         latest_update = self._latest_updated_datetime(top_products)
         context = PageContext(
             title=f"Gift deals — {self.settings.site_name}",
-            description="See the biggest price drops across Grab Gifts' Amazon finds, refreshed daily.",
+            description=deals_description,
             canonical_url=f"{self.settings.base_url.rstrip('/')}/deals.html",
             body=body,
             og_image=og_image,
@@ -3317,6 +3334,17 @@ retailerSelect.addEventListener('change', () => {{
 """
         (self.output_dir / "sitemap.xml").write_text(xml.strip(), encoding="utf-8")
 
+    def _write_robots(self) -> None:
+        sitemap_url = self._absolute_url("sitemap.xml")
+        content = "\n".join(
+            [
+                "User-agent: *",
+                "Allow: /",
+                f"Sitemap: {sitemap_url}",
+            ]
+        )
+        (self.output_dir / "robots.txt").write_text(f"{content}\n", encoding="utf-8")
+
     def _select_deals_products(self, products: Iterable[Product], limit: int = 60) -> List[Product]:
         deals: List[tuple[Product, float, float, datetime]] = []
         for product in products:
@@ -3417,6 +3445,26 @@ retailerSelect.addEventListener('change', () => {{
             ],
         }
 
+    def _collection_page_structured_data(
+        self, *, name: str, description: str, url: str, item_list: dict
+    ) -> dict:
+        has_part = {key: value for key, value in item_list.items() if key != "@context"}
+        website_url = (self.settings.base_url or "").strip()
+        website: dict[str, str] = {"@type": "WebSite", "name": self.settings.site_name}
+        if website_url:
+            website["url"] = website_url
+        data: dict[str, object] = {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": name,
+            "description": description,
+            "url": url,
+            "hasPart": has_part,
+        }
+        if website:
+            data["isPartOf"] = website
+        return data
+
     def _latest_updated_datetime(self, products: Iterable[Product]) -> datetime | None:
         latest: datetime | None = None
         for product in products:
@@ -3470,6 +3518,8 @@ retailerSelect.addEventListener('change', () => {{
                 "ratingValue": f"{product.rating:.1f}",
                 "reviewCount": str(product.total_reviews),
             }
+        if product.brand:
+            data["brand"] = {"@type": "Brand", "name": product.brand}
         return data
 
     @staticmethod
