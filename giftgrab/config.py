@@ -22,6 +22,7 @@ class SiteSettings:
     )
     adsense_client_id: str | None = None
     adsense_slot: str | None = None
+    adsense_rail_slot: str | None = None
     amazon_partner_tag: str | None = None
     twitter_handle: str | None = None
     facebook_page: str | None = None
