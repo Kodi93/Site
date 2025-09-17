@@ -119,7 +119,9 @@ Example feed (`data/retailers/handmade.json`):
       "rating": 4.8,
       "total_reviews": 112,
       "features": ["walnut", "handmade"],
-      "keywords": ["coffee", "pour over"]
+      "keywords": ["coffee", "pour over"],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     }
   ]
 }
@@ -136,6 +138,8 @@ data/retailers/amazon-sitestripe/
 ```
 
 Each JSON file is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.
+
+If you already know which on-site category an item belongs to, include `category_slug` (matching one of the slugs listed in `giftgrab.config.DEFAULT_CATEGORIES`) and `category` (the friendly display name). Those fields keep per-item landing pages and search results labeled correctly even when a curated feed skips the automated keyword matching step.
 
 Every retailer feed is merged alongside Amazon data, producing separate product cards with the correct outbound CTA, retailer badge, and inclusion in the site-wide search filters.
 

@@ -119,6 +119,8 @@ class StaticRetailerAdapter:
                         "rating": entry.get("rating"),
                         "total_reviews": entry.get("total_reviews"),
                         "keywords": entry.get("keywords") or [],
+                        "category_slug": entry.get("category_slug"),
+                        "category": entry.get("category"),
                     }
                     merged[normalized["id"]] = normalized
             self._items = [merged[key] for key in sorted(merged)]

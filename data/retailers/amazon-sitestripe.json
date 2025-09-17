@@ -29,7 +29,9 @@
         "heritage",
         "precision tool roll",
         "pro kit"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-3I2aKND",
@@ -57,7 +59,9 @@
         "savoy",
         "skincare vault",
         "set"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-3IbS6Tr",
@@ -86,7 +90,9 @@
         "pulse",
         "smart home sensor kit",
         "pro"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-3IbSKjP",
@@ -115,7 +121,9 @@
         "solar",
         "esports chair",
         "pack"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-3Ig0AsI",
@@ -144,7 +152,9 @@
         "vault",
         "cosplay toolkit",
         "wave"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-3IgMUxG",
@@ -173,7 +183,9 @@
         "velvet",
         "coffee bar organizer",
         "studio"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-3IoJ99k",
@@ -202,7 +214,9 @@
         "everest",
         "camp chef kit",
         "kit"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-3Ir56Vd",
@@ -231,7 +245,9 @@
         "revive",
         "cardio studio",
         "pack"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-3Ir5rHt",
@@ -260,7 +276,9 @@
         "vector",
         "ergo keyboard",
         "collection"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-3It90Np",
@@ -289,7 +307,9 @@
         "playful",
         "outdoor explorer pack",
         "adventure"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-3K3A32p",
@@ -317,7 +337,9 @@
         "summit",
         "brewmaster kit",
         "set"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-3K47stH",
@@ -345,7 +367,9 @@
         "willow",
         "cozy knit throw",
         "box"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-3K5sHeG",
@@ -374,7 +398,9 @@
         "pulse",
         "modular keyboard",
         "studio"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-3K6IhXl",
@@ -403,7 +429,9 @@
         "nebula",
         "retro console",
         "set"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-3K7ykJh",
@@ -432,7 +460,9 @@
         "radiant",
         "cosplay toolkit",
         "wave"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-3K8wkR2",
@@ -461,7 +491,9 @@
         "cloud",
         "coffee bar organizer",
         "edition"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-3KaaegW",
@@ -490,7 +522,9 @@
         "outrider",
         "all-weather jacket",
         "series"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-3Kditc9",
@@ -519,7 +553,9 @@
         "pulse",
         "massage gun",
         "set"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-3VPEmRo",
@@ -548,7 +584,9 @@
         "summit",
         "organizer system",
         "kit"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-3VQCjfR",
@@ -577,7 +615,9 @@
         "storytime",
         "family game night",
         "bundle"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-3VReHYr",
@@ -605,7 +645,9 @@
         "vanguard",
         "charcoal bbq set",
         "deluxe"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-3Vlg5m0",
@@ -633,7 +675,9 @@
         "savoy",
         "creative craft kit",
         "edition"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-3VlllWY",
@@ -662,7 +706,9 @@
         "prism",
         "audio soundstage",
         "system"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-41ZAqRz",
@@ -691,7 +737,9 @@
         "nebula",
         "streaming kit",
         "bundle"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-42AXrKO",
@@ -720,7 +768,9 @@
         "mythos",
         "poster gallery",
         "drop"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-42u2f4z",
@@ -749,7 +799,9 @@
         "elmwood",
         "chef knife block",
         "studio"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-42wLh5J",
@@ -778,7 +830,9 @@
         "horizon",
         "backpacking stove",
         "pack"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-466qubu",
@@ -807,7 +861,9 @@
         "revive",
         "wellness roller set",
         "set"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-466qzfi",
@@ -836,7 +892,9 @@
         "nimbus",
         "organizer system",
         "station"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-468qLdV",
@@ -865,7 +923,9 @@
         "bright",
         "science adventure pack",
         "adventure"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-46EYtb7",
@@ -893,7 +953,9 @@
         "copper",
         "performance training watch",
         "pro kit"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-46iJmnT",
@@ -921,7 +983,9 @@
         "savoy",
         "wellness journal",
         "collection"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-46kYJL6",
@@ -950,7 +1014,9 @@
         "quantum",
         "smart home sensor kit",
         "engine"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-46nFUHj",
@@ -979,7 +1045,9 @@
         "crimson",
         "vr fitness game",
         "bundle"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-46nGO6F",
@@ -1008,7 +1076,9 @@
         "omni",
         "fan patch set",
         "series"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-46oRrWS",
@@ -1037,7 +1107,9 @@
         "harvest",
         "coffee bar organizer",
         "studio"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-46oRtOu",
@@ -1066,7 +1138,9 @@
         "timber",
         "backpacking stove",
         "gear"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-46oS2YC",
@@ -1095,7 +1169,9 @@
         "harmony",
         "smart yoga mat",
         "edition"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-46oS2b4",
@@ -1124,7 +1200,9 @@
         "beacon",
         "desk command center",
         "kit"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-46ocjxn",
@@ -1153,7 +1231,9 @@
         "cosmic",
         "creative craft crate",
         "adventure"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-46pmO3g",
@@ -1181,7 +1261,9 @@
         "atlas",
         "grilling arsenal",
         "gear pack"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-46q86sS",
@@ -1209,7 +1291,9 @@
         "bloom",
         "wellness journal",
         "box"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-46tFHCl",
@@ -1238,7 +1322,9 @@
         "nova",
         "creator console",
         "suite"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-46tG1B3",
@@ -1267,7 +1353,9 @@
         "spectra",
         "speedrun controller",
         "upgrade"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-47ICEsl",
@@ -1296,7 +1384,9 @@
         "chronicle",
         "limited hoodie",
         "drop"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-47LTdUj",
@@ -1325,7 +1415,9 @@
         "artisan",
         "pour-over station",
         "collection"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-47N4BiD",
@@ -1354,7 +1446,9 @@
         "trailblazer",
         "hydration pack",
         "system"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-47N4Yd1",
@@ -1383,7 +1477,9 @@
         "harmony",
         "cardio studio",
         "edition"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-47NBawS",
@@ -1412,7 +1508,9 @@
         "orbit",
         "desk command center",
         "edition"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-47S7YFb",
@@ -1441,7 +1539,9 @@
         "playful",
         "stem lab kit",
         "set"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4853M55",
@@ -1469,7 +1569,9 @@
         "ironwood",
         "brewmaster kit",
         "bundle"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-4853vPB",
@@ -1497,7 +1599,9 @@
         "solstice",
         "tea discovery box",
         "bundle"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-48h0Emw",
@@ -1526,7 +1630,9 @@
         "nova",
         "smart home sensor kit",
         "deck"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-48h0qvG",
@@ -1555,7 +1661,9 @@
         "solar",
         "esports chair",
         "collection"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-48keh4k",
@@ -1584,7 +1692,9 @@
         "cosmic",
         "lore encyclopedia",
         "exhibit"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-48mP35p",
@@ -1613,7 +1723,9 @@
         "saffron",
         "decor styling kit",
         "edition"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-48mPcWv",
@@ -1642,7 +1754,9 @@
         "seeker",
         "trail cooking system",
         "system"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-48qFKkO",
@@ -1671,7 +1785,9 @@
         "core",
         "wellness retreat box",
         "system"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-4gB225K",
@@ -1700,7 +1816,9 @@
         "aero",
         "creative task lamp",
         "suite"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-4goBNPG",
@@ -1729,7 +1847,9 @@
         "playful",
         "stem lab kit",
         "kit"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4goEW1Y",
@@ -1757,7 +1877,9 @@
         "copper",
         "grooming caddy",
         "bundle"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-4gqPwpb",
@@ -1785,7 +1907,9 @@
         "bloom",
         "skincare vault",
         "set"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-4gqyFmB",
@@ -1814,7 +1938,9 @@
         "nebula",
         "smart home sensor kit",
         "suite"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-4gs2vH2",
@@ -1843,7 +1969,9 @@
         "stealth",
         "esports chair",
         "kit"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-4gs7xUf",
@@ -1872,7 +2000,9 @@
         "eternal",
         "vinyl showcase",
         "collection"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-4gsI2Cc",
@@ -1901,7 +2031,9 @@
         "golden",
         "chef knife block",
         "kit"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-4gsIoJ2",
@@ -1930,7 +2062,9 @@
         "canyon",
         "compact tent",
         "gear"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-4gvyDty",
@@ -1959,7 +2093,9 @@
         "radiant",
         "hydration coach bottle",
         "system"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-4mgADqL",
@@ -1988,7 +2124,9 @@
         "nimbus",
         "portable work hub",
         "kit"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-4miDMq8",
@@ -2017,7 +2155,9 @@
         "galaxy",
         "creative craft crate",
         "kit"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4miqUjC",
@@ -2045,7 +2185,9 @@
         "copper",
         "precision tool roll",
         "deluxe"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-4mkKqMz",
@@ -2073,7 +2215,9 @@
         "luxe",
         "aromatherapy diffuser",
         "kit"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-4ml7YB0",
@@ -2102,7 +2246,9 @@
         "flux",
         "smart home sensor kit",
         "suite"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-4mmyZnM",
@@ -2131,7 +2277,9 @@
         "mythic",
         "esports chair",
         "upgrade"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-4mmyzhc",
@@ -2160,7 +2308,9 @@
         "galaxy",
         "limited hoodie",
         "wave"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-4mnDJcJ",
@@ -2189,7 +2339,9 @@
         "pure",
         "ceramic bakeware",
         "edition"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-4mnEKl3",
@@ -2218,7 +2370,9 @@
         "horizon",
         "backpacking stove",
         "gear"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-4mo1KjM",
@@ -2247,7 +2401,9 @@
         "harmony",
         "wellness retreat box",
         "edition"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-4mo2plg",
@@ -2276,7 +2432,9 @@
         "echo",
         "video meeting studio",
         "suite"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-4mqIKRL",
@@ -2305,7 +2463,9 @@
         "wonder",
         "learning tablet",
         "set"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4mviQfS",
@@ -2333,7 +2493,9 @@
         "heritage",
         "travel backpack",
         "deluxe"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-4n1LztD",
@@ -2361,7 +2523,9 @@
         "willow",
         "beauty organizer",
         "box"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-4nDOith",
@@ -2390,7 +2554,9 @@
         "vector",
         "smart home sensor kit",
         "array"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-4nDsfms",
@@ -2419,7 +2585,9 @@
         "rogue",
         "card strategy set",
         "series"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-4nEUSjb",
@@ -2448,7 +2616,9 @@
         "legion",
         "vinyl showcase",
         "set"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-4naXQvY",
@@ -2477,7 +2647,9 @@
         "hearth",
         "serving board",
         "kit"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-4naw82r",
@@ -2506,7 +2678,9 @@
         "summit",
         "trail cooking system",
         "set"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-4nfvaC8",
@@ -2535,7 +2709,9 @@
         "align",
         "smart yoga mat",
         "bundle"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-4nvg2jr",
@@ -2564,7 +2740,9 @@
         "quantum",
         "desk command center",
         "kit"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-4nzB0O7",
@@ -2593,7 +2771,9 @@
         "rainbow",
         "puzzle challenge set",
         "series"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4nzBhAD",
@@ -2621,7 +2801,9 @@
         "copper",
         "tactical edc organizer",
         "edition"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     },
     {
       "id": "amzn-4pGntGG",
@@ -2649,7 +2831,9 @@
         "celestial",
         "spa retreat set",
         "experience"
-      ]
+      ],
+      "category_slug": "gifts-for-her",
+      "category": "For Her"
     },
     {
       "id": "amzn-4pinekK",
@@ -2678,7 +2862,9 @@
         "aero",
         "smart hub",
         "engine"
-      ]
+      ],
+      "category_slug": "tech-and-gadgets",
+      "category": "For a Techy"
     },
     {
       "id": "amzn-4pintwa",
@@ -2707,7 +2893,9 @@
         "nebula",
         "rgb desk mat",
         "edition"
-      ]
+      ],
+      "category_slug": "entertainment-and-games",
+      "category": "For Gamers"
     },
     {
       "id": "amzn-4ppfFJ0",
@@ -2736,7 +2924,9 @@
         "galaxy",
         "art print series",
         "collection"
-      ]
+      ],
+      "category_slug": "fandom-and-collectibles",
+      "category": "For Fandom"
     },
     {
       "id": "amzn-4ppxfMX",
@@ -2765,7 +2955,9 @@
         "harvest",
         "chef knife block",
         "edition"
-      ]
+      ],
+      "category_slug": "home-and-kitchen",
+      "category": "Homebody Upgrades"
     },
     {
       "id": "amzn-4pqALXD",
@@ -2794,7 +2986,9 @@
         "timber",
         "trail fitness watch",
         "series"
-      ]
+      ],
+      "category_slug": "outdoors-and-adventure",
+      "category": "For Adventurers"
     },
     {
       "id": "amzn-4pqlLcb",
@@ -2823,7 +3017,9 @@
         "momentum",
         "strength cube",
         "system"
-      ]
+      ],
+      "category_slug": "fitness-and-wellness",
+      "category": "Wellness Warriors"
     },
     {
       "id": "amzn-4psO0Hf",
@@ -2852,7 +3048,9 @@
         "vertex",
         "organizer system",
         "suite"
-      ]
+      ],
+      "category_slug": "office-and-productivity",
+      "category": "Productivity Power-Ups"
     },
     {
       "id": "amzn-4psfaxS",
@@ -2881,7 +3079,9 @@
         "playful",
         "sensory play box",
         "kit"
-      ]
+      ],
+      "category_slug": "kids-and-family",
+      "category": "Family Time"
     },
     {
       "id": "amzn-4pwMXWU",
@@ -2909,7 +3109,9 @@
         "vanguard",
         "precision tool roll",
         "series"
-      ]
+      ],
+      "category_slug": "gifts-for-him",
+      "category": "For Him"
     }
   ]
 }
