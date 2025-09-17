@@ -223,6 +223,69 @@ nav {
   box-shadow: 0 0 0 4px rgba(255, 45, 106, 0.35), 0 10px 22px rgba(255, 178, 36, 0.28);
 }
 
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.nav-toggle:hover,
+.nav-toggle:focus {
+  border-color: rgba(255, 45, 106, 0.3);
+  box-shadow: 0 18px 34px rgba(178, 46, 94, 0.18);
+}
+
+.nav-toggle-icon,
+.nav-toggle-icon::before,
+.nav-toggle-icon::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.nav-toggle-icon {
+  position: relative;
+}
+
+.nav-toggle-icon::before,
+.nav-toggle-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.nav-toggle-icon::before {
+  top: -6px;
+}
+
+.nav-toggle-icon::after {
+  top: 6px;
+}
+
+.nav-open .nav-toggle-icon {
+  background: transparent;
+}
+
+.nav-open .nav-toggle-icon::before {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.nav-open .nav-toggle-icon::after {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
 .nav-groups {
   display: flex;
   align-items: center;
@@ -1586,30 +1649,30 @@ footer {
 
 @media (max-width: 900px) {
   nav {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
   }
 
   .nav-groups {
+    display: none;
     width: 100%;
-    justify-content: space-between;
-  }
-
-  .nav-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .search-form {
-    margin-left: auto;
-  }
-}
-
-@media (max-width: 720px) {
-  .nav-groups {
     flex-direction: column;
     align-items: stretch;
-    gap: 1rem;
+    gap: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 45, 106, 0.16);
+  }
+
+  nav.nav-open .nav-groups {
+    display: flex;
+  }
+
+  .nav-links {
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .nav-actions {
@@ -1620,8 +1683,11 @@ footer {
 
   .search-form {
     width: 100%;
+    margin: 0;
   }
+}
 
+@media (max-width: 720px) {
   .search-form input {
     min-width: 0;
     flex: 1;
@@ -2023,9 +2089,13 @@ class SiteGenerator:
   <body>
     <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
     <header>
-      <nav aria-label=\"Primary\">
+      <nav aria-label=\"Primary\" data-nav>
         <a href=\"/index.html\" class=\"logo\">{html.escape(self.settings.site_name)}</a>
-        <div class=\"nav-groups\">
+        <button type=\"button\" class=\"nav-toggle\" aria-expanded=\"false\" aria-controls=\"nav-menu\" data-nav-toggle>
+          <span class=\"nav-toggle-icon\" aria-hidden=\"true\"></span>
+          <span class=\"sr-only\">Toggle navigation</span>
+        </button>
+        <div class=\"nav-groups\" id=\"nav-menu\">
           <div class=\"nav-links\">{nav_links}</div>
           <div class=\"nav-actions\">{nav_actions_html}</div>
         </div>
@@ -2106,6 +2176,44 @@ class SiteGenerator:
             applyTheme(event.newValue === 'dark' ? 'dark' : 'light');
           }}
         }});
+
+        var nav = document.querySelector('[data-nav]');
+        var navToggle = document.querySelector('[data-nav-toggle]');
+        var navMenu = document.getElementById('nav-menu');
+
+        if (nav && navToggle && navMenu) {{
+          function setNavState(open) {{
+            nav.classList.toggle('nav-open', open);
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }}
+
+          navToggle.addEventListener('click', function () {{
+            var next = !nav.classList.contains('nav-open');
+            setNavState(next);
+          }});
+
+          window.addEventListener('resize', function () {{
+            if (window.innerWidth > 900) {{
+              setNavState(false);
+            }}
+          }});
+
+          document.addEventListener('keydown', function (event) {{
+            if (event.key === 'Escape') {{
+              setNavState(false);
+            }}
+          }});
+
+          navMenu.addEventListener('click', function (event) {{
+            var target = event.target;
+            if (target instanceof Element) {{
+              var link = target.closest('a');
+              if (link) {{
+                setNavState(false);
+              }}
+            }}
+          }});
+        }}
       }})();
     </script>
   </body>
