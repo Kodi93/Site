@@ -85,6 +85,73 @@ class StaticRetailerAdapter:
     def _load(self) -> List[dict]:
         if self._items is None:
             merged: dict[str, dict] = {}
+< codex/find-workaround-for-amazon-associates-api-access-95zosq
+            seen_paths: set[Path] = set()
+
+            def iter_entries(source: Path) -> Iterable[dict]:
+                source = Path(source)
+                if source.is_dir():
+                    for child in sorted(source.iterdir()):
+                        yield from iter_entries(child)
+                    return
+
+                resolved = source.resolve()
+                if resolved in seen_paths:
+                    return
+                seen_paths.add(resolved)
+
+                raw = load_json(source, default={}) or {}
+                if isinstance(raw, list):
+                    for entry in raw:
+                        if isinstance(entry, dict):
+                            yield entry
+                    return
+                if not isinstance(raw, dict):
+                    return
+
+                if raw.get("name"):
+                    self.name = str(raw["name"])
+                if raw.get("homepage"):
+                    self.homepage = raw.get("homepage")
+                if raw.get("cta_label"):
+                    self.cta_label = str(raw["cta_label"])
+
+                raw_items = raw.get("items")
+                if isinstance(raw_items, dict):
+                    raw_items = [raw_items]
+                if isinstance(raw_items, list):
+                    for entry in raw_items:
+                        if isinstance(entry, dict):
+                            yield entry
+                elif any(raw.get(key) for key in ("id", "asin")):
+                    yield raw
+
+                nested: list[Path] = []
+                for key in ("items_dir", "items_path"):
+                    value = raw.get(key)
+                    if not value:
+                        continue
+                    values = value if isinstance(value, list) else [value]
+                    for candidate in values:
+                        candidate_path = (source.parent / str(candidate)).resolve()
+                        if candidate_path.is_dir() or candidate_path.is_file():
+                            nested.append(candidate_path)
+                for key in ("items_file", "items_files"):
+                    value = raw.get(key)
+                    if not value:
+                        continue
+                    values = value if isinstance(value, list) else [value]
+                    for candidate in values:
+                        candidate_path = (source.parent / str(candidate)).resolve()
+                        if candidate_path.is_file():
+                            nested.append(candidate_path)
+
+                for candidate in nested:
+                    yield from iter_entries(candidate)
+
+            for source in self._sources:
+                for entry in iter_entries(source):
+
             for source in self._sources:
                 raw = load_json(source, default={}) or {}
                 items: list
@@ -104,6 +171,7 @@ class StaticRetailerAdapter:
                 else:
                     items = []
                 for entry in items:
+ main
                     if not isinstance(entry, dict):
                         continue
                     product_id = entry.get("id") or entry.get("asin")
@@ -119,6 +187,8 @@ class StaticRetailerAdapter:
                         "rating": entry.get("rating"),
                         "total_reviews": entry.get("total_reviews"),
                         "keywords": entry.get("keywords") or [],
+                        "category_slug": entry.get("category_slug"),
+                        "category": entry.get("category"),
                     }
                     merged[normalized["id"]] = normalized
             self._items = [merged[key] for key in sorted(merged)]
@@ -130,6 +200,8 @@ class StaticRetailerAdapter:
         dataset = self._load()
         needle = [keyword.lower() for keyword in keywords if keyword]
         if not needle:
+            if item_count <= 0:
+                return list(dataset)
             return dataset[:item_count]
         matches: List[dict] = []
         for entry in dataset:
@@ -142,12 +214,11 @@ class StaticRetailerAdapter:
             ).lower()
             if all(fragment in haystack for fragment in needle):
                 matches.append(entry)
-            if len(matches) >= item_count:
-                break
-        if len(matches) < item_count:
-            remainder = [item for item in dataset if item not in matches]
-            matches.extend(remainder[: item_count - len(matches)])
-        return matches[:item_count]
+        if matches:
+            return matches
+        if item_count <= 0:
+            return list(dataset)
+        return dataset[:item_count]
 
     def decorate_url(self, url: str | None) -> str:
         if url:

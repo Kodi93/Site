@@ -145,6 +145,42 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
     base_path = Path(directory_override).expanduser() if directory_override else DATA_DIR / "retailers"
     if not base_path.exists():
         return adapters
+codex/find-workaround-for-amazon-associates-api-access-95zosq
+
+    grouped: dict[str, dict[str, Path]] = {}
+    for entry in sorted(base_path.iterdir()):
+        if entry.is_file() and entry.suffix.lower() == ".json":
+            slug = entry.stem.lower().replace("_", "-")
+            grouped.setdefault(slug, {})["file"] = entry
+        elif entry.is_dir():
+            slug = entry.name.lower().replace("_", "-")
+            grouped.setdefault(slug, {})["dir"] = entry
+
+    for slug in sorted(grouped):
+        info = grouped[slug]
+        sources: List[Path] = []
+        metadata: dict = {}
+        directory = info.get("dir")
+        if directory:
+            for meta_name in ("meta.json", "metadata.json"):
+                meta_path = directory / meta_name
+                if meta_path.exists():
+                    metadata = load_json(meta_path, default={}) or {}
+                    break
+        if directory:
+            sources.append(directory)
+        file_path = info.get("file")
+        if file_path:
+            sources.append(file_path)
+            file_meta = load_json(file_path, default={}) or {}
+            if isinstance(file_meta, dict):
+                metadata = {**metadata, **file_meta}
+
+        if not sources:
+            continue
+
+        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+
     for entry in sorted(base_path.iterdir()):
         if entry.is_file() and entry.suffix.lower() == ".json":
             slug = entry.stem.lower().replace("_", "-")
@@ -168,11 +204,15 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
         )
         if not item_paths:
             continue
+
         adapters.append(
             StaticRetailerAdapter(
                 slug=slug,
                 name=str(metadata.get("name") or display),
+codex/find-workaround-for-amazon-associates-api-access-95zosq
+                dataset=sources if len(sources) > 1 else sources[0],
                 dataset=item_paths,
+
                 cta_label=str(metadata.get("cta_label") or "Shop now"),
                 homepage=metadata.get("homepage"),
             )
