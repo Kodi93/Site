@@ -5,13 +5,14 @@ import html
 import json
 import logging
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List
 from urllib.parse import quote_plus
 
-from .config import OUTPUT_DIR, SiteSettings, ensure_directories
+from .config import DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
 from .models import Category, PricePoint, Product
 from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string
 
@@ -2223,6 +2224,40 @@ class SiteGenerator:
     def _write_assets(self) -> None:
         stylesheet_path = self.assets_dir / "styles.css"
         stylesheet_path.write_text(ASSETS_STYLES, encoding="utf-8")
+        self._copy_retailer_assets()
+
+    def _copy_retailer_assets(self) -> None:
+        retailers_dir = DATA_DIR / "retailers"
+        if not retailers_dir.exists():
+            return
+
+        for retailer_dir in sorted(retailers_dir.iterdir()):
+            if not retailer_dir.is_dir():
+                continue
+            source = retailer_dir / "images"
+            if not source.exists() or not source.is_dir():
+                continue
+
+            destination = self.assets_dir / retailer_dir.name
+            destination.mkdir(parents=True, exist_ok=True)
+
+            copied: set[str] = set()
+            for path in sorted(source.glob("**/*")):
+                if path.is_dir():
+                    continue
+                relative_parent = path.parent.relative_to(source)
+                target_dir = destination / relative_parent
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / path.name
+                shutil.copy2(path, target_path)
+                copied.add(str(target_path.relative_to(destination)))
+
+            for path in destination.glob("**/*"):
+                if path.is_dir():
+                    continue
+                relative = str(path.relative_to(destination))
+                if relative not in copied:
+                    path.unlink()
 
     def _write_index(
         self,
