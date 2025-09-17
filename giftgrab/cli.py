@@ -145,74 +145,69 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
     base_path = Path(directory_override).expanduser() if directory_override else DATA_DIR / "retailers"
     if not base_path.exists():
         return adapters
-codex/find-workaround-for-amazon-associates-api-access-95zosq
-
-    grouped: dict[str, dict[str, Path]] = {}
+    grouped: dict[str, dict[str, list[Path]]] = {}
     for entry in sorted(base_path.iterdir()):
-        if entry.is_file() and entry.suffix.lower() == ".json":
-            slug = entry.stem.lower().replace("_", "-")
-            grouped.setdefault(slug, {})["file"] = entry
+        if entry.is_file():
+            if entry.suffix.lower() != ".json":
+                continue
+            slug = entry.stem
+            slug = slug.lower().replace("_", "-")
+            grouped.setdefault(slug, {}).setdefault("files", []).append(entry)
         elif entry.is_dir():
             slug = entry.name.lower().replace("_", "-")
-            grouped.setdefault(slug, {})["dir"] = entry
+            grouped.setdefault(slug, {}).setdefault("dirs", []).append(entry)
+
+    def extract_display_fields(payload: object) -> dict[str, str]:
+        if not isinstance(payload, dict):
+            return {}
+        fields: dict[str, str] = {}
+        for key in ("name", "cta_label", "homepage"):
+            value = payload.get(key)
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                fields[key] = text
+        return fields
 
     for slug in sorted(grouped):
         info = grouped[slug]
-        sources: List[Path] = []
-        metadata: dict = {}
-        directory = info.get("dir")
-        if directory:
+        sources: list[Path] = []
+        metadata: dict[str, str] = {}
+
+        for directory in info.get("dirs", []):
+            if not directory.exists():
+                continue
             for meta_name in ("meta.json", "metadata.json"):
                 meta_path = directory / meta_name
                 if meta_path.exists():
-                    metadata = load_json(meta_path, default={}) or {}
+                    metadata.update(extract_display_fields(load_json(meta_path, default={}) or {}))
                     break
-        if directory:
             sources.append(directory)
-        file_path = info.get("file")
-        if file_path:
+
+        for file_path in info.get("files", []):
+            if not file_path.exists():
+                continue
+            metadata.update(extract_display_fields(load_json(file_path, default={}) or {}))
             sources.append(file_path)
-            file_meta = load_json(file_path, default={}) or {}
-            if isinstance(file_meta, dict):
-                metadata = {**metadata, **file_meta}
 
         if not sources:
             continue
 
+        unique_sources = list(dict.fromkeys(Path(path) for path in sources))
         display = " ".join(part.capitalize() for part in slug.split("-")) or slug
 
-    for entry in sorted(base_path.iterdir()):
-        if entry.is_file() and entry.suffix.lower() == ".json":
-            slug = entry.stem.lower().replace("_", "-")
-            display = " ".join(part.capitalize() for part in slug.split("-")) or slug
-            adapters.append(StaticRetailerAdapter(slug=slug, name=display, dataset=entry))
-            continue
-        if not entry.is_dir():
-            continue
-        slug = entry.name.lower().replace("_", "-")
-        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
-        metadata: dict = {}
-        for meta_name in ("meta.json", "metadata.json"):
-            meta_path = entry / meta_name
-            if meta_path.exists():
-                metadata = load_json(meta_path, default={}) or {}
-                break
-        item_paths = sorted(
-            path
-            for path in entry.rglob("*.json")
-            if path.is_file() and path.name not in {"meta.json", "metadata.json"}
-        )
-        if not item_paths:
-            continue
+        dataset: Path | Sequence[Path]
+        if len(unique_sources) == 1:
+            dataset = unique_sources[0]
+        else:
+            dataset = tuple(unique_sources)
 
         adapters.append(
             StaticRetailerAdapter(
                 slug=slug,
                 name=str(metadata.get("name") or display),
-codex/find-workaround-for-amazon-associates-api-access-95zosq
-                dataset=sources if len(sources) > 1 else sources[0],
-                dataset=item_paths,
-
+                dataset=dataset,
                 cta_label=str(metadata.get("cta_label") or "Shop now"),
                 homepage=metadata.get("homepage"),
             )
