@@ -2263,13 +2263,28 @@ class SiteGenerator:
             )
             if ads_enabled and index % 5 == 0:
                 ad_card = self._adsense_card()
-                if ad_card:
+                if ad_card: codex/find-workaround-for-amazon-associates-api-access-95zosq
                     if "card card--ad" in ad_card:
+
+                    if '<article class="card card--ad"' in ad_card:
                         ad_card = ad_card.replace(
                             '<article class="card card--ad"',
                             f'<article class="card card--ad feed-card" data-feed-ad-after="{index}"',
                             1,
                         )
+ codex/find-workaround-for-amazon-associates-api-access-95zosq
+
+                    elif "card card--ad" in ad_card:
+                        ad_card = ad_card.replace(
+                            "card card--ad", "card card--ad feed-card", 1
+                        )
+                        if "<article" in ad_card:
+                            ad_card = ad_card.replace(
+                                "<article",
+                                f'<article data-feed-ad-after="{index}"',
+                                1,
+                            )
+ain
                     feed_cards.append(ad_card)
         feed_grid = "".join(feed_cards)
         if not feed_cards:
@@ -2312,6 +2327,7 @@ class SiteGenerator:
     return;
   }}
   const sortButtons = Array.from(document.querySelectorAll('[data-feed-sort]'));
+ codex/find-workaround-for-amazon-associates-api-access-95zosq
   let cards = Array.from(feed.querySelectorAll('[data-updated]'));
   const sentinel = document.querySelector('[data-feed-sentinel]');
   const moreButton = sentinel ? sentinel.querySelector('[data-feed-more]') : null;
@@ -2377,12 +2393,43 @@ class SiteGenerator:
   }}
 
   function applySort(key, resetCount) {{
+
+  const cards = Array.from(feed.children).filter(function (element) {{
+    return element.dataset && element.dataset.updated;
+  }});
+  const adCards = Array.from(feed.children).filter(function (element) {{
+    return element.dataset && element.dataset.feedAdAfter;
+  }});
+  const adSlots = {{}};
+  adCards.forEach(function (ad) {{
+    const afterValue = parseInt(ad.dataset.feedAdAfter || '', 10);
+    if (Number.isNaN(afterValue)) {{
+      return;
+    }}
+    if (!adSlots[afterValue]) {{
+      adSlots[afterValue] = [];
+    }}
+    adSlots[afterValue].push(ad);
+  }});
+  function applySort(key) {{
+in
     const sorted = cards.slice().sort(function (a, b) {{
       return Number(b.dataset[key] || 0) - Number(a.dataset[key] || 0);
     }});
-    sorted.forEach(function (card) {{
-      feed.appendChild(card);
+    const fragment = document.createDocumentFragment();
+    const insertedAds = new Set();
+    sorted.forEach(function (card, index) {{
+      fragment.appendChild(card);
+      const position = index + 1;
+      const adsForPosition = adSlots[position];
+      if (adsForPosition) {{
+        adsForPosition.forEach(function (ad) {{
+          insertedAds.add(ad);
+          fragment.appendChild(ad);
+        }});
+      }}
     }});
+codex/find-workaround-for-amazon-associates-api-access-95zosq
     refreshCards();
     if (resetCount) {{
       visibleCount = Math.min(INITIAL_BATCH, cards.length);
@@ -2398,6 +2445,18 @@ class SiteGenerator:
       applyVisibility();
     }}
     updateButtonState();
+
+    adCards.forEach(function (ad) {{
+      if (!insertedAds.has(ad)) {{
+        fragment.appendChild(ad);
+      }}
+    }});
+    feed.textContent = '';
+    feed.appendChild(fragment);
+    if (typeof window !== 'undefined' && typeof window.updateAds === 'function') {{
+      window.updateAds();
+    }}
+ain
   }}
 
   sortButtons.forEach(function (button) {{

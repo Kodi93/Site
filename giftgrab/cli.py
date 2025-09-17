@@ -145,6 +145,7 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
     base_path = Path(directory_override).expanduser() if directory_override else DATA_DIR / "retailers"
     if not base_path.exists():
         return adapters
+codex/find-workaround-for-amazon-associates-api-access-95zosq
 
     grouped: dict[str, dict[str, Path]] = {}
     for entry in sorted(base_path.iterdir()):
@@ -179,11 +180,39 @@ def load_static_retailers() -> List[StaticRetailerAdapter]:
             continue
 
         display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+
+    for entry in sorted(base_path.iterdir()):
+        if entry.is_file() and entry.suffix.lower() == ".json":
+            slug = entry.stem.lower().replace("_", "-")
+            display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+            adapters.append(StaticRetailerAdapter(slug=slug, name=display, dataset=entry))
+            continue
+        if not entry.is_dir():
+            continue
+        slug = entry.name.lower().replace("_", "-")
+        display = " ".join(part.capitalize() for part in slug.split("-")) or slug
+        metadata: dict = {}
+        for meta_name in ("meta.json", "metadata.json"):
+            meta_path = entry / meta_name
+            if meta_path.exists():
+                metadata = load_json(meta_path, default={}) or {}
+                break
+        item_paths = sorted(
+            path
+            for path in entry.rglob("*.json")
+            if path.is_file() and path.name not in {"meta.json", "metadata.json"}
+        )
+        if not item_paths:
+            continue
+
         adapters.append(
             StaticRetailerAdapter(
                 slug=slug,
                 name=str(metadata.get("name") or display),
+codex/find-workaround-for-amazon-associates-api-access-95zosq
                 dataset=sources if len(sources) > 1 else sources[0],
+                dataset=item_paths,
+
                 cta_label=str(metadata.get("cta_label") or "Shop now"),
                 homepage=metadata.get("homepage"),
             )

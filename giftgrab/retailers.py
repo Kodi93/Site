@@ -85,6 +85,7 @@ class StaticRetailerAdapter:
     def _load(self) -> List[dict]:
         if self._items is None:
             merged: dict[str, dict] = {}
+< codex/find-workaround-for-amazon-associates-api-access-95zosq
             seen_paths: set[Path] = set()
 
             def iter_entries(source: Path) -> Iterable[dict]:
@@ -150,6 +151,27 @@ class StaticRetailerAdapter:
 
             for source in self._sources:
                 for entry in iter_entries(source):
+
+            for source in self._sources:
+                raw = load_json(source, default={}) or {}
+                items: list
+                if isinstance(raw, dict) and any(raw.get(key) for key in ("id", "asin")):
+                    items = [raw]
+                elif isinstance(raw, dict):
+                    if raw.get("name"):
+                        self.name = str(raw["name"])
+                    if not self.homepage and raw.get("homepage"):
+                        self.homepage = raw.get("homepage")
+                    if raw.get("cta_label"):
+                        self.cta_label = str(raw["cta_label"])
+                    raw_items = raw.get("items", [])
+                    items = raw_items if isinstance(raw_items, list) else []
+                elif isinstance(raw, list):
+                    items = raw
+                else:
+                    items = []
+                for entry in items:
+ main
                     if not isinstance(entry, dict):
                         continue
                     product_id = entry.get("id") or entry.get("asin")
