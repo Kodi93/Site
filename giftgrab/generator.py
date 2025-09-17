@@ -2951,7 +2951,7 @@ class SiteGenerator:
                     "retailerSlug": product.retailer_slug,
                 }
             )
-        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\/")
+        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\\/")
         body = f"""
 <section class="search-page">
   <h1>Search Grab Gifts</h1>
