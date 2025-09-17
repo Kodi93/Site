@@ -120,6 +120,7 @@ class AmazonProductClient:
             "Resources": [
                 "Images.Primary.Large",
                 "Images.Primary.Medium",
+                "Images.Primary.Small",
                 "ItemInfo.Title",
                 "ItemInfo.Features",
                 "ItemInfo.ByLineInfo",
@@ -174,10 +175,13 @@ class AmazonProductClient:
             if isinstance(primary, dict):
                 large = primary.get("Large")
                 medium = primary.get("Medium")
-                if isinstance(large, dict):
-                    image_url = large.get("URL")
-                elif isinstance(medium, dict):
-                    image_url = medium.get("URL")
+                small = primary.get("Small")
+                for size_info in (large, medium, small):
+                    if isinstance(size_info, dict):
+                        url = size_info.get("URL")
+                        if url:
+                            image_url = url
+                            break
             offers = item.get("Offers", {})
             price = None
             listings = offers.get("Listings") if isinstance(offers, dict) else None
