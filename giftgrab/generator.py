@@ -22,71 +22,71 @@ CURRENCY_SYMBOL_BY_CODE = {code: symbol for symbol, code in PRICE_CURRENCY_SYMBO
 ASSETS_STYLES = """
 :root {
   color-scheme: light dark;
-  --brand: #7c3aed;
-  --brand-dark: #5b21b6;
-  --accent: #22d3ee;
-  --highlight: #f97316;
-  --bg: #fdfbff;
-  --bg-muted: #f5f3ff;
-  --text: #221c35;
-  --muted: #6c6880;
-  --muted-strong: #3f3a58;
+  --brand: #ff2d6a;
+  --brand-dark: #c4134a;
+  --accent: #ffb224;
+  --highlight: #0ea5e9;
+  --bg: #fff7fb;
+  --bg-muted: #ffecf3;
+  --text: #2a1223;
+  --muted: #806274;
+  --muted-strong: #452138;
   --card: #ffffff;
-  --card-elevated: #f7f2ff;
+  --card-elevated: #ffe3ef;
   --card-sheen: rgba(255, 255, 255, 0.92);
-  --border: rgba(78, 70, 128, 0.12);
-  --border-strong: rgba(78, 70, 128, 0.2);
-  --overlay: rgba(124, 58, 237, 0.06);
-  --pill-bg: rgba(124, 58, 237, 0.14);
-  --pill-bg-hover: rgba(124, 58, 237, 0.24);
-  --badge-bg: rgba(34, 211, 238, 0.18);
-  --badge-color: #0f766e;
-  --price-bg: rgba(124, 58, 237, 0.16);
-  --rating-bg: rgba(249, 115, 22, 0.18);
-  --newsletter-bg: rgba(124, 58, 237, 0.08);
-  --newsletter-border: rgba(124, 58, 237, 0.35);
+  --border: rgba(255, 45, 106, 0.12);
+  --border-strong: rgba(255, 45, 106, 0.22);
+  --overlay: rgba(255, 45, 106, 0.08);
+  --pill-bg: rgba(255, 45, 106, 0.16);
+  --pill-bg-hover: rgba(255, 45, 106, 0.28);
+  --badge-bg: rgba(255, 178, 36, 0.18);
+  --badge-color: #a25900;
+  --price-bg: rgba(255, 45, 106, 0.2);
+  --rating-bg: rgba(14, 165, 233, 0.18);
+  --newsletter-bg: rgba(255, 45, 106, 0.08);
+  --newsletter-border: rgba(255, 45, 106, 0.35);
   --input-bg: #ffffff;
-  --input-border: rgba(99, 102, 241, 0.2);
-  --shadow-soft: 0 16px 32px rgba(58, 34, 94, 0.08);
-  --shadow-card: 0 28px 60px rgba(58, 34, 94, 0.12);
-  --shadow-card-hover: 0 36px 72px rgba(58, 34, 94, 0.18);
-  --header-bg: rgba(255, 255, 255, 0.82);
-  --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(124, 58, 237, 0.12) 0%, rgba(34, 211, 238, 0.08) 45%, transparent 100%);
-  --theme-track: rgba(124, 58, 237, 0.2);
+  --input-border: rgba(255, 45, 106, 0.2);
+  --shadow-soft: 0 16px 32px rgba(178, 46, 94, 0.12);
+  --shadow-card: 0 28px 60px rgba(178, 46, 94, 0.18);
+  --shadow-card-hover: 0 36px 72px rgba(178, 46, 94, 0.24);
+  --header-bg: rgba(255, 255, 255, 0.88);
+  --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(255, 45, 106, 0.12) 0%, rgba(255, 178, 36, 0.08) 45%, transparent 100%);
+  --theme-track: rgba(255, 45, 106, 0.24);
   --theme-thumb: #ffffff;
   font-family: 'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark light;
-  --bg: #0f1329;
-  --bg-muted: #131836;
-  --text: #f5f4ff;
-  --muted: #a5a4c4;
-  --muted-strong: #d5d3f5;
-  --card: #141b36;
-  --card-elevated: #1b2347;
-  --card-sheen: rgba(31, 36, 68, 0.85);
-  --border: rgba(165, 164, 196, 0.18);
-  --border-strong: rgba(165, 164, 196, 0.32);
-  --overlay: rgba(124, 58, 237, 0.22);
-  --pill-bg: rgba(124, 58, 237, 0.28);
-  --pill-bg-hover: rgba(124, 58, 237, 0.4);
-  --badge-bg: rgba(34, 211, 238, 0.32);
-  --badge-color: #67e8f9;
-  --price-bg: rgba(124, 58, 237, 0.35);
-  --rating-bg: rgba(249, 115, 22, 0.36);
-  --newsletter-bg: rgba(124, 58, 237, 0.28);
-  --newsletter-border: rgba(34, 211, 238, 0.4);
-  --input-bg: rgba(20, 24, 52, 0.7);
-  --input-border: rgba(165, 164, 196, 0.35);
-  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.42);
-  --shadow-card: 0 32px 70px rgba(0, 0, 0, 0.48);
-  --shadow-card-hover: 0 40px 80px rgba(0, 0, 0, 0.6);
-  --header-bg: rgba(14, 17, 36, 0.82);
-  --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(124, 58, 237, 0.24) 0%, rgba(34, 211, 238, 0.16) 45%, rgba(7, 11, 30, 0.92) 100%);
-  --theme-track: rgba(124, 58, 237, 0.35);
-  --theme-thumb: #121738;
+  --bg: #19031f;
+  --bg-muted: #23062a;
+  --text: #ffeef7;
+  --muted: #d39ab5;
+  --muted-strong: #ffd9e7;
+  --card: #200625;
+  --card-elevated: #2b0b31;
+  --card-sheen: rgba(48, 9, 56, 0.82);
+  --border: rgba(255, 143, 181, 0.24);
+  --border-strong: rgba(255, 143, 181, 0.36);
+  --overlay: rgba(255, 45, 106, 0.24);
+  --pill-bg: rgba(255, 45, 106, 0.32);
+  --pill-bg-hover: rgba(255, 45, 106, 0.46);
+  --badge-bg: rgba(255, 178, 36, 0.34);
+  --badge-color: #ffd59a;
+  --price-bg: rgba(255, 45, 106, 0.38);
+  --rating-bg: rgba(14, 165, 233, 0.32);
+  --newsletter-bg: rgba(255, 45, 106, 0.3);
+  --newsletter-border: rgba(255, 178, 36, 0.44);
+  --input-bg: rgba(30, 8, 36, 0.74);
+  --input-border: rgba(255, 178, 36, 0.38);
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.52);
+  --shadow-card: 0 32px 70px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0 40px 80px rgba(0, 0, 0, 0.68);
+  --header-bg: rgba(20, 4, 28, 0.86);
+  --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(255, 45, 106, 0.26) 0%, rgba(255, 178, 36, 0.2) 45%, rgba(12, 0, 20, 0.92) 100%);
+  --theme-track: rgba(255, 45, 106, 0.38);
+  --theme-thumb: #2a0733;
 }
 
 html {
@@ -106,8 +106,8 @@ body {
   flex-direction: column;
   background: var(--bg);
   background-image:
-    radial-gradient(120% 120% at 0% 0%, rgba(124, 58, 237, 0.12) 0%, transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(34, 211, 238, 0.12) 0%, transparent 60%),
+    radial-gradient(120% 120% at 0% 0%, rgba(255, 45, 106, 0.12) 0%, transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(255, 178, 36, 0.12) 0%, transparent 60%),
     var(--hero-glow);
   background-attachment: fixed;
   color: var(--text);
@@ -178,14 +178,14 @@ header {
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid rgba(124, 58, 237, 0.16);
-  box-shadow: 0 18px 40px rgba(58, 34, 94, 0.14);
+  border-bottom: 1px solid rgba(255, 45, 106, 0.16);
+  box-shadow: 0 18px 40px rgba(178, 46, 94, 0.14);
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 :root[data-theme='dark'] header {
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
-  border-color: rgba(124, 58, 237, 0.28);
+  border-color: rgba(255, 45, 106, 0.28);
 }
 
 nav {
@@ -216,11 +216,11 @@ nav {
   border-radius: 6px;
   transform: rotate(12deg);
   background: linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.18), 0 8px 18px rgba(34, 211, 238, 0.25);
+  box-shadow: 0 0 0 4px rgba(255, 45, 106, 0.18), 0 8px 18px rgba(255, 178, 36, 0.25);
 }
 
 :root[data-theme='dark'] .logo::before {
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.35), 0 10px 22px rgba(34, 211, 238, 0.28);
+  box-shadow: 0 0 0 4px rgba(255, 45, 106, 0.35), 0 10px 22px rgba(255, 178, 36, 0.28);
 }
 
 .nav-groups {
@@ -292,21 +292,21 @@ nav {
   justify-content: center;
   padding: 0.55rem 0.95rem;
   border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.24);
+  border: 1px solid rgba(255, 45, 106, 0.24);
   font-weight: 600;
   color: var(--brand);
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(34, 211, 238, 0.12));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.16), rgba(255, 178, 36, 0.12));
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
 }
 
 .pill-link:hover,
 .pill-link:focus {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.26), rgba(34, 211, 238, 0.2));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.26), rgba(255, 178, 36, 0.2));
   color: var(--brand);
   transform: translateY(-2px);
-  border-color: rgba(124, 58, 237, 0.36);
-  box-shadow: 0 14px 28px rgba(124, 58, 237, 0.18);
+  border-color: rgba(255, 45, 106, 0.36);
+  box-shadow: 0 14px 28px rgba(255, 45, 106, 0.18);
 }
 
 .search-form {
@@ -316,14 +316,14 @@ nav {
   padding: 0.5rem 0.75rem;
   background: rgba(255, 255, 255, 0.88);
   border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(18px);
 }
 
 :root[data-theme='dark'] .search-form {
-  background: rgba(20, 24, 52, 0.65);
-  border-color: rgba(165, 164, 196, 0.28);
+  background: rgba(36, 10, 44, 0.68);
+  border-color: rgba(255, 178, 36, 0.32);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.4);
 }
 
@@ -379,12 +379,12 @@ nav {
 .search-filters select {
   padding: 0.4rem 0.65rem;
   border-radius: 10px;
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(255, 45, 106, 0.2);
   background: var(--card-sheen);
   color: var(--muted-strong);
   font-size: 0.92rem;
   cursor: pointer;
-  box-shadow: 0 12px 26px rgba(58, 34, 94, 0.12);
+  box-shadow: 0 12px 26px rgba(178, 46, 94, 0.12);
 }
 
 .search-meta {
@@ -471,7 +471,7 @@ nav {
 }
 
 .theme-toggle-input:checked + .theme-toggle-label {
-  border-color: rgba(124, 58, 237, 0.32);
+  border-color: rgba(255, 45, 106, 0.32);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-text {
@@ -480,12 +480,12 @@ nav {
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-track {
   background: linear-gradient(135deg, var(--brand), var(--accent));
-  box-shadow: 0 12px 26px rgba(124, 58, 237, 0.32);
+  box-shadow: 0 12px 26px rgba(255, 45, 106, 0.32);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-thumb {
   transform: translateX(26px);
-  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.35);
+  box-shadow: 0 8px 18px rgba(255, 45, 106, 0.35);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon--moon,
@@ -525,7 +525,7 @@ main > section + section {
 
 .ad-rail {
   background: linear-gradient(180deg, var(--card-sheen) 0%, var(--card) 100%);
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
   border-radius: 24px;
   box-shadow: var(--shadow-card);
   padding: 1.5rem;
@@ -533,7 +533,7 @@ main > section + section {
 }
 
 :root[data-theme='dark'] .ad-rail {
-  border-color: rgba(34, 211, 238, 0.25);
+  border-color: rgba(255, 178, 36, 0.25);
 }
 
 .ad-rail-inner {
@@ -549,7 +549,7 @@ main > section + section {
   text-transform: uppercase;
   color: var(--muted);
   background: var(--pill-bg);
-  border: 1px solid rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(255, 45, 106, 0.18);
   border-radius: 999px;
   padding: 0.3rem 0.75rem;
 }
@@ -560,9 +560,9 @@ main > section + section {
   padding: 3.75rem 1.8rem;
   margin: 0 auto 3.75rem;
   max-width: 1020px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(34, 211, 238, 0.1)), var(--card);
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.14), rgba(255, 178, 36, 0.1)), var(--card);
   border-radius: 32px;
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
   box-shadow: var(--shadow-card);
   overflow: hidden;
   backdrop-filter: blur(6px);
@@ -573,8 +573,8 @@ main > section + section {
   position: absolute;
   inset: -25%;
   background:
-    radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.25), transparent 55%),
-    radial-gradient(circle at 80% 25%, rgba(34, 211, 238, 0.18), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(255, 45, 106, 0.25), transparent 55%),
+    radial-gradient(circle at 80% 25%, rgba(255, 178, 36, 0.18), transparent 55%),
     conic-gradient(from 140deg at 50% 50%, rgba(249, 115, 22, 0.25), transparent 65%);
   opacity: 0.85;
   filter: blur(0.5px);
@@ -601,15 +601,15 @@ main > section + section {
   justify-content: center;
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.16);
+  background: rgba(255, 45, 106, 0.16);
   color: var(--brand);
-  border: 1px solid rgba(124, 58, 237, 0.22);
+  border: 1px solid rgba(255, 45, 106, 0.22);
   text-transform: uppercase;
   letter-spacing: 0.22em;
   font-size: 0.75rem;
   font-weight: 700;
   margin-bottom: 1.15rem;
-  box-shadow: 0 12px 26px rgba(124, 58, 237, 0.2);
+  box-shadow: 0 12px 26px rgba(255, 45, 106, 0.2);
   backdrop-filter: blur(6px);
 }
 
@@ -652,7 +652,7 @@ main > section + section {
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.04em;
-  box-shadow: 0 22px 48px rgba(124, 58, 237, 0.32);
+  box-shadow: 0 22px 48px rgba(255, 45, 106, 0.32);
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   white-space: nowrap;
 }
@@ -662,7 +662,7 @@ main > section + section {
 .cta-button:hover,
 .cta-button:focus {
   transform: translateY(-2px);
-  box-shadow: 0 30px 60px rgba(124, 58, 237, 0.38);
+  box-shadow: 0 30px 60px rgba(255, 45, 106, 0.38);
   filter: brightness(1.05);
 }
 
@@ -673,22 +673,22 @@ main > section + section {
   gap: 0.35rem;
   padding: 0.8rem 1.15rem;
   border-radius: 999px;
-  border: 1px solid rgba(34, 211, 238, 0.24);
+  border: 1px solid rgba(255, 178, 36, 0.24);
   font-weight: 600;
   color: var(--accent);
-  background: rgba(34, 211, 238, 0.12);
-  box-shadow: 0 16px 32px rgba(34, 211, 238, 0.18);
+  background: rgba(255, 178, 36, 0.12);
+  box-shadow: 0 16px 32px rgba(255, 178, 36, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
 }
 
 .cta-secondary:hover,
 .cta-secondary:focus {
-  background: rgba(34, 211, 238, 0.2);
+  background: rgba(255, 178, 36, 0.2);
   color: var(--accent);
   transform: translateY(-2px);
-  border-color: rgba(34, 211, 238, 0.42);
-  box-shadow: 0 24px 48px rgba(34, 211, 238, 0.24);
+  border-color: rgba(255, 178, 36, 0.42);
+  box-shadow: 0 24px 48px rgba(255, 178, 36, 0.24);
 }
 
 .section-heading {
@@ -739,12 +739,12 @@ main > section + section {
   border-radius: 999px;
   background: var(--card-sheen);
   border: 1px solid var(--border);
-  box-shadow: 0 14px 28px rgba(58, 34, 94, 0.12);
+  box-shadow: 0 14px 28px rgba(178, 46, 94, 0.12);
 }
 
 :root[data-theme='dark'] .feed-controls {
-  background: rgba(20, 24, 52, 0.75);
-  border-color: rgba(165, 164, 196, 0.35);
+  background: rgba(36, 10, 44, 0.78);
+  border-color: rgba(255, 178, 36, 0.38);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.45);
 }
 
@@ -762,13 +762,13 @@ main > section + section {
 .feed-sort:hover,
 .feed-sort:focus {
   color: var(--brand);
-  background: rgba(124, 58, 237, 0.14);
+  background: rgba(255, 45, 106, 0.14);
 }
 
 .feed-sort.is-active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(34, 211, 238, 0.2));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.22), rgba(255, 178, 36, 0.2));
   color: var(--brand);
-  box-shadow: 0 18px 32px rgba(124, 58, 237, 0.24);
+  box-shadow: 0 18px 32px rgba(255, 45, 106, 0.24);
 }
 
 :root[data-theme='dark'] .feed-sort.is-active {
@@ -796,20 +796,20 @@ main > section + section {
 
 .feed-more {
   border: none;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(34, 211, 238, 0.18));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.14), rgba(255, 178, 36, 0.18));
   color: var(--brand);
   font-weight: 600;
   padding: 0.85rem 2.4rem;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 18px 38px rgba(58, 34, 94, 0.18);
+  box-shadow: 0 18px 38px rgba(178, 46, 94, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .feed-more:hover,
 .feed-more:focus {
   transform: translateY(-2px);
-  box-shadow: 0 22px 44px rgba(58, 34, 94, 0.22);
+  box-shadow: 0 22px 44px rgba(178, 46, 94, 0.22);
 }
 
 .feed-card {
@@ -837,7 +837,7 @@ main > section + section {
   border-radius: 26px;
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  border: 1px solid rgba(124, 58, 237, 0.14);
+  border: 1px solid rgba(255, 45, 106, 0.14);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -847,14 +847,14 @@ main > section + section {
 .card:hover {
   transform: translateY(-6px);
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(124, 58, 237, 0.28);
+  border-color: rgba(255, 45, 106, 0.28);
 }
 
 .card::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 20% 15%, rgba(124, 58, 237, 0.18), transparent 55%), radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.18), transparent 60%);
+  background: radial-gradient(circle at 20% 15%, rgba(255, 45, 106, 0.18), transparent 55%), radial-gradient(circle at 80% 20%, rgba(255, 178, 36, 0.18), transparent 60%);
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
@@ -868,7 +868,7 @@ main > section + section {
   position: relative;
   display: block;
   overflow: hidden;
-  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
+  border-bottom: 1px solid rgba(255, 45, 106, 0.12);
 }
 
 .card-media img {
@@ -889,12 +889,12 @@ main > section + section {
   left: 14px;
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(34, 211, 238, 0.75));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.85), rgba(255, 178, 36, 0.75));
   color: #fff;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  box-shadow: 0 12px 26px rgba(58, 34, 94, 0.35);
+  box-shadow: 0 12px 26px rgba(178, 46, 94, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -928,13 +928,13 @@ main > section + section {
   text-transform: uppercase;
   color: var(--muted);
   background: var(--pill-bg);
-  border: 1px solid rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(255, 45, 106, 0.18);
   border-radius: 999px;
   padding: 0.35rem 0.75rem;
 }
 
 :root[data-theme='dark'] .card-ad-label {
-  border-color: rgba(34, 211, 238, 0.28);
+  border-color: rgba(255, 178, 36, 0.28);
 }
 
 .card-content h3 {
@@ -973,12 +973,12 @@ main > section + section {
 .card-deal {
   display: inline-block;
   margin-top: 0.35rem;
-  background: rgba(34, 211, 238, 0.18);
+  background: rgba(255, 178, 36, 0.18);
   color: var(--accent);
   font-weight: 600;
   padding: 0.35rem 0.7rem;
   border-radius: 12px;
-  border: 1px solid rgba(34, 211, 238, 0.35);
+  border: 1px solid rgba(255, 178, 36, 0.35);
 }
 
 .card-deal--up {
@@ -993,7 +993,7 @@ main > section + section {
   background: var(--price-bg);
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.24);
+  border: 1px solid rgba(255, 45, 106, 0.24);
 }
 
 .card-rating {
@@ -1005,7 +1005,7 @@ main > section + section {
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 8px 18px rgba(58, 34, 94, 0.25);
+  box-shadow: 0 8px 18px rgba(178, 46, 94, 0.25);
 }
 
 .card-rating svg {
@@ -1050,9 +1050,9 @@ main > section + section {
   align-items: center;
   margin-bottom: 2.8rem;
   padding: 2.5rem;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.1)), var(--card);
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.12), rgba(255, 178, 36, 0.1)), var(--card);
   border-radius: 30px;
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
   box-shadow: var(--shadow-card);
 }
 
@@ -1065,8 +1065,8 @@ main > section + section {
   margin: 3.5rem auto 0;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.1)), var(--card);
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.12), rgba(255, 178, 36, 0.1)), var(--card);
+  border: 1px solid rgba(255, 45, 106, 0.2);
   border-radius: 28px;
   padding: 2.5rem;
   text-align: center;
@@ -1088,7 +1088,7 @@ main > section + section {
   left: -25%;
   width: 60%;
   height: 120%;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.28), transparent 65%);
+  background: radial-gradient(circle, rgba(255, 45, 106, 0.28), transparent 65%);
 }
 
 .newsletter-banner::after {
@@ -1096,7 +1096,7 @@ main > section + section {
   right: -10%;
   width: 70%;
   height: 130%;
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.2), transparent 60%);
+  background: radial-gradient(circle, rgba(255, 178, 36, 0.2), transparent 60%);
 }
 
 .newsletter-banner > * {
@@ -1129,11 +1129,11 @@ main > section + section {
   min-width: 0;
   padding: 0.85rem 1.1rem;
   border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.22);
+  border: 1px solid rgba(255, 45, 106, 0.22);
   background: var(--card-sheen);
   font-size: 1rem;
   color: var(--text);
-  box-shadow: 0 16px 34px rgba(58, 34, 94, 0.18);
+  box-shadow: 0 16px 34px rgba(178, 46, 94, 0.18);
 }
 
 .newsletter-fields input[type="email"]::placeholder {
@@ -1149,14 +1149,14 @@ main > section + section {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 24px 48px rgba(124, 58, 237, 0.32);
+  box-shadow: 0 24px 48px rgba(255, 45, 106, 0.32);
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .newsletter-fields button:hover,
 .newsletter-fields button:focus {
   transform: translateY(-2px);
-  box-shadow: 0 30px 60px rgba(124, 58, 237, 0.38);
+  box-shadow: 0 30px 60px rgba(255, 45, 106, 0.38);
 }
 
 .value-prop {
@@ -1174,7 +1174,7 @@ main > section + section {
   background: linear-gradient(180deg, var(--card-sheen), var(--card));
   border-radius: 26px;
   padding: 1.85rem;
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
   box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -1184,7 +1184,7 @@ main > section + section {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top right, rgba(124, 58, 237, 0.22), transparent 60%), radial-gradient(circle at bottom left, rgba(34, 211, 238, 0.18), transparent 60%);
+  background: radial-gradient(circle at top right, rgba(255, 45, 106, 0.22), transparent 60%), radial-gradient(circle at bottom left, rgba(255, 178, 36, 0.18), transparent 60%);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -1192,7 +1192,7 @@ main > section + section {
 .value-card:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(124, 58, 237, 0.28);
+  border-color: rgba(255, 45, 106, 0.28);
 }
 
 .value-card:hover::after {
@@ -1213,7 +1213,7 @@ main > section + section {
   align-items: center;
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(34, 211, 238, 0.16));
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.16), rgba(255, 178, 36, 0.16));
   color: var(--brand);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
@@ -1283,7 +1283,7 @@ main > section + section {
   padding: 0.6rem 0.8rem;
   border-radius: 14px;
   font-weight: 600;
-  border: 1px solid rgba(124, 58, 237, 0.24);
+  border: 1px solid rgba(255, 45, 106, 0.24);
 }
 
 .deal-callout--up {
@@ -1308,8 +1308,8 @@ main > section + section {
 }
 
 .wishlist-toggle {
-  background: rgba(124, 58, 237, 0.08);
-  border: 1px solid rgba(124, 58, 237, 0.24);
+  background: rgba(255, 45, 106, 0.08);
+  border: 1px solid rgba(255, 45, 106, 0.24);
   border-radius: 999px;
   padding: 0.45rem 1.2rem;
   font-weight: 600;
@@ -1320,16 +1320,16 @@ main > section + section {
 
 .wishlist-toggle:hover,
 .wishlist-toggle:focus {
-  background: rgba(124, 58, 237, 0.16);
-  border-color: rgba(124, 58, 237, 0.32);
-  box-shadow: 0 12px 26px rgba(124, 58, 237, 0.24);
+  background: rgba(255, 45, 106, 0.16);
+  border-color: rgba(255, 45, 106, 0.32);
+  box-shadow: 0 12px 26px rgba(255, 45, 106, 0.24);
 }
 
 .wishlist-toggle.is-active {
   background: var(--brand);
   color: #fff;
   border-color: var(--brand);
-  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 14px 32px rgba(255, 45, 106, 0.3);
 }
 
 .share-controls {
@@ -1347,14 +1347,14 @@ main > section + section {
   padding: 0.45rem 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 16px 34px rgba(124, 58, 237, 0.28);
+  box-shadow: 0 16px 34px rgba(255, 45, 106, 0.28);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .share-primary:hover,
 .share-primary:focus {
   transform: translateY(-2px);
-  box-shadow: 0 20px 42px rgba(124, 58, 237, 0.32);
+  box-shadow: 0 20px 42px rgba(255, 45, 106, 0.32);
 }
 
 .share-links {
@@ -1371,24 +1371,24 @@ main > section + section {
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
   background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(255, 45, 106, 0.18);
   color: var(--accent);
   font-weight: 500;
   cursor: pointer;
 }
 
 .share-copy {
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(255, 45, 106, 0.08);
 }
 
 :root[data-theme='dark'] .share-links a,
 :root[data-theme='dark'] .share-copy {
-  background: rgba(31, 36, 68, 0.7);
-  border-color: rgba(165, 164, 196, 0.28);
+  background: rgba(42, 12, 50, 0.72);
+  border-color: rgba(255, 178, 36, 0.32);
 }
 
 :root[data-theme='dark'] .share-copy {
-  background: rgba(124, 58, 237, 0.25);
+  background: rgba(255, 45, 106, 0.25);
 }
 
 .related-grid {
@@ -1402,11 +1402,11 @@ main > section + section {
 
 .price-insights {
   margin-top: 3rem;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.12)), var(--card);
+  background: linear-gradient(135deg, rgba(255, 45, 106, 0.12), rgba(255, 178, 36, 0.12)), var(--card);
   padding: 1.8rem 2rem;
   border-radius: 24px;
   box-shadow: var(--shadow-card);
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(255, 45, 106, 0.16);
 }
 
 .price-insights h2 {
@@ -1433,8 +1433,8 @@ main > section + section {
   padding: 0.65rem 0.85rem;
   border-radius: 14px;
   background: linear-gradient(180deg, var(--card-sheen), var(--card));
-  box-shadow: 0 14px 28px rgba(58, 34, 94, 0.12);
-  border: 1px solid rgba(124, 58, 237, 0.14);
+  box-shadow: 0 14px 28px rgba(178, 46, 94, 0.12);
+  border: 1px solid rgba(255, 45, 106, 0.14);
 }
 
 .price-history span {
@@ -1498,7 +1498,7 @@ main > section + section {
 
 .search-result {
   background: linear-gradient(180deg, var(--card-sheen), var(--card));
-  border: 1px solid rgba(124, 58, 237, 0.14);
+  border: 1px solid rgba(255, 45, 106, 0.14);
   border-radius: 24px;
   padding: 1.5rem 1.75rem;
   box-shadow: var(--shadow-card);
@@ -1508,7 +1508,7 @@ main > section + section {
 .search-result:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(124, 58, 237, 0.28);
+  border-color: rgba(255, 45, 106, 0.28);
 }
 
 .search-result h3 {
@@ -1532,18 +1532,18 @@ main > section + section {
 }
 
 footer {
-  border-top: 1px solid rgba(124, 58, 237, 0.16);
+  border-top: 1px solid rgba(255, 45, 106, 0.16);
   margin-top: 3.5rem;
   padding: 2.75rem 1.5rem;
   text-align: center;
   color: var(--muted);
   font-size: 0.92rem;
-  background: linear-gradient(180deg, rgba(124, 58, 237, 0.08), transparent 45%, rgba(34, 211, 238, 0.08));
+  background: linear-gradient(180deg, rgba(255, 45, 106, 0.08), transparent 45%, rgba(255, 178, 36, 0.08));
   transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
 }
 
 :root[data-theme='dark'] footer {
-  background: linear-gradient(180deg, rgba(12, 15, 34, 0.65), rgba(124, 58, 237, 0.22));
+  background: linear-gradient(180deg, rgba(12, 15, 34, 0.65), rgba(255, 45, 106, 0.22));
 }
 
 .footer-links {
@@ -1716,7 +1716,7 @@ class PageContext:
 
 
 class SiteGenerator:
-    """Generate static HTML pages for the curated gift site."""
+    """Generate static HTML pages for the Grab Gifts experience."""
 
     def __init__(
         self,
@@ -1814,11 +1814,11 @@ class SiteGenerator:
             f"<a href=\"/{self._category_path(slug)}\">{html.escape(name)}</a>"
             for slug, name in self._navigation_links()
         )
-        nav_action_links = ['<a href="/latest.html">Latest</a>']
+        nav_action_links = ['<a href="/latest.html">Latest drops</a>']
         if self._has_deals_page:
             nav_action_links.append('<a href="/deals.html">Deals</a>')
         nav_action_links.append(
-            '<button type="button" class="pill-link nav-surprise" data-surprise>Surprise me</button>'
+            '<button type="button" class="pill-link nav-surprise" data-surprise>Deal me in</button>'
         )
         newsletter_link = None
         newsletter_attrs = ""
@@ -1833,8 +1833,8 @@ class SiteGenerator:
             )
         search_form = (
             "<form class=\"search-form\" action=\"/search.html\" method=\"get\" role=\"search\">"
-            "<label class=\"sr-only\" for=\"nav-search\">Search curated gifts</label>"
-            "<input id=\"nav-search\" type=\"search\" name=\"q\" placeholder=\"Search curated gifts...\" aria-label=\"Search curated gifts\" />"
+            "<label class=\"sr-only\" for=\"nav-search\">Search Grab Gifts</label>"
+            "<input id=\"nav-search\" type=\"search\" name=\"q\" placeholder=\"Search gift drops...\" aria-label=\"Search Grab Gifts\" />"
             "<button type=\"submit\" aria-label=\"Submit search\">"
             "<svg aria-hidden=\"true\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><line x1=\"20\" y1=\"20\" x2=\"16.65\" y2=\"16.65\"></line></svg>"
             "</button>"
@@ -2124,17 +2124,17 @@ class SiteGenerator:
         cta_href = f"/{self._category_path(categories[0].slug)}" if categories else "#"
         hero_description = (
             f"{self.settings.description.strip()} "
-            "Spin through a sortable news feed of affiliate-ready gift ideas updated around the clock."
+            "Power through a shoppable feed of affiliate-ready gift drops fueled by live trend data."
         )
         hero = f"""
 <section class=\"hero\">
-  <span class=\"eyebrow\">Conversion-optimized gift discovery</span>
+  <span class=\"eyebrow\">Your viral gift playbook</span>
   <h1>{html.escape(self.settings.site_name)}</h1>
   <p>{html.escape(hero_description)}</p>
   <div class=\"hero-actions\">
-    <a class=\"button-link\" href=\"{cta_href}\">Browse curated gems</a>
-    <button type=\"button\" class=\"cta-secondary surprise-button\" data-surprise>Surprise me</button>
-    <a class=\"cta-secondary\" href=\"/latest.html\">See today's refresh</a>
+    <a class=\"button-link\" href=\"{cta_href}\">Browse latest drops</a>
+    <button type=\"button\" class=\"cta-secondary surprise-button\" data-surprise>Deal me in</button>
+    <a class=\"cta-secondary\" href=\"/latest.html\">Watch today's reload</a>
   </div>
 </section>
 """
@@ -2145,8 +2145,8 @@ class SiteGenerator:
         category_section = f"""
 <section>
   <div class=\"section-heading\">
-    <h2>Explore by vibe</h2>
-    <p>Jump into themed collections that blend persuasive copy, contextual affiliate links, and display ad slots.</p>
+    <h2>Shop by vibe</h2>
+    <p>Dive into themed lineups built with click-magnetic copy, affiliate compliance, and ad inventory baked in.</p>
   </div>
   <div class=\"grid\">{category_cards}</div>
 </section>
@@ -2154,24 +2154,24 @@ class SiteGenerator:
         value_props = """
 <section class=\"value-prop\">
   <div class=\"section-heading\">
-    <h2>Why marketers love Curated Gift Radar</h2>
-    <p>We do the heavy lifting so you can focus on distribution, partnerships, and profitable ad spend.</p>
+    <h2>Why marketers love Grab Gifts</h2>
+    <p>Plug in the automation, own the audience, and keep your gift commerce funnels roaring.</p>
   </div>
   <div class=\"value-grid\">
     <article class=\"value-card\">
-      <span class=\"badge\">SEO Ready</span>
-      <h3>Long-form copy that ranks</h3>
-      <p>Every page ships with keyword-rich storytelling, internal links, and structured data to woo organic traffic.</p>
+      <span class=\"badge\">Storyselling</span>
+      <h3>Copy that sparks clicks</h3>
+      <p>Every card blends social proof angles, urgency cues, and SEO-primed structure to lift conversions.</p>
     </article>
     <article class=\"value-card\">
-      <span class=\"badge\">Affiliate Friendly</span>
-      <h3>Monetize every click</h3>
-      <p>Amazon partner tags are hard-wired into each CTA so discovery instantly turns into tracked commissions.</p>
+      <span class=\"badge\">Affiliate Fuel</span>
+      <h3>Your tags, everywhere</h3>
+      <p>Amazon and partner CTAs ship pre-wired with your tracking so every discovery turns into attributable revenue.</p>
     </article>
     <article class=\"value-card\">
-      <span class=\"badge\">Fresh Daily</span>
-      <h3>Automations keep it relevant</h3>
-      <p>Nightly refreshes ensure your catalogue reflects the latest viral finds and seasonal crowd-pleasers.</p>
+      <span class=\"badge\">Always Fresh</span>
+      <h3>Automation handles the grind</h3>
+      <p>Nightly refreshes, trend scoring, and deal callouts keep the catalogue feeling like a live drop campaign.</p>
     </article>
   </div>
 </section>
@@ -2218,7 +2218,7 @@ class SiteGenerator:
                 og_image = DEFAULT_SOCIAL_IMAGE
         latest_site_update = self._latest_updated_datetime(all_products)
         context = PageContext(
-            title=f"{self.settings.site_name} — Daily curated Amazon gift ideas",
+            title=f"{self.settings.site_name} — Daily gift drops that convert",
             description=self.settings.description,
             canonical_url=f"{self.settings.base_url.rstrip('/')}/index.html",
             body=body,
@@ -2297,10 +2297,10 @@ class SiteGenerator:
   <div class=\"feed-header\">
     <div>
       <span class=\"badge\">Daily drops</span>
-      <h2>Gift news feed</h2>
-      <p>Sort and scan curated products by what's fresh, popular, or spiking in trend data.</p>
+      <h2>Grab Gifts live feed</h2>
+      <p>Shuffle trending finds by freshest drops, breakout hits, or velocity to spotlight your next feature.</p>
     </div>
-    <div class=\"feed-controls\" role=\"group\" aria-label=\"Sort curated gift feed\">
+  <div class=\"feed-controls\" role=\"group\" aria-label=\"Sort Grab Gifts feed\">
       <button type=\"button\" class=\"feed-sort is-active\" data-feed-sort=\"updated\" aria-pressed=\"true\">Most recent</button>
       <button type=\"button\" class=\"feed-sort\" data-feed-sort=\"popularity\" aria-pressed=\"false\">Most popular</button>
       <button type=\"button\" class=\"feed-sort\" data-feed-sort=\"trending\" aria-pressed=\"false\">Trending</button>
@@ -2842,7 +2842,7 @@ class SiteGenerator:
         latest_update = self._latest_updated_datetime(products)
         context = PageContext(
             title=f"Latest gift drops — {self.settings.site_name}",
-            description="The newest curated Amazon gift ideas, refreshed automatically for maximum conversion potential.",
+            description="The newest Grab Gifts drops from Amazon and partners, refreshed automatically for maximum conversion potential.",
             canonical_url=f"{self.settings.base_url.rstrip('/')}/latest.html",
             body=body,
             og_image=og_image,
@@ -2898,7 +2898,7 @@ class SiteGenerator:
         latest_update = self._latest_updated_datetime(top_products)
         context = PageContext(
             title=f"Gift deals — {self.settings.site_name}",
-            description="See the biggest price drops on curated Amazon gift ideas, refreshed daily.",
+            description="See the biggest price drops across Grab Gifts' Amazon finds, refreshed daily.",
             canonical_url=f"{self.settings.base_url.rstrip('/')}/deals.html",
             body=body,
             og_image=og_image,
@@ -2937,11 +2937,11 @@ class SiteGenerator:
         dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\/")
         body = f"""
 <section class="search-page">
-  <h1>Search the gift radar</h1>
-  <p>Filter our conversion-ready product library by keyword, price, rating, or marketplace partner.</p>
+  <h1>Search Grab Gifts</h1>
+  <p>Zero in on conversion-ready gift drops by keyword, price point, rating, or marketplace partner.</p>
   <form id="search-page-form" class="search-form" action="/search.html" method="get" role="search">
-    <label class="sr-only" for="search-query">Search curated gifts</label>
-    <input id="search-query" type="search" name="q" placeholder="Type a gift, keyword, or category" aria-label="Search curated gifts" />
+    <label class="sr-only" for="search-query">Search Grab Gifts</label>
+    <input id="search-query" type="search" name="q" placeholder="Type a product, keyword, or vibe" aria-label="Search Grab Gifts" />
     <button type="submit" aria-label="Submit search">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.65" y2="16.65"></line></svg>
     </button>
@@ -3172,13 +3172,13 @@ retailerSelect.addEventListener('change', () => {{
                 "@context": "https://schema.org",
                 "@type": "SearchResultsPage",
                 "name": f"Search {self.settings.site_name}",
-                "description": "Search curated Amazon gift ideas across every category.",
+                "description": "Search Grab Gifts for conversion-ready Amazon finds across every category.",
                 "url": f"{self.settings.base_url.rstrip('/')}/search.html",
             }
         ]
         context = PageContext(
             title=f"Search gifts — {self.settings.site_name}",
-            description="Search curated Amazon gift ideas instantly.",
+            description="Search Grab Gifts for conversion-ready Amazon ideas instantly.",
             canonical_url=f"{self.settings.base_url.rstrip('/')}/search.html",
             body=body,
             structured_data=structured_data,
@@ -3190,7 +3190,7 @@ retailerSelect.addEventListener('change', () => {{
         item_blocks: List[str] = []
         if self._has_deals_page and self._deals_products:
             first_deal = self._deals_products[0]
-            description = "Spot today's top price drops on curated gift finds."
+            description = "Spot today's top price drops on Grab Gifts finds."
             if first_deal.title:
                 description = f"Spot today's top price drops including {first_deal.title}."
             deals_pub = getattr(first_deal, "updated_at", "") or ""
@@ -3378,8 +3378,8 @@ retailerSelect.addEventListener('change', () => {{
             button_label = html.escape(cta_copy)
             return f"""
 <section class=\"newsletter-banner\" id=\"newsletter\">
-  <h3>Steal our weekly bestseller intel</h3>
-  <p>Subscribe to receive high-performing gift drops, category insights, and seasonal launch reminders.</p>
+  <h3>Get the Grab Gifts insider drop</h3>
+  <p>Subscribe for breakout performers, promo angles, and launch reminders straight from the gift commerce lab.</p>
   <form class=\"newsletter-form\" action=\"{action}\" method=\"{method_attr}\" target=\"_blank\">
     <label class=\"sr-only\" for=\"newsletter-email\">Email address</label>
     <div class=\"newsletter-fields\">
@@ -3394,8 +3394,8 @@ retailerSelect.addEventListener('change', () => {{
             button_label = html.escape(cta_copy)
             return f"""
 <section class=\"newsletter-banner\" id=\"newsletter\">
-  <h3>Steal our weekly bestseller intel</h3>
-  <p>Subscribe to receive high-performing gift drops, category insights, and seasonal launch reminders.</p>
+  <h3>Get the Grab Gifts insider drop</h3>
+  <p>Subscribe for breakout performers, promo angles, and launch reminders straight from the gift commerce lab.</p>
   <a class=\"button-link\" href=\"{url}\" target=\"_blank\" rel=\"noopener\">{button_label}</a>
 </section>
 """

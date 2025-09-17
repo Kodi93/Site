@@ -15,10 +15,10 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 class SiteSettings:
     """Global site level settings used during generation."""
 
-    site_name: str = "Curated Gift Radar"
-    base_url: str = "https://example.com"
+    site_name: str = "Grab Gifts"
+    base_url: str = "https://grabgifts.net"
     description: str = (
-        "Daily hand-picked Amazon gift ideas organized into intuitive categories."
+        "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation."
     )
     adsense_client_id: str | None = None
     adsense_slot: str | None = None
