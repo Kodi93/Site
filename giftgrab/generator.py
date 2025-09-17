@@ -297,6 +297,7 @@ nav {
   color: var(--brand);
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(34, 211, 238, 0.12));
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 }
 
 .pill-link:hover,
@@ -678,6 +679,7 @@ main > section + section {
   background: rgba(34, 211, 238, 0.12);
   box-shadow: 0 16px 32px rgba(34, 211, 238, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  cursor: pointer;
 }
 
 .cta-secondary:hover,
@@ -703,6 +705,93 @@ main > section + section {
   margin: 0 auto;
   color: var(--muted);
   max-width: 640px;
+}
+
+.news-feed {
+  margin-top: 3.5rem;
+}
+
+.feed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.feed-header h2 {
+  margin-bottom: 0.35rem;
+}
+
+.feed-header p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 520px;
+}
+
+.feed-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 999px;
+  background: var(--card-sheen);
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 28px rgba(58, 34, 94, 0.12);
+}
+
+:root[data-theme='dark'] .feed-controls {
+  background: rgba(20, 24, 52, 0.75);
+  border-color: rgba(165, 164, 196, 0.35);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.45);
+}
+
+.feed-sort {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feed-sort:hover,
+.feed-sort:focus {
+  color: var(--brand);
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.feed-sort.is-active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(34, 211, 238, 0.2));
+  color: var(--brand);
+  box-shadow: 0 18px 32px rgba(124, 58, 237, 0.24);
+}
+
+:root[data-theme='dark'] .feed-sort.is-active {
+  color: var(--accent);
+}
+
+.feed-grid {
+  display: grid;
+  gap: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.feed-card {
+  position: relative;
+}
+
+.feed-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: var(--card-sheen);
 }
 
 .grid {
@@ -1512,6 +1601,20 @@ footer {
     width: 100%;
   }
 
+  .feed-header {
+    align-items: stretch;
+  }
+
+  .feed-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .feed-sort {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
   .hero {
     padding: 3rem 1.25rem;
   }
@@ -1531,6 +1634,10 @@ footer {
   }
 
   .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .feed-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1679,6 +1786,9 @@ class SiteGenerator:
         nav_action_links = ['<a href="/latest.html">Latest</a>']
         if self._has_deals_page:
             nav_action_links.append('<a href="/deals.html">Deals</a>')
+        nav_action_links.append(
+            '<button type="button" class="pill-link nav-surprise" data-surprise>Surprise me</button>'
+        )
         newsletter_link = None
         newsletter_attrs = ""
         if getattr(self.settings, "newsletter_url", None):
@@ -1981,21 +2091,26 @@ class SiteGenerator:
         all_products: List[Product],
     ) -> None:
         cta_href = f"/{self._category_path(categories[0].slug)}" if categories else "#"
+        hero_description = (
+            f"{self.settings.description.strip()} "
+            "Spin through a sortable news feed of affiliate-ready gift ideas updated around the clock."
+        )
         hero = f"""
 <section class=\"hero\">
   <span class=\"eyebrow\">Conversion-optimized gift discovery</span>
   <h1>{html.escape(self.settings.site_name)}</h1>
-  <p>{html.escape(self.settings.description)}</p>
+  <p>{html.escape(hero_description)}</p>
   <div class=\"hero-actions\">
     <a class=\"button-link\" href=\"{cta_href}\">Browse curated gems</a>
-    <a class=\"cta-secondary\" href=\"/latest.html\">See what's new today</a>
+    <button type=\"button\" class=\"cta-secondary surprise-button\" data-surprise>Surprise me</button>
+    <a class=\"cta-secondary\" href=\"/latest.html\">See today's refresh</a>
   </div>
 </section>
 """
         category_cards = "".join(
             self._category_card(category) for category in categories
         )
-        featured_cards = self._product_cards_with_ads(featured_products)
+        feed_section = self._news_feed_section(all_products)
         category_section = f"""
 <section>
   <div class=\"section-heading\">
@@ -2003,16 +2118,6 @@ class SiteGenerator:
     <p>Jump into themed collections that blend persuasive copy, contextual affiliate links, and display ad slots.</p>
   </div>
   <div class=\"grid\">{category_cards}</div>
-</section>
-"""
-        featured_section = f"""
-<section class=\"latest-intro\">
-  <div class=\"section-heading\">
-    <h2>Latest trending gifts</h2>
-    <p>Freshly ingested Amazon finds with hype-driven descriptions, perfect for daily newsletter mentions or social promos.</p>
-  </div>
-  <div class=\"grid\">{featured_cards}</div>
-  <p><a class=\"cta-secondary\" href=\"/latest.html\">View the full trending list</a></p>
 </section>
 """
         value_props = """
@@ -2041,7 +2146,7 @@ class SiteGenerator:
 </section>
 """
         newsletter_banner = self._newsletter_banner()
-        body = f"{hero}{category_section}{featured_section}{newsletter_banner}{value_props}"
+        body = f"{hero}{feed_section}{category_section}{newsletter_banner}{value_props}"
         organization_data = self._organization_structured_data()
         website_schema = {
             "@context": "https://schema.org",
@@ -2092,6 +2197,113 @@ class SiteGenerator:
             updated_time=self._format_iso8601(latest_site_update),
         )
         self._write_page(self.output_dir / "index.html", context)
+
+    def _news_feed_section(self, products: List[Product]) -> str:
+        now = datetime.now(timezone.utc)
+        feed_limit = 30
+        feed_products = products[:feed_limit]
+        feed_cards: List[str] = []
+        pool_limit = min(len(products), 60)
+        seen_urls: set[str] = set()
+        surprise_pool: List[str] = []
+        for product in products[:pool_limit]:
+            url = f"/{self._product_path(product)}"
+            if url not in seen_urls:
+                seen_urls.add(url)
+                surprise_pool.append(url)
+        for product in feed_products:
+            updated_score, popularity_score, trending_score = self._news_feed_metrics(
+                product, now
+            )
+            url = f"/{self._product_path(product)}"
+            extra_attrs = (
+                f'data-updated="{updated_score}" '
+                f'data-popularity="{popularity_score:.2f}" '
+                f'data-trending="{trending_score:.2f}" '
+                f'data-url="{html.escape(url, quote=True)}"'
+            )
+            feed_cards.append(
+                self._product_card(
+                    product,
+                    extra_attrs=extra_attrs,
+                    extra_classes="feed-card",
+                )
+            )
+        feed_grid = "".join(feed_cards)
+        if not feed_cards:
+            feed_grid = (
+                "<p class=\"feed-empty\">More gift ideas are on the way. Check back after the next refresh.</p>"
+            )
+        surprise_json = json.dumps(surprise_pool, ensure_ascii=False).replace("</", "<\\/")
+        section = f"""
+<section class=\"news-feed\">
+  <div class=\"feed-header\">
+    <div>
+      <span class=\"badge\">Daily drops</span>
+      <h2>Gift news feed</h2>
+      <p>Sort and scan curated products by what's fresh, popular, or spiking in trend data.</p>
+    </div>
+    <div class=\"feed-controls\" role=\"group\" aria-label=\"Sort curated gift feed\">
+      <button type=\"button\" class=\"feed-sort is-active\" data-feed-sort=\"updated\" aria-pressed=\"true\">Most recent</button>
+      <button type=\"button\" class=\"feed-sort\" data-feed-sort=\"popularity\" aria-pressed=\"false\">Most popular</button>
+      <button type=\"button\" class=\"feed-sort\" data-feed-sort=\"trending\" aria-pressed=\"false\">Trending</button>
+    </div>
+  </div>
+  <div class=\"feed-grid\" data-feed>{feed_grid}</div>
+</section>
+"""
+        script = f"""
+<script>
+(function() {{
+  const feed = document.querySelector('[data-feed]');
+  if (!feed) {{
+    return;
+  }}
+  const sortButtons = Array.from(document.querySelectorAll('[data-feed-sort]'));
+  const cards = Array.from(feed.children).filter(function (element) {{
+    return element.dataset && element.dataset.updated;
+  }});
+  function applySort(key) {{
+    const sorted = cards.slice().sort(function (a, b) {{
+      return Number(b.dataset[key] || 0) - Number(a.dataset[key] || 0);
+    }});
+    sorted.forEach(function (card) {{
+      feed.appendChild(card);
+    }});
+  }}
+  sortButtons.forEach(function (button) {{
+    button.addEventListener('click', function () {{
+      const key = button.getAttribute('data-feed-sort');
+      if (!key) {{
+        return;
+      }}
+      sortButtons.forEach(function (item) {{
+        const isActive = item === button;
+        item.classList.toggle('is-active', isActive);
+        item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      }});
+      applySort(key);
+    }});
+  }});
+  applySort('updated');
+  const surpriseButtons = Array.from(document.querySelectorAll('[data-surprise]'));
+  const surpriseTargets = {surprise_json};
+  if (surpriseButtons.length && surpriseTargets.length) {{
+    surpriseButtons.forEach(function (button) {{
+      button.addEventListener('click', function (event) {{
+        event.preventDefault();
+        const index = Math.floor(Math.random() * surpriseTargets.length);
+        const target = surpriseTargets[index];
+        if (target) {{
+          window.location.href = target;
+        }}
+      }});
+    }});
+  }}
+}})();
+</script>
+"""
+        return section + script
 
     def _write_category_page(self, category: Category, products: List[Product]) -> None:
         cards = self._product_cards_with_ads(products)
@@ -3178,6 +3390,22 @@ retailerSelect.addEventListener('change', () => {{
             "\n</article>"
         )
 
+    def _news_feed_metrics(self, product: Product, now: datetime) -> tuple[int, float, float]:
+        updated_dt = self._parse_iso_datetime(getattr(product, "updated_at", None))
+        updated_score = int(updated_dt.timestamp()) if updated_dt else 0
+        rating_value = product.rating or 0.0
+        review_count = float(product.total_reviews or 0)
+        popularity_score = review_count + (rating_value * 100)
+        trending_score = popularity_score
+        if updated_dt:
+            hours_old = (now - updated_dt).total_seconds() / 3600.0
+            recency_window = max(0.0, 240 - hours_old)
+            trending_score += recency_window * 10
+        drop_percent = product.price_drop_percent()
+        if drop_percent:
+            trending_score += drop_percent * 25
+        return updated_score, popularity_score, trending_score
+
     def _product_cards_with_ads(self, products: Iterable[Product]) -> str:
         cards: List[str] = []
         ads_enabled = self._adsense_inline_enabled()
@@ -3189,13 +3417,27 @@ retailerSelect.addEventListener('change', () => {{
                     cards.append(ad_card)
         return "".join(cards)
 
-    def _product_card(self, product: Product) -> str:
+    def _product_card(
+        self,
+        product: Product,
+        *,
+        extra_attrs: str = "",
+        extra_classes: str = "",
+    ) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
         image = html.escape(product.image or "")
         category_badge = ""
         category = self._category_lookup.get(product.category_slug)
         if category:
             category_badge = f'<span class="card-badge">{html.escape(category.name)}</span>'
+        classes = "card"
+        extra_class_value = extra_classes.strip()
+        if extra_class_value:
+            classes = f"{classes} {extra_class_value}"
+        attr_fragment = ""
+        extra_attr_value = extra_attrs.strip()
+        if extra_attr_value:
+            attr_fragment = f" {extra_attr_value}"
         price_html = (
             f'<span class="card-price">{html.escape(product.price)}</span>'
             if product.price
@@ -3244,7 +3486,7 @@ retailerSelect.addEventListener('change', () => {{
                 f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">{html.escape(cta_copy)}</a>'
             )
         return f"""
-<article class="card">
+<article class="{classes}"{attr_fragment}>
   <a class="card-media" href="/{self._product_path(product)}">
     <img src="{image}" alt="{html.escape(product.title)}" loading="lazy" decoding="async" />
     {category_badge}
