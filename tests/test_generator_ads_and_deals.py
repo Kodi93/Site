@@ -136,6 +136,8 @@ def test_site_without_adsense_has_no_ad_slots(tmp_path: Path) -> None:
     settings = SiteSettings(
         site_name="No Ads",
         base_url="https://example.com",
+        adsense_client_id=None,
+        adsense_slot=None,
     )
     category = Category(slug="testing", name="Testing", blurb="Test blurb", keywords=["test"])
     generator = SiteGenerator(settings, output_dir=tmp_path)
