@@ -100,7 +100,7 @@ When a form action is configured the navigation “Newsletter” link jumps to t
 
 ### Adding additional retailers
 
-The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed should export a list of product dictionaries or an object with an `items` array. Supported keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
+The pipeline automatically picks up any JSON feeds stored in `data/retailers/` (or a directory specified with `STATIC_RETAILER_DIR`). Each feed can be a single JSON file or a directory that contains multiple partial JSON files—perfect when you want to append new batches without creating merge conflicts. For directories, drop a `meta.json` file alongside your item batches to override display copy. Every item file can export either a list of product dictionaries or an object with an `items` array. Supported item keys mirror the built-in Amazon adapter: `id`, `title`, `url`, `price`, `image`, `rating`, `total_reviews`, `features`, and `keywords`. Optional top-level keys `name`, `homepage`, and `cta_label` override the retailer display copy.
 
 Example feed (`data/retailers/handmade.json`):
 
@@ -124,6 +124,18 @@ Example feed (`data/retailers/handmade.json`):
   ]
 }
 ```
+
+Directory-backed feed layout:
+
+```
+data/retailers/amazon-sitestripe/
+├── meta.json            # optional retailer display overrides
+└── batches/
+    ├── batch-0001.json  # { "items": [ ... ] }
+    └── batch-0002.json  # append new URLs in additional batches
+```
+
+Each batch is merged, de-duplicated by `id`, and sorted automatically during ingestion so you can add new SiteStripe links by dropping a fresh file without editing previous ones.
 
 Every retailer feed is merged alongside Amazon data, producing separate product cards with the correct outbound CTA, retailer badge, and inclusion in the site-wide search filters.
 
