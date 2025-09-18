@@ -28,14 +28,27 @@ class BlogTests(unittest.TestCase):
     def test_build_category_phrase_for_audience_categories(self) -> None:
         self.assertEqual(build_category_phrase("For Him"), "the perfect gift for him")
         self.assertEqual(
-            build_category_phrase("For a Techy"),
+            build_category_phrase("For a Techy"),< codex/revise-product-titles-and-descriptions-nopw04
+            "the perfect gift for tech enthusiasts",
+
             "the perfect gift for a techy",
+ main
         )
 
     def test_build_category_phrase_handles_homebody_upgrades(self) -> None:
         self.assertEqual(
             build_category_phrase("Homebody Upgrades"),
+ codex/revise-product-titles-and-descriptions-nopw04
+            "a homebody upgrade they'll appreciate",
+        )
+
+    def test_build_category_phrase_converts_concept_audiences(self) -> None:
+        self.assertEqual(
+            build_category_phrase("For Fandom"),
+            "the perfect gift for devoted superfans",
+=======
             "a homebody upgrade worth gifting",
+>>>>>> main
         )
 
     def test_generate_blog_post_builds_rich_html(self) -> None:
@@ -44,7 +57,9 @@ class BlogTests(unittest.TestCase):
         self.assertIn("Gravity-Defying Coffee Mug", blog.summary)
         self.assertIn("Levitating design", blog.html)
         self.assertIn("cta-button", blog.html)
-        self.assertTrue("Check it out" in blog.html or "See the latest price" in blog.html)
+        self.assertTrue(
+            "View full details" in blog.html or "Check current pricing" in blog.html
+        )
 
     def test_generate_blog_post_includes_review_callout(self) -> None:
         product = sample_product()

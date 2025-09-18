@@ -8,26 +8,26 @@ from typing import Iterable, List, Sequence
 from .models import Product
 
 INTRO_TEMPLATES = [
-    "Looking for {category_phrase}? Meet <strong>{title}</strong>, a standout find that instantly caught our eye.",
-    "Stop the endless scrolling—<strong>{title}</strong> is the kind of {category_phrase} that deserves a permanent spot on your wishlist.",
-    "Need {category_phrase}? {title} delivers the wow factor without the guesswork.",
+    "Searching for {category_phrase}? <strong>{title}</strong> delivers a polished answer.",
+    "Need {category_phrase}? <strong>{title}</strong> balances thoughtful design with everyday utility.",
+    "Reviewing {category_phrase}? Shortlist <strong>{title}</strong> for a dependable win.",
 ]
 
 FEATURE_INTROS = [
-    "Why we're obsessed:",
-    "Unwrap the highlights:",
-    "Reasons it'll be a hit:",
+    "Key details:",
+    "Highlights worth noting:",
+    "What stands out:",
 ]
 
 OUTRO_TEMPLATES = [
-    "Snag <strong>{title}</strong> now and be the gifting hero who always knows what's trending.",
-    "Ready to upgrade your gift game? Tap that buy button and let <strong>{title}</strong> do the bragging.",
-    "Trust us—<strong>{title}</strong> is the kind of present that earns repeat high fives.",
+    "Count on <strong>{title}</strong> to leave a refined impression when it's unwrapped.",
+    "Gift <strong>{title}</strong> with confidence—it's built to be appreciated long after the occasion.",
+    "Let <strong>{title}</strong> deliver the thoughtful finish while you take credit for the savvy pick.",
 ]
 
 CTA_TEMPLATES = [
-    "<a class=\"cta-button\" href=\"{link}\" target=\"_blank\" rel=\"noopener sponsored\">Check it out on Amazon</a>",
-    "<a class=\"cta-button\" href=\"{link}\" target=\"_blank\" rel=\"noopener sponsored\">See the latest price on Amazon</a>",
+    "<a class=\"cta-button\" href=\"{link}\" target=\"_blank\" rel=\"noopener sponsored\">View full details on Amazon</a>",
+    "<a class=\"cta-button\" href=\"{link}\" target=\"_blank\" rel=\"noopener sponsored\">Check current pricing on Amazon</a>",
 ]
 
 
@@ -58,6 +58,37 @@ def build_category_phrase(category_name: str) -> str:
     if not normalized:
         return "a standout gift"
     lower = normalized.lower()
+ codex/revise-product-titles-and-descriptions-nopw04
+
+    audience_rewrites = {
+        "fandom": "devoted superfans",
+        "the fandom": "devoted superfans",
+        "a techy": "tech enthusiasts",
+        "techy": "tech enthusiasts",
+        "techies": "tech enthusiasts",
+    }
+
+    def _audience_phrase(audience: str) -> str:
+        normalized_audience = _normalized_words(audience).strip()
+        if not normalized_audience:
+            return ""
+        replacement = audience_rewrites.get(normalized_audience.lower(), normalized_audience.lower())
+        return f"the perfect gift for {replacement}"
+
+    if lower.startswith("gifts for "):
+        audience = normalized[len("gifts for ") :].strip()
+        phrase = _audience_phrase(audience)
+        if phrase:
+            return phrase
+    if lower.startswith("for "):
+        audience = normalized[len("for ") :].strip()
+        phrase = _audience_phrase(audience)
+        if phrase:
+            return phrase
+    if lower.endswith(" upgrades"):
+        base = lower[: -len(" upgrades")].strip()
+        if base:
+            return f"{_article(base)} {base} upgrade they'll appreciate"
     if lower.startswith("gifts for "):
         audience = lower[len("gifts for ") :].strip()
         if audience:
@@ -70,6 +101,7 @@ def build_category_phrase(category_name: str) -> str:
         base = lower[: -len(" upgrades")].strip()
         if base:
             return f"{_article(base)} {base} upgrade worth gifting"
+
     if lower.endswith(" power-ups"):
         base = lower[: -len(" power-ups")].strip()
         if base:
@@ -156,7 +188,11 @@ def generate_summary(product: Product, category_name: str, features: Iterable[st
         highlights.append(_to_sentence_fragment(trimmed))
     highlight_phrase = _join_with_and(highlights)
     return (
+ codex/revise-product-titles-and-descriptions-nopw04
+       f"{product.title} is {phrase} with notable details such as {highlight_phrase}."
+
         f"{product.title} is {phrase} thanks to smart details like {highlight_phrase}."
+ main
     )
 
 
