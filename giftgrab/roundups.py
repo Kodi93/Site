@@ -1,6 +1,7 @@
 """Helpers for generating roundup articles and synthetic products."""
 from __future__ import annotations
 
+<< codex/automate-daily-top-10-product-roundups-utru0g
 import argparse
 import json
 import random
@@ -8,17 +9,27 @@ import re
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
+import json
+import random
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List, Sequence
+main
 
 from .affiliates import amazon_search_link
 from .article_repository import ArticleRepository
 from .config import DATA_DIR
 from .models import GeneratedProduct, RoundupArticle, RoundupItem
 from .repository import ProductRepository
+codex/automate-daily-top-10-product-roundups-utru0g
 from .text import clamp, clean_text, desc_roundup, intro_roundup, title_roundup
+from .text import intro_breakdown, intro_roundup, title_roundup, desc_roundup
+ main
 from .utils import slugify, timestamp
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROUNDUP_CONFIG_FILE = BASE_DIR / "config" / "roundups.json"
+codex/automate-daily-top-10-product-roundups-utru0g
 ROUNDUPS_PER_DAY_DEFAULT = 15
 ROUNDUP_PRODUCT_COUNT = 10
 
@@ -111,6 +122,20 @@ def _to_iso(when: datetime | None) -> str | None:
         when = when.replace(tzinfo=timezone.utc)
     return when.astimezone(timezone.utc).isoformat()
 
+====
+
+DEFAULT_BULLETS = [
+    "Quick to set up",
+    "Useful daily features",
+    "Compact footprint",
+    "Giftable packaging",
+]
+DEFAULT_CAVEATS = [
+    "Price fluctuates",
+    "Specs vary by seller",
+]
+
+>>>> main
 
 def load_roundup_config(path: Path) -> Sequence[dict]:
     if not path.exists():
@@ -125,7 +150,11 @@ def load_roundup_config(path: Path) -> Sequence[dict]:
 def pick_combinations(
     config: Sequence[dict],
     *,
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     limit: int = ROUNDUPS_PER_DAY_DEFAULT,
+====
+    limit: int = 15,
+>>>> main
     seed: str | None = None,
 ) -> List[tuple[str, int]]:
     options: List[tuple[str, int]] = []
@@ -148,6 +177,7 @@ def pick_combinations(
     return options[:limit]
 
 
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
 def synthesize_item_names(
     topic: str,
     *,
@@ -341,6 +371,40 @@ def _compose_roundup_summary(
     detail = detail_pool[0].rstrip(".")
     summary = clean_text(f"{base} {detail}.")
     return summary
+=====
+def synthesize_item_names(topic: str) -> List[str]:
+    words = [word for word in topic.split() if word]
+    if not words:
+        words = ["gift"]
+    first = words[0]
+    last = words[-1]
+    composite = " ".join(words)
+    templates = [
+        f"Compact {first} Tool",
+        f"Mini {last.title()} Kit",
+        f"{first.title()} Pro Set",
+        f"Pocket {last.title()}",
+        f"Smart {composite.title()}",
+        f"Ultra-Light {first.title()}",
+        f"Foldable {last.title()}",
+        f"Rechargeable {composite.title()}",
+        f"{first.title()} Gift Pack",
+        f"{last.title()} Starter",
+    ]
+    seen: set[str] = set()
+    results: List[str] = []
+    for template in templates:
+        candidate = " ".join(template.split())
+        if candidate not in seen:
+            seen.add(candidate)
+            results.append(candidate)
+    while len(results) < 10:
+        fallback = f"{first.title()} {len(results) + 1} Kit"
+        if fallback not in seen:
+            seen.add(fallback)
+            results.append(fallback)
+    return results[:10]
+>>>> main
 
 
 def build_generated_product(
@@ -349,6 +413,7 @@ def build_generated_product(
     cap: int,
     *,
     rank: int,
+<<<<< codex/automate-daily-top-10-product-roundups-utru0g
     edition_label: str | None,
     slug_suffix: str | None,
     published_at: datetime | None,
@@ -367,11 +432,18 @@ def build_generated_product(
     intro = _compose_product_intro(name, topic, cap, edition_label)
     publish_iso = _to_iso(published_at)
     score = max(50, 120 - rank * 5 + rng.randint(0, 8))
+=====
+) -> GeneratedProduct:
+    query = f"{name} {topic} under ${cap}"
+    affiliate = amazon_search_link(query)
+    slug = slugify(f"{name}-{topic}-under-{cap}")
+>>>> main
     product = GeneratedProduct(
         slug=slug,
         name=name,
         query=query,
-        affiliate_url=affiliate,
+       affiliate_url=affiliate,
+<<<<< codex/automate-daily-top-10-product-roundups-utru0g
         intro=intro,
         bullets=bullets,
         caveats=caveats,
@@ -385,6 +457,17 @@ def build_generated_product(
         product.created_at = publish_iso
     else:
         product.mark_published()
+====
+        intro=intro_breakdown(name, cap),
+        bullets=list(DEFAULT_BULLETS),
+        caveats=list(DEFAULT_CAVEATS),
+        category=topic,
+        price_cap=cap,
+        status="published",
+        score=max(0, 100 - rank),
+    )
+    product.mark_published()
+>>>> main
     return product
 
 
@@ -392,6 +475,7 @@ def build_roundup(
     topic: str,
     cap: int,
     products: Sequence[GeneratedProduct],
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     *,
     edition_label: str | None,
     slug_suffix: str | None,
@@ -399,54 +483,81 @@ def build_roundup(
 ) -> RoundupArticle:
     slug = _compose_slug("top-10", topic, f"under-{cap}", slug_suffix)
     publish_iso = _to_iso(published_at)
+====
+) -> RoundupArticle:
+    slug = slugify(f"top-10-{topic}-under-{cap}")
+>>>> main
     items = [
         RoundupItem(
             rank=index,
             title=product.name,
             product_slug=product.slug,
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
             summary=_compose_roundup_summary(
                 topic=topic,
                 cap=cap,
                 edition_label=edition_label,
                 rank=index,
                 product=product,
+====
+            summary=(
+                f"Why it fits: {product.name} nails the {topic} brief under ${cap} with gift-ready utility."
+>>>> main
             ),
         )
         for index, product in enumerate(products, start=1)
     ]
     roundup = RoundupArticle(
         slug=slug,
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
         title=_compose_roundup_title(topic, cap, edition_label),
         description=_compose_roundup_description(topic, cap, edition_label),
         topic=topic,
         price_cap=cap,
         intro=_compose_roundup_intro(topic, cap, edition_label),
+====
+        title=title_roundup(topic, cap),
+        description=desc_roundup(topic, cap),
+        topic=topic,
+        price_cap=cap,
+        intro=intro_roundup(topic, cap),
+>>>> main
         amazon_search_url=amazon_search_link(f"{topic} under ${cap}"),
         items=items,
         status="published",
     )
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     if publish_iso:
         roundup.mark_published(when=publish_iso)
         roundup.created_at = publish_iso
     else:
         roundup.mark_published()
+====
+    roundup.mark_published()
+>>>> main
     return roundup
 
 
 def generate_roundups(
     *,
     config_path: Path = ROUNDUP_CONFIG_FILE,
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     limit: int = ROUNDUPS_PER_DAY_DEFAULT,
     seed: str | None = None,
     edition_date: date | None = None,
     edition_label: str | None = None,
     slug_suffix: str | None = None,
     publish_at: datetime | None = None,
+=====
+    limit: int = 15,
+    seed: str | None = None,
+>>> main
 ) -> tuple[List[RoundupArticle], List[GeneratedProduct]]:
     config = load_roundup_config(config_path)
     combinations = pick_combinations(config, limit=limit, seed=seed)
     roundups: List[RoundupArticle] = []
     generated_products: List[GeneratedProduct] = []
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     for combo_index, (topic, cap) in enumerate(combinations, start=1):
         combo_seed = f"{seed or 'auto'}-{slug_suffix or ''}-{topic}-{cap}-{combo_index}"
         names = synthesize_item_names(
@@ -526,11 +637,25 @@ def generate_roundups_for_span(
     return roundups, products
 
 
+====
+    for topic, cap in combinations:
+        names = synthesize_item_names(topic)
+        topic_products = [
+            build_generated_product(name, topic, cap, rank=index)
+            for index, name in enumerate(names, start=1)
+        ]
+        generated_products.extend(topic_products)
+        roundups.append(build_roundup(topic, cap, topic_products))
+    return roundups, generated_products
+
+
+>>>> main
 def run_daily_roundups(
     *,
     config_path: Path = ROUNDUP_CONFIG_FILE,
     repository: ProductRepository | None = None,
     article_repository: ArticleRepository | None = None,
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     limit: int = ROUNDUPS_PER_DAY_DEFAULT,
     seed: str | None = None,
     days: int = 1,
@@ -544,6 +669,15 @@ def run_daily_roundups(
         days=days,
         limit=limit,
         seed=seed,
+=====
+    limit: int = 15,
+    seed: str | None = None,
+) -> tuple[List[RoundupArticle], List[GeneratedProduct]]:
+    repo = repository or ProductRepository()
+    article_repo = article_repository or ArticleRepository(DATA_DIR / "articles.json")
+    roundups, generated_products = generate_roundups(
+        config_path=config_path, limit=limit, seed=seed
+>>>> main
     )
     for roundup in roundups:
         article_repo.upsert_roundup(roundup)
@@ -551,6 +685,7 @@ def run_daily_roundups(
     return roundups, generated_products
 
 
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
 def cli_entry(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Generate roundup articles and linked product breakdowns.",
@@ -598,6 +733,10 @@ def cli_entry(argv: Sequence[str] | None = None) -> None:
         days=days,
         start_date=start_date,
     )
+====
+def cli_entry() -> None:
+    roundups, products = run_daily_roundups()
+>>>>> main
     print(
         f"Created {len(roundups)} roundups and {len(products)} generated products at {timestamp()}"
     )
@@ -605,8 +744,13 @@ def cli_entry(argv: Sequence[str] | None = None) -> None:
 
 __all__ = [
     "ROUNDUP_CONFIG_FILE",
+<<<< codex/automate-daily-top-10-product-roundups-utru0g
     "generate_roundups",
     "generate_roundups_for_span",
     "run_daily_roundups",
+===
+    "run_daily_roundups",
+    "generate_roundups",
+>>> main
     "cli_entry",
 ]
