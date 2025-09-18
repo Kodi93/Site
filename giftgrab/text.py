@@ -131,47 +131,44 @@ def make_meta(params: MetaParams) -> str:
 
     subject = clean_text(params.name)
     spec_items = _summarize_specs(params.specs or [])
+    spec_summary = ", ".join(spec_items) if spec_items else "key features"
     if params.price is not None:
         rounded_price = int(round(params.price))
         price_text = f"{rounded_price} {params.currency or 'USD'}"
     else:
-        price_text = "current pricing"
-    use_clause = clean_text(params.use or "")
-    first_spec = spec_items[0] if spec_items else "practical performance"
-    second_spec = spec_items[1] if len(spec_items) > 1 else None
-    if use_clause:
-        if second_spec:
-            feature_sentence = (
-                f"{title_case(use_clause)} planners can rely on {subject} for {first_spec} and {second_spec}."
-            )
-        else:
-            feature_sentence = (
-                f"{title_case(use_clause)} planners can rely on {subject} for {first_spec}."
-            )
-    else:
-        if second_spec:
-            feature_sentence = (
-                f"{subject} delivers {first_spec} and {second_spec}."
-            )
-        else:
-            feature_sentence = f"{subject} delivers {first_spec}."
-    support_sentence = ""
-    price_sentence = f"Check pricing near {price_text} and confirm availability before launch."
+        price_text = "the current price"
+    use_clause = clean_text(params.use or "").lower()
+    use_prefix = f"For {use_clause}. " if use_clause else ""
     description = clean_text(
-        " ".join(part for part in [feature_sentence, support_sentence, price_sentence] if part)
+        f"{use_prefix}{subject} — {spec_summary}. Check {price_text} before you buy."
     )
+    extras = [
+        "See highlights inside.",
+        "We outline trade-offs.",
+        "Learn more inside.",
+    ]
+    for extra in extras:
+        if len(description) >= 140:
+            break
+        candidate = clean_text(f"{description} {extra}")
+        if len(candidate) <= 155:
+            description = candidate
     if len(description) > 155:
-        description = clean_text(f"{feature_sentence} {price_sentence}")
-    if len(description) > 155:
-        description = clean_text(f"{feature_sentence} Check pricing near {price_text} before launch.")
+        description = clamp(description, 155)
+    if not description.endswith("."):
+        candidate = f"{description}."
+        description = candidate if len(candidate) <= 155 else clamp(candidate, 155)
     if len(description) < 140:
-        padding = "Confirm assets."
-        description = clean_text(f"{description} {padding}")
-        if len(description) > 155:
-            description = clamp(description, 155)
-    if not description.endswith(".") and len(description) < 155:
-        description = f"{description}."
-    return clamp(description, 155)
+        for extra in extras:
+            candidate = clean_text(f"{description} {extra}")
+            if len(candidate) <= 155:
+                description = candidate
+                break
+        if len(description) < 140:
+            description = clamp(
+                clean_text(f"{description} Explore buyer context inside."), 155
+            )
+    return description
 
 
 @dataclass
@@ -192,5 +189,5 @@ def make_intro(params: IntroParams) -> str:
     )
     return (
         f"{clean_text(params.title)} is a practical pick{use_fragment}{price_fragment}. "
-        "Highlights below with honest trade-offs."
+        "Highlights and trade-offs below."
     )

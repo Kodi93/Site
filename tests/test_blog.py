@@ -79,22 +79,22 @@ class BlogTests(unittest.TestCase):
             "Homebody Upgrades",
             ["Levitating design", "USB-powered base", "USB-powered base"],
         )
-        self.assertIn("Homebody Upgrades planners can rely on", summary)
-        self.assertIn("Levitating design and USB-powered base", summary)
-        self.assertNotIn("coffee", summary)
+        self.assertIn("For homebody upgrades.", summary)
+        self.assertIn("Levitating design, USB-powered base", summary)
+        self.assertIn("See highlights inside.", summary)
 
     def test_generate_summary_falls_back_to_keywords(self) -> None:
         product = sample_product()
         summary = generate_summary(product, "Homebody Upgrades", [])
-        self.assertIn("coffee and novelty", summary)
-        self.assertIn("confirm availability", summary)
+        self.assertIn("coffee, novelty", summary)
+        self.assertIn("We outline trade-offs.", summary)
 
     def test_generate_summary_handles_missing_highlights(self) -> None:
         product = sample_product()
         product.keywords = []
         summary = generate_summary(product, "Homebody Upgrades", [])
-        self.assertIn("practical performance", summary)
-        self.assertIn("Confirm assets", summary)
+        self.assertIn("key features", summary)
+        self.assertIn("We outline trade-offs.", summary)
 
 
 if __name__ == "__main__":
