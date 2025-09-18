@@ -103,6 +103,7 @@ def test_main_without_command_fetches_when_repository_empty(monkeypatch):
     monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
     monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
     monkeypatch.setattr(cli, "load_credentials", lambda: None)
+    monkeypatch.setattr(cli, "load_ebay_credentials", lambda: None)
     monkeypatch.setattr(cli, "load_static_retailers", lambda: [static_adapter])
     monkeypatch.setattr(cli, "ensure_directories", lambda: None)
 
@@ -177,6 +178,7 @@ def test_main_without_command_uses_default_when_products_exist(monkeypatch):
     monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
     monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
     monkeypatch.setattr(cli, "load_credentials", fail_credentials)
+    monkeypatch.setattr(cli, "load_ebay_credentials", lambda: None)
     monkeypatch.setattr(cli, "load_static_retailers", lambda: [static_adapter])
     monkeypatch.setattr(cli, "ensure_directories", lambda: None)
 
@@ -223,3 +225,134 @@ def test_main_generate_without_products_errors(monkeypatch):
 
     assert excinfo.value.code == 2
     assert "Run 'update'" in captured["message"]
+
+
+def test_update_command_adds_ebay_adapter_when_credentials_present(monkeypatch):
+    monkeypatch.delenv("GIFTGRAB_DEFAULT_COMMAND", raising=False)
+
+    ebay_credentials = object()
+    captured: dict[str, dict[str, object]] = {}
+
+    class DummyRepository:
+        def __init__(self, data_file):
+            self.data_file = data_file
+
+        def load_products(self):
+            return []
+
+    class DummyGenerator:
+        def __init__(self, settings, output_dir):
+            self.settings = settings
+            self.output_dir = output_dir
+
+    class DummyArticleRepository:
+        def __init__(self, path):
+            self.path = path
+
+    class DummyPipeline:
+        def __init__(
+            self,
+            *,
+            repository,
+            generator,
+            categories,
+            credentials,
+            retailers,
+            article_repository,
+        ):
+            captured["init"] = {
+                "repository": repository,
+                "generator": generator,
+                "categories": categories,
+                "credentials": credentials,
+                "retailers": retailers,
+                "article_repository": article_repository,
+            }
+
+        def run(self, *, item_count, regenerate_only):
+            captured["run"] = {
+                "item_count": item_count,
+                "regenerate_only": regenerate_only,
+            }
+
+    monkeypatch.setattr(cli, "ProductRepository", DummyRepository)
+    monkeypatch.setattr(cli, "SiteGenerator", DummyGenerator)
+    monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
+    monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
+    monkeypatch.setattr(cli, "load_credentials", lambda: None)
+    monkeypatch.setattr(cli, "load_ebay_credentials", lambda: ebay_credentials)
+    monkeypatch.setattr(cli, "load_static_retailers", lambda: [])
+    monkeypatch.setattr(cli, "AmazonRetailerAdapter", lambda creds: ("amazon", creds))
+    monkeypatch.setattr(cli, "EbayRetailerAdapter", lambda creds: ("ebay", creds))
+    monkeypatch.setattr(cli, "ensure_directories", lambda: None)
+
+    cli.main(["update", "--item-count", "3"])
+
+    assert captured["run"] == {"item_count": 3, "regenerate_only": False}
+    assert captured["init"]["credentials"] is None
+    assert captured["init"]["retailers"] == [("ebay", ebay_credentials)]
+
+
+def test_update_command_skips_ebay_without_credentials(monkeypatch):
+    monkeypatch.delenv("GIFTGRAB_DEFAULT_COMMAND", raising=False)
+
+    static_adapter = object()
+    captured: dict[str, dict[str, object]] = {}
+
+    class DummyRepository:
+        def __init__(self, data_file):
+            self.data_file = data_file
+
+        def load_products(self):
+            return []
+
+    class DummyGenerator:
+        def __init__(self, settings, output_dir):
+            self.settings = settings
+            self.output_dir = output_dir
+
+    class DummyArticleRepository:
+        def __init__(self, path):
+            self.path = path
+
+    class DummyPipeline:
+        def __init__(
+            self,
+            *,
+            repository,
+            generator,
+            categories,
+            credentials,
+            retailers,
+            article_repository,
+        ):
+            captured["init"] = {
+                "repository": repository,
+                "generator": generator,
+                "categories": categories,
+                "credentials": credentials,
+                "retailers": retailers,
+                "article_repository": article_repository,
+            }
+
+        def run(self, *, item_count, regenerate_only):
+            captured["run"] = {
+                "item_count": item_count,
+                "regenerate_only": regenerate_only,
+            }
+
+    monkeypatch.setattr(cli, "ProductRepository", DummyRepository)
+    monkeypatch.setattr(cli, "SiteGenerator", DummyGenerator)
+    monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
+    monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
+    monkeypatch.setattr(cli, "load_credentials", lambda: None)
+    monkeypatch.setattr(cli, "load_ebay_credentials", lambda: None)
+    monkeypatch.setattr(cli, "load_static_retailers", lambda: [static_adapter])
+    monkeypatch.setattr(cli, "AmazonRetailerAdapter", lambda creds: ("amazon", creds))
+    monkeypatch.setattr(cli, "EbayRetailerAdapter", lambda creds: ("ebay", creds))
+    monkeypatch.setattr(cli, "ensure_directories", lambda: None)
+
+    cli.main(["update"])
+
+    assert captured["init"]["retailers"] == [static_adapter]
+    assert captured["init"]["credentials"] is None
