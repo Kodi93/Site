@@ -15,11 +15,12 @@ from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
 from .retailers import AmazonRetailerAdapter, StaticRetailerAdapter
+from .roundups import run_daily_roundups
 from .utils import load_json
 
 LOGGER = logging.getLogger(__name__)
 
-COMMAND_CHOICES: tuple[str, ...] = ("update", "generate")
+COMMAND_CHOICES: tuple[str, ...] = ("update", "generate", "roundups")
 
 
 def get_configured_default_command() -> str:
@@ -48,7 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=COMMAND_CHOICES,
         nargs="?",
         help=(
-            "Use 'update' to fetch new products and rebuild, or 'generate' to rebuild from stored data. "
+            "Use 'update' to fetch new products and rebuild, 'generate' to rebuild from stored data, "
+            "or 'roundups' to synthesize roundup playbooks and refresh the site. "
             f"When omitted, defaults to '{default_command}' once stored data exists; "
             "if no products have been stored yet, the update command runs automatically."
         ),
@@ -304,6 +306,20 @@ def main(argv: Optional[list[str]] = None) -> None:
             article_repository=article_repository,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=False)
+    elif command == "roundups":
+        run_daily_roundups(
+            repository=repository, article_repository=article_repository
+        )
+        retailer_adapters = load_static_retailers()
+        pipeline = GiftPipeline(
+            repository=repository,
+            generator=generator,
+            categories=DEFAULT_CATEGORIES,
+            credentials=None,
+            retailers=retailer_adapters,
+            article_repository=article_repository,
+        )
+        pipeline.run(item_count=args.item_count, regenerate_only=True)
     else:
         retailer_adapters = load_static_retailers()
         pipeline = GiftPipeline(

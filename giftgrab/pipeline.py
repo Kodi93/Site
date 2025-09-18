@@ -11,7 +11,13 @@ from .article_repository import ArticleRepository
 from .article_scheduler import ArticleAutomation
 from .blog import generate_blog_post
 from .config import CategoryDefinition
-from .models import Category, CooldownEntry, Product
+from .models import (
+    Category,
+    CooldownEntry,
+    GeneratedProduct,
+    Product,
+    RoundupArticle,
+)
 from .retailers import AmazonRetailerAdapter, RetailerAdapter
 from .repository import ProductRepository
 
@@ -201,7 +207,24 @@ class GiftPipeline:
             except Exception as error:
                 logger.warning("Article automation failed: %s", error)
             articles = self.article_repository.list_published()
-        self.generator.build(categories, combined, articles=articles)
+        generated_products: List[GeneratedProduct] = (
+            self.repository.load_generated_products()
+        )
+        roundups: List[RoundupArticle] = []
+        if self.article_repository is not None:
+            try:
+                roundups = self.article_repository.list_published_roundups()
+            except Exception as error:
+                logger.warning("Unable to load roundup articles: %s", error)
+        best_generated = self.repository.best_generated_product()
+        self.generator.build(
+            categories,
+            combined,
+            articles=articles,
+            generated_products=generated_products,
+            roundups=roundups,
+            best_generated=best_generated,
+        )
         return PipelineResult(products=combined, categories=categories)
 
     def _select_fallback_products(

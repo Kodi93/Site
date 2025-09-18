@@ -191,3 +191,48 @@ def make_intro(params: IntroParams) -> str:
         f"{clean_text(params.title)} is a practical pick{use_fragment}{price_fragment}. "
         "Highlights and trade-offs below."
     )
+
+
+def title_roundup(topic: str, cap: int) -> str:
+    return clamp(clean_text(f"Top 10 {topic} Under ${cap}"), 60)
+
+
+def desc_roundup(topic: str, cap: int) -> str:
+    copy = clean_text(
+        f"Ten {topic} under ${cap}. Curated picks with quick blurbs and retailer search links."
+    )
+    return clamp(copy, 155)
+
+
+def intro_roundup(topic: str, cap: int) -> str:
+    topic_clean = clean_text(topic)
+    return (
+        f"Looking for {topic_clean.lower()} under ${cap}? "
+        "Here are ten solid ideas with quick blurbs and links to check current prices."
+    )
+
+
+def title_breakdown(name: str, topic: str | None = None, cap: int | None = None) -> str:
+    parts = [clean_text(name)]
+    if topic:
+        parts.append(clean_text(topic))
+    title = " – ".join(parts)
+    if cap is not None:
+        title = f"{title} under ${cap}"
+    return clamp(title, 60)
+
+
+def desc_breakdown(name: str) -> str:
+    base = clean_text(
+        f"{name}: key details, uses, and honest trade-offs. Check current price on Amazon."
+    )
+    return clamp(base, 155)
+
+
+def intro_breakdown(name: str, cap: int | None = None) -> str:
+    name_clean = clean_text(name)
+    price_fragment = f" under ${cap}" if cap is not None else ""
+    return (
+        f"{name_clean} is a practical pick{price_fragment}. "
+        "Highlights and trade-offs below."
+    )
