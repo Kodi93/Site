@@ -190,7 +190,22 @@ Every retailer feed is merged alongside Amazon data, producing separate product 
    python -m giftgrab.cli roundups
    ```
 
+<<<<< codex/automate-daily-top-10-product-roundups-utru0g
+   Use the optional flags to scale output:
+
+   ```bash
+   # Generate a full year (365 days) of 15-per-day roundups starting January 1st
+   python -m giftgrab.cli roundups \
+     --roundup-days 365 \
+     --roundup-limit 15 \
+     --roundup-start-date 2024-01-01 \
+     --roundup-seed editorial-calendar
+   ```
+
+   The command persists all generated content to JSON, refreshes the static site, and highlights the highest scoring product as “Best Gift This Week” on the homepage. You can invoke the same logic via `python scripts/daily_roundups.py --days 30 --limit 15` if you prefer the lightweight helper entrypoint.
+=====
    The command persists all generated content to JSON, refreshes the static site, and highlights the highest scoring product as “Best Gift This Week” on the homepage.
+>>>>> main
 
 4. **Schedule daily automation**
 
@@ -199,10 +214,17 @@ Every retailer feed is merged alongside Amazon data, producing separate product 
    ```cron
    # Run at 6:00 AM server time
    0 5 * * * cd /var/www/gifts && /usr/bin/env -S bash -lc 'python -m giftgrab.cli update --item-count 8'
+<<<<< codex/automate-daily-top-10-product-roundups-utru0g
+   30 5 * * * cd /var/www/gifts && /usr/bin/env -S bash -lc 'python -m giftgrab.cli roundups --roundup-days 1 --roundup-limit 15'
+   ```
+
+   The first cron line refreshes retailer products; the second synthesizes fresh roundup content. Both commands are idempotent – products are upserted by ASIN and generated content is updated by slug so reruns safely refresh existing records while appending new finds. Adjust `--roundup-days` and `--roundup-start-date` for seasonal batches (for example, run once a quarter with `--roundup-days 90`).
+=====
    30 5 * * * cd /var/www/gifts && /usr/bin/env -S bash -lc 'python -m giftgrab.cli roundups'
    ```
 
    The first cron line refreshes retailer products; the second synthesizes fresh roundup content. Both commands are idempotent – products are upserted by ASIN and generated content is updated by slug so reruns safely refresh existing records while appending new finds.
+>>>> main
 
 ## Deploying the static site
 
