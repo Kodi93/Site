@@ -60,11 +60,12 @@ class BlogTests(unittest.TestCase):
         product = sample_product()
         blog = generate_blog_post(product, "Home & Kitchen", ["Levitating design", "USB-powered base"])
         self.assertIn("Gravity-Defying Coffee Mug", blog.summary)
-        self.assertIn("Levitating design", blog.html)
+        self.assertIn("Levitating design", blog.summary)
+        self.assertIn("Key takeaways", blog.html)
+        self.assertIn("Good for:", blog.html)
+        self.assertIn("Consider:", blog.html)
         self.assertIn("cta-button", blog.html)
-        self.assertTrue(
-            "View full details" in blog.html or "Check current pricing" in blog.html
-        )
+        self.assertIn("Review the listing on Amazon", blog.html)
 
     def test_generate_blog_post_includes_review_callout(self) -> None:
         product = sample_product()
@@ -78,24 +79,24 @@ class BlogTests(unittest.TestCase):
             "Homebody Upgrades",
             ["Levitating design", "USB-powered base", "USB-powered base"],
         )
-        self.assertIn("delivers a homebody upgrade they'll appreciate", summary)
-        self.assertIn(
-            "Standout details include levitating design and USB-powered base.",
-            summary,
-        )
+        self.assertIn("For homebody upgrades.", summary)
+        self.assertIn("Levitating design", summary)
+        self.assertIn("USB-powered base", summary)
         self.assertNotIn("coffee", summary)
 
     def test_generate_summary_falls_back_to_keywords(self) -> None:
         product = sample_product()
         summary = generate_summary(product, "Homebody Upgrades", [])
-        self.assertIn("Key themes include coffee", summary)
+        self.assertIn("coffee", summary)
         self.assertIn("novelty", summary)
+        self.assertIn("Confirm stock", summary)
 
     def test_generate_summary_handles_missing_highlights(self) -> None:
         product = sample_product()
         product.keywords = []
         summary = generate_summary(product, "Homebody Upgrades", [])
-        self.assertIn("Expect thoughtful touches throughout.", summary)
+        self.assertIn("key features", summary)
+        self.assertIn("Confirm stock", summary)
 
 
 if __name__ == "__main__":
