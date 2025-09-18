@@ -192,6 +192,65 @@ class PipelineCooldownTests(unittest.TestCase):
         asins = {product.asin for product in stored}
         self.assertEqual(asins, {f"ASIN{idx}" for idx in range(5, 10)})
 
+    def test_missing_ratings_do_not_block_marketplace_diversity(self) -> None:
+        amazon_items = [
+            {
+                "id": "AMAZON-1",
+                "title": "Amazon Low Rated 1",
+                "url": "https://example.com/amazon/1",
+                "image": "https://example.com/images/amazon1.jpg",
+                "price": "$14.99",
+                "features": ["feature one", "feature two"],
+                "rating": 0.05,
+                "total_reviews": 0,
+                "brand": "Amazon Basics",
+            },
+            {
+                "id": "AMAZON-2",
+                "title": "Amazon Low Rated 2",
+                "url": "https://example.com/amazon/2",
+                "image": "https://example.com/images/amazon2.jpg",
+                "price": "$15.99",
+                "features": ["feature three", "feature four"],
+                "rating": 0.05,
+                "total_reviews": 0,
+                "brand": "Amazon Essentials",
+            },
+        ]
+        ebay_items = [
+            {
+                "id": "EBAY-1",
+                "title": "eBay Listing",
+                "url": "https://example.com/ebay/1",
+                "image": "https://example.com/images/ebay1.jpg",
+                "price": "$18.99",
+                "features": ["unique find", "limited stock"],
+                "rating": None,
+                "total_reviews": None,
+                "brand": "Independent",
+            }
+        ]
+        amazon_retailer = FakeRetailerAdapter(amazon_items)
+        ebay_retailer = FakeRetailerAdapter(ebay_items)
+        ebay_retailer.slug = "ebay"
+        ebay_retailer.name = "eBay"
+        ebay_retailer.homepage = "https://www.ebay.com/"
+        pipeline = GiftPipeline(
+            repository=self.repo,
+            generator=DummyGenerator(),
+            categories=[TEST_CATEGORY],
+            retailers=[amazon_retailer, ebay_retailer],
+            credentials=None,
+            minimum_daily_posts=2,
+            bootstrap_target=2,
+        )
+        pipeline.run(item_count=3, regenerate_only=False)
+        products = self.repo.load_products()
+        ebay_selected = [
+            product for product in products if product.retailer_slug == "ebay"
+        ]
+        self.assertGreaterEqual(len(ebay_selected), 1)
+
 
 def test_pipeline_generate_only_handles_article_repository(tmp_path: Path) -> None:
     data_file = tmp_path / "products.json"

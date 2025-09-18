@@ -340,14 +340,28 @@ class GiftPipeline:
     @classmethod
     def _quality_score(cls, product: Product) -> float:
         score = 0.0
-        if product.rating:
-            score += float(product.rating) * 120.0
-        else:
-            score -= 40.0
-        if product.total_reviews:
-            score += min(float(product.total_reviews), 500.0) * 0.6
-        else:
-            score -= 20.0
+        rating_value: float | None = None
+        if product.rating is not None:
+            try:
+                rating_value = float(product.rating)
+            except (TypeError, ValueError):
+                rating_value = None
+        if rating_value is not None:
+            if rating_value > 0:
+                score += rating_value * 120.0
+            else:
+                score -= 40.0
+        reviews_value: float | None = None
+        if product.total_reviews is not None:
+            try:
+                reviews_value = float(product.total_reviews)
+            except (TypeError, ValueError):
+                reviews_value = None
+        if reviews_value is not None:
+            if reviews_value > 0:
+                score += min(reviews_value, 500.0) * 0.6
+            else:
+                score -= 20.0
         if product.price:
             score += 12.0
         if product.image:
