@@ -2217,6 +2217,136 @@ class SiteGenerator:
         }}
       }})();
     </script>
+    <script>
+      (function () {{
+        function findTrackable(start) {{
+          if (!(start instanceof Element)) {{
+            return null;
+          }}
+          return start.closest('[data-analytics]');
+        }}
+
+        function buildDetail(element) {{
+          if (!(element instanceof Element)) {{
+            return null;
+          }}
+          var eventName = element.getAttribute('data-event') || 'interaction';
+          var category = element.getAttribute('data-category') || element.getAttribute('data-placement') || 'engagement';
+          var rawLabel = element.getAttribute('data-label');
+          var label = rawLabel;
+          if (!label) {{
+            var aria = element.getAttribute('aria-label');
+            if (aria) {{
+              label = aria;
+            }} else {{
+              var text = element.textContent || '';
+              text = text.replace(/\\s+/g, ' ').trim();
+              label = text || undefined;
+            }}
+          }}
+          var params = {{ event_category: category }};
+          if (label) {{
+            params.event_label = label;
+          }}
+          var placement = element.getAttribute('data-placement');
+          if (placement) {{
+            params.engagement_location = placement;
+          }}
+          var productSlug = element.getAttribute('data-product');
+          var productName = element.getAttribute('data-product-name');
+          var categoryName = element.getAttribute('data-category-name');
+          var categorySlug = element.getAttribute('data-category');
+          var retailerName = element.getAttribute('data-retailer-name');
+          var retailerSlug = element.getAttribute('data-retailer');
+          var items = null;
+          if (productSlug || productName || categoryName || categorySlug || retailerName || retailerSlug) {{
+            items = [{{
+              item_id: productSlug || undefined,
+              item_name: productName || label || undefined,
+              item_category: categoryName || categorySlug || undefined,
+              item_brand: retailerName || retailerSlug || undefined,
+            }}];
+            if (productSlug) {{
+              params.product_slug = productSlug;
+            }}
+            if (categoryName) {{
+              params.product_category = categoryName;
+            }}
+            if (categorySlug) {{
+              params.product_category_slug = categorySlug;
+            }}
+            if (retailerName) {{
+              params.product_retailer = retailerName;
+            }}
+            if (retailerSlug) {{
+              params.product_retailer_slug = retailerSlug;
+            }}
+          }}
+          var rawValue = element.getAttribute('data-value');
+          if (rawValue) {{
+            var numericValue = Number(rawValue);
+            if (Number.isFinite(numericValue)) {{
+              params.value = numericValue;
+            }}
+          }}
+          if (items) {{
+            params.items = items;
+          }}
+          return {{ name: eventName, params: params }};
+        }}
+
+        function sendEvent(element) {{
+          if (typeof window === 'undefined' || typeof window.gtag !== 'function') {{
+            return;
+          }}
+          var detail = buildDetail(element);
+          if (!detail) {{
+            return;
+          }}
+          try {{
+            window.gtag('event', detail.name, detail.params);
+          }} catch (error) {{
+            console.warn('Analytics dispatch failed', error);
+          }}
+        }}
+
+        document.addEventListener('click', function (event) {{
+          var target = event.target;
+          if (!(target instanceof Element)) {{
+            return;
+          }}
+          var trackable = findTrackable(target);
+          if (!trackable) {{
+            return;
+          }}
+          if (trackable instanceof HTMLButtonElement && trackable.type === 'submit') {{
+            return;
+          }}
+          sendEvent(trackable);
+        }});
+
+        document.addEventListener('submit', function (event) {{
+          var form = event.target;
+          if (!(form instanceof HTMLFormElement)) {{
+            return;
+          }}
+          var candidate = null;
+          var submitter = event.submitter;
+          if (submitter instanceof Element) {{
+            candidate = findTrackable(submitter);
+          }}
+          if (!candidate) {{
+            candidate = findTrackable(form);
+          }}
+          if (!candidate) {{
+            candidate = form.querySelector('[data-analytics]');
+          }}
+          if (candidate instanceof Element) {{
+            sendEvent(candidate);
+          }}
+        }}, true);
+      }})();
+    </script>
   </body>
 </html>
 """
@@ -2771,15 +2901,33 @@ class SiteGenerator:
         encoded_title = quote_plus(product.title)
         tweet_url = f"https://twitter.com/intent/tweet?text={encoded_title}&url={encoded_url}"
         facebook_url = f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}"
+        product_slug_attr = html.escape(product.slug, quote=True)
+        category_slug_attr = html.escape(product.category_slug or "", quote=True)
+        category_name_attr = html.escape(category.name, quote=True)
+        retailer_slug_attr = html.escape(product.retailer_slug or "", quote=True)
+        retailer_name_attr = html.escape(product.retailer_name or "", quote=True)
+        product_title_attr = html.escape(product.title, quote=True)
+        analytics_base_parts = [
+            f'data-product="{product_slug_attr}"',
+            f'data-product-name="{product_title_attr}"',
+            f'data-category="{category_slug_attr}"',
+            f'data-category-name="{category_name_attr}"',
+            f'data-retailer="{retailer_slug_attr}"',
+        ]
+        if retailer_name_attr:
+            analytics_base_parts.append(
+                f'data-retailer-name="{retailer_name_attr}"'
+            )
+        analytics_base = " ".join(analytics_base_parts)
         engagement_html = f"""
 <div class="engagement-tools">
-  <button class="wishlist-toggle" type="button" data-wishlist="toggle" data-product="{html.escape(product.slug)}" aria-pressed="false">Save to shortlist</button>
+  <button class="wishlist-toggle" type="button" data-wishlist="toggle" {analytics_base} data-analytics="wishlist" data-event="wishlist-toggle" data-placement="product-page" data-label="Save to shortlist" aria-pressed="false">Save to shortlist</button>
   <div class="share-controls">
-    <button class="share-primary" type="button" data-share>Share with a friend</button>
+    <button class="share-primary" type="button" data-share {analytics_base} data-analytics="share" data-event="share-open" data-placement="product-page" data-label="Open share menu">Share with a friend</button>
     <div class="share-links">
-      <button class="share-copy" type="button" data-copy="{html.escape(canonical_url)}">Copy link</button>
-      <a href="{tweet_url}" target="_blank" rel="noopener">Tweet</a>
-      <a href="{facebook_url}" target="_blank" rel="noopener">Share</a>
+      <button class="share-copy" type="button" data-copy="{html.escape(canonical_url)}" {analytics_base} data-analytics="share" data-event="share-copy" data-placement="product-page" data-label="Copy product link">Copy link</button>
+      <a href="{tweet_url}" target="_blank" rel="noopener" {analytics_base} data-analytics="share" data-event="share-twitter" data-placement="product-page" data-label="Tweet share">Tweet</a>
+      <a href="{facebook_url}" target="_blank" rel="noopener" {analytics_base} data-analytics="share" data-event="share-facebook" data-placement="product-page" data-label="Facebook share">Share</a>
     </div>
   </div>
 </div>
@@ -2822,7 +2970,7 @@ class SiteGenerator:
         if product.link:
             cta_label = product.call_to_action or f"Shop on {product.retailer_name}"
             cta_block = (
-                f'<p class="cta-row"><a class="cta-button" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">{html.escape(cta_label)}</a></p>'
+                f'<p class="cta-row"><a class="cta-button" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored" {analytics_base} data-analytics="product-cta" data-event="cta-click" data-placement="product-page" data-label="{html.escape(cta_label, quote=True)}">{html.escape(cta_label)}</a></p>'
             )
         body = f"""
 {breadcrumbs_html}
@@ -3078,6 +3226,17 @@ class SiteGenerator:
             latest_point = product.latest_price_point
             price_value = latest_point.amount if latest_point else None
             price_display = product.price or (latest_point.display if latest_point else None)
+            drop_amount = product.price_drop_amount()
+            drop_percent = product.price_drop_percent()
+            on_deal = drop_amount is not None
+            drop_label = ""
+            if drop_amount is not None:
+                currency_code = latest_point.currency if latest_point else None
+                formatted_amount = self._format_currency(drop_amount, currency_code)
+                if drop_percent is not None:
+                    drop_label = f"↓ {drop_percent:.0f}% ({formatted_amount} off)"
+                else:
+                    drop_label = f"↓ {formatted_amount} off"
             index_entries.append(
                 {
                     "title": product.title,
@@ -3089,6 +3248,10 @@ class SiteGenerator:
                     "keywordBlob": keyword_blob,
                     "priceValue": price_value,
                     "priceDisplay": price_display,
+                    "priceDropAmount": drop_amount,
+                    "priceDropPercent": drop_percent,
+                    "priceDropLabel": drop_label,
+                    "onDeal": on_deal,
                     "rating": product.rating,
                     "retailerName": product.retailer_name,
                     "retailerSlug": product.retailer_slug,
@@ -3121,6 +3284,13 @@ class SiteGenerator:
       <option value="4">4★ &amp; up</option>
       <option value="4.5">4.5★ &amp; up</option>
     </select>
+    <label for="filter-deal">Deal status</label>
+    <select id="filter-deal" name="deal">
+      <option value="all">Any status</option>
+      <option value="on-sale">On sale</option>
+      <option value="drop-10">Price drop ≥ 10%</option>
+      <option value="drop-25">Price drop ≥ 25%</option>
+    </select>
     <label for="filter-retailer">Retailer</label>
     <select id="filter-retailer" name="retailer">
       <option value="all">All partners</option>
@@ -3137,6 +3307,7 @@ const feedback = document.getElementById('search-feedback');
 const resultsList = document.getElementById('search-results');
 const priceSelect = document.getElementById('filter-price');
 const ratingSelect = document.getElementById('filter-rating');
+const dealSelect = document.getElementById('filter-deal');
 const retailerSelect = document.getElementById('filter-retailer');
 const retailerMap = new Map();
 for (const item of PRODUCT_INDEX) {{
@@ -3154,6 +3325,7 @@ function getFilters() {{
   return {{
     price: priceSelect.value || 'all',
     rating: ratingSelect.value || 'all',
+    deal: dealSelect.value || 'all',
     retailer: retailerSelect.value || 'all',
   }};
 }}
@@ -3180,6 +3352,23 @@ function matchesFilters(item, filters) {{
     const minRating = parseFloat(filters.rating);
     if (!item.rating || item.rating < minRating) {{
       return false;
+    }}
+  }}
+  if (filters.deal !== 'all') {{
+    const percent = typeof item.priceDropPercent === 'number' ? item.priceDropPercent : null;
+    const onSale = Boolean(item.onDeal) || (percent !== null && percent > 0);
+    if (filters.deal === 'on-sale') {{
+      if (!onSale) {{
+        return false;
+      }}
+    }} else if (filters.deal === 'drop-10') {{
+      if (!(percent !== null && percent >= 10)) {{
+        return false;
+      }}
+    }} else if (filters.deal === 'drop-25') {{
+      if (!(percent !== null && percent >= 25)) {{
+        return false;
+      }}
     }}
   }}
   if (filters.retailer !== 'all' && item.retailerSlug !== filters.retailer) {{
@@ -3211,7 +3400,7 @@ function matchesQuery(item, normalized, hasQuery) {{
 function renderResults(query, filters) {{
   resultsList.innerHTML = '';
   const hasQuery = Boolean(query);
-  const hasFilters = filters.price !== 'all' || filters.rating !== 'all' || filters.retailer !== 'all';
+  const hasFilters = filters.price !== 'all' || filters.rating !== 'all' || filters.deal !== 'all' || filters.retailer !== 'all';
   if (!hasQuery && !hasFilters) {{
     feedback.textContent = 'Start typing to reveal the latest gift ideas.';
     return;
@@ -3247,6 +3436,9 @@ function renderResults(query, filters) {{
     }}
     if (match.retailerName) {{
       metaParts.push(match.retailerName);
+    }}
+    if (match.priceDropLabel) {{
+      metaParts.push(match.priceDropLabel);
     }}
     if (metaParts.length) {{
       const meta = document.createElement('p');
@@ -3291,15 +3483,20 @@ const initial = (params.get('q') || '').trim();
 const initialFilters = {{
   price: params.get('price') || 'all',
   rating: params.get('rating') || 'all',
+  deal: params.get('deal') || 'all',
   retailer: params.get('retailer') || 'all',
 }};
 const priceOptions = new Set(['all', 'under-25', '25-50', '50-100', '100-plus']);
 const ratingOptions = new Set(['all', '4', '4.5']);
+const dealOptions = new Set(['all', 'on-sale', 'drop-10', 'drop-25']);
 if (!priceOptions.has(initialFilters.price)) {{
   initialFilters.price = 'all';
 }}
 if (!ratingOptions.has(initialFilters.rating)) {{
   initialFilters.rating = 'all';
+}}
+if (!dealOptions.has(initialFilters.deal)) {{
+  initialFilters.deal = 'all';
 }}
 if (initialFilters.retailer && !retailerMap.has(initialFilters.retailer)) {{
   initialFilters.retailer = 'all';
@@ -3307,6 +3504,7 @@ if (initialFilters.retailer && !retailerMap.has(initialFilters.retailer)) {{
 input.value = initial;
 priceSelect.value = initialFilters.price;
 ratingSelect.value = initialFilters.rating;
+dealSelect.value = initialFilters.deal;
 retailerSelect.value = initialFilters.retailer;
 applyState();
 form.addEventListener('submit', (event) => {{
@@ -3320,6 +3518,9 @@ priceSelect.addEventListener('change', () => {{
   applyState();
 }});
 ratingSelect.addEventListener('change', () => {{
+  applyState();
+}});
+dealSelect.addEventListener('change', () => {{
   applyState();
 }});
 retailerSelect.addEventListener('change', () => {{
@@ -3555,7 +3756,7 @@ retailerSelect.addEventListener('change', () => {{
     <label class=\"sr-only\" for=\"newsletter-email\">Email address</label>
     <div class=\"newsletter-fields\">
       <input id=\"newsletter-email\" type=\"email\" name=\"{email_field}\" placeholder=\"you@example.com\" autocomplete=\"email\" required />
-      <button type=\"submit\">{button_label}</button>
+      <button type=\"submit\" data-analytics=\"newsletter\" data-event=\"newsletter-submit\" data-category=\"newsletter\" data-placement=\"newsletter-banner\" data-label=\"{button_label}\">{button_label}</button>
     </div>{hidden_inputs_html}
   </form>
 </section>
@@ -3795,6 +3996,14 @@ retailerSelect.addEventListener('change', () => {{
         category_badge = ""
         if category:
             category_badge = f'<span class="card-badge">{html.escape(category.name)}</span>'
+        product_slug_attr = html.escape(product.slug, quote=True)
+        category_slug_attr = html.escape(product.category_slug or "", quote=True)
+        category_name_attr = (
+            html.escape(category.name, quote=True) if category else ""
+        )
+        retailer_slug_attr = html.escape(product.retailer_slug or "", quote=True)
+        retailer_name_attr = html.escape(product.retailer_name or "", quote=True)
+        product_label_attr = html.escape(product.title, quote=True)
         classes = "card"
         extra_class_value = extra_classes.strip()
         if extra_class_value:
@@ -3847,8 +4056,27 @@ retailerSelect.addEventListener('change', () => {{
         outbound_cta = ""
         if product.link:
             cta_copy = product.call_to_action or f"Shop on {product.retailer_name}"
+            analytics_attrs = [
+                'data-analytics="product-cta"',
+                'data-event="cta-click"',
+                f'data-product="{product_slug_attr}"',
+                f'data-product-name="{product_label_attr}"',
+                f'data-category="{category_slug_attr}"',
+                f'data-retailer="{retailer_slug_attr}"',
+                'data-placement="product-card"',
+                f'data-label="{product_label_attr}"',
+            ]
+            if category_name_attr:
+                analytics_attrs.append(
+                    f'data-category-name="{category_name_attr}"'
+                )
+            if retailer_name_attr:
+                analytics_attrs.append(
+                    f'data-retailer-name="{retailer_name_attr}"'
+                )
+            analytics_attr_str = " ".join(analytics_attrs)
             outbound_cta = (
-                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored">{html.escape(cta_copy)}</a>'
+                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored" {analytics_attr_str}>{html.escape(cta_copy)}</a>'
             )
         return f"""
 <article class="{classes}"{attr_fragment}>
