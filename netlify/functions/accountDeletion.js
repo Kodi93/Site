@@ -1,29 +1,5 @@
-<<<< codex/create-account-deletion-netlify-function-uz8ih4
-export async function handler(event) {
-  const headers = event.headers || {};
-  const token =
-    headers['x-verification-token'] ||
-    headers['x-verificationtoken'] ||
-    headers['x-verification_token'];
-
-  if (token !== process.env.DELETION_TOKEN) {
-    return { statusCode: 403, body: 'Invalid token' };
-  }
-
-  let body = {};
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch (error) {
-    console.warn('Failed to parse deletion payload:', error);
-  }
-
-  // TODO: delete user data in your DB using body.userId / body.email
-  console.log('Marketplace delete request:', body);
-
-  return { statusCode: 200, body: 'ok' };
-}
-====
 const REQUIRED_METHOD = 'POST';
+const EXPECTED_TOKEN = 'gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5';
 
 exports.handler = async (event) => {
   if (event.httpMethod !== REQUIRED_METHOD) {
@@ -36,20 +12,14 @@ exports.handler = async (event) => {
     };
   }
 
-  const expectedToken = process.env.MARKETPLACE_DELETION_TOKEN;
-
-  if (!expectedToken) {
-    console.error('MARKETPLACE_DELETION_TOKEN is not configured.');
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Server misconfiguration.' }),
-    };
-  }
-
   const headers = event.headers || {};
-  const receivedToken = headers['x-verification-token'] || headers['X-Verification-Token'];
+  const receivedToken =
+    headers['x-verification-token'] ||
+    headers['X-Verification-Token'] ||
+    headers['x-verificationtoken'] ||
+    headers['x-verification_token'];
 
-  if (!receivedToken || receivedToken !== expectedToken) {
+  if (receivedToken !== EXPECTED_TOKEN) {
     console.warn('Received request with invalid verification token.');
     return {
       statusCode: 403,
@@ -83,4 +53,3 @@ exports.handler = async (event) => {
     body: '',
   };
 };
->>>> main
