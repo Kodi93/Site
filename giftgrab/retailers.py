@@ -11,10 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Protocol, Sequence
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 from .amazon import AmazonCredentials, AmazonProductClient
+from .ebay import EbayCredentials, EbayProductClient
 from .utils import apply_partner_tag, load_json
 
 
@@ -369,6 +370,47 @@ class AmazonRetailerAdapter:
 
     def decorate_url(self, url: str | None) -> str:
         return apply_partner_tag(url, self.credentials.partner_tag)
+
+
+class EbayRetailerAdapter:
+    """Adapter wrapping the eBay Browse API client."""
+
+    slug = "ebay"
+    name = "eBay"
+    cta_label = "Shop on eBay"
+    homepage = "https://www.ebay.com/"
+
+    def __init__(self, credentials: EbayCredentials) -> None:
+        self.credentials = credentials
+        self.client = EbayProductClient(credentials)
+
+    def search_items(
+        self, *, keywords: Iterable[str], item_count: int
+    ) -> List[dict]:
+        return self.client.search_items(keywords=keywords, item_count=item_count)
+
+    def decorate_url(self, url: str | None) -> str:
+        destination = url or self.homepage
+        campaign_id = self.credentials.affiliate_campaign_id
+        if not campaign_id:
+            return destination
+        try:
+            parsed = urlparse(destination)
+        except ValueError:
+            return destination
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["campid"] = campaign_id
+        new_query = urlencode(query, doseq=True)
+        return urlunparse(
+            (
+                parsed.scheme or "https",
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                new_query,
+                parsed.fragment,
+            )
+        )
 
 
 @dataclass

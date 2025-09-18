@@ -10,12 +10,13 @@ from typing import List, Optional
 from urllib.parse import parse_qsl
 
 from .amazon import AmazonCredentials
+from .ebay import EbayCredentials
 from .article_repository import ArticleRepository
 from .config import DEFAULT_CATEGORIES, DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
-from .retailers import AmazonRetailerAdapter, StaticRetailerAdapter
+from .retailers import AmazonRetailerAdapter, EbayRetailerAdapter, StaticRetailerAdapter
 from .roundups import run_daily_roundups
 from .utils import load_json
 
@@ -69,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--item-count",
         type=int,
         default=6,
-        help="Number of products to request per category when fetching from Amazon.",
+        help="Number of products to request per category when fetching from configured retailers.",
     )
     parser.add_argument(
         "--data-file",
@@ -211,6 +212,22 @@ def load_credentials() -> Optional[AmazonCredentials]:
     )
 
 
+def load_ebay_credentials() -> Optional[EbayCredentials]:
+    client_id = os.getenv("EBAY_CLIENT_ID")
+    client_secret = os.getenv("EBAY_CLIENT_SECRET")
+    developer_id = os.getenv("EBAY_DEV_ID") or os.getenv("EBAY_DEVELOPER_ID")
+    campaign_id = os.getenv("EBAY_CAMPAIGN_ID")
+    if not all(value and value.strip() for value in (client_id, client_secret, developer_id)):
+        return None
+    campaign = campaign_id.strip() if campaign_id and campaign_id.strip() else None
+    return EbayCredentials(
+        client_id=client_id.strip(),
+        client_secret=client_secret.strip(),
+        developer_id=developer_id.strip(),
+        affiliate_campaign_id=campaign,
+    )
+
+
 def load_static_retailers() -> List[StaticRetailerAdapter]:
     """Discover JSON-backed retailer feeds stored on disk."""
 
@@ -323,21 +340,28 @@ def main(argv: Optional[list[str]] = None) -> None:
         parser.error("No stored products available. Run 'update' first to fetch data.")
 
     if command == "update":
-        credentials = load_credentials()
+        amazon_credentials = load_credentials()
+        ebay_credentials = load_ebay_credentials()
         static_retailers = load_static_retailers()
-        if credentials is None and not static_retailers:
+        if (
+            amazon_credentials is None
+            and ebay_credentials is None
+            and not static_retailers
+        ):
             parser.error(
-                "No retailer sources configured. Provide Amazon credentials or add JSON feeds under data/retailers/."
+                "No retailer sources configured. Provide Amazon or eBay credentials, or add JSON feeds under data/retailers/."
             )
         retailer_adapters = []
-        if credentials:
-            retailer_adapters.append(AmazonRetailerAdapter(credentials))
+        if amazon_credentials:
+            retailer_adapters.append(AmazonRetailerAdapter(amazon_credentials))
+        if ebay_credentials:
+            retailer_adapters.append(EbayRetailerAdapter(ebay_credentials))
         retailer_adapters.extend(static_retailers)
         pipeline = GiftPipeline(
             repository=repository,
             generator=generator,
             categories=DEFAULT_CATEGORIES,
-            credentials=credentials,
+            credentials=amazon_credentials,
             retailers=retailer_adapters,
             article_repository=article_repository,
         )

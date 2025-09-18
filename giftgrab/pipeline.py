@@ -31,7 +31,7 @@ class PipelineResult:
 
 
 class GiftPipeline:
-    """High level workflow that aggregates Amazon items and rebuilds the site."""
+    """High level workflow that aggregates retailer listings and rebuilds the site."""
 
     def __init__(
         self,
