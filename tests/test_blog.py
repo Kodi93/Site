@@ -28,13 +28,17 @@ class BlogTests(unittest.TestCase):
     def test_build_category_phrase_for_audience_categories(self) -> None:
         self.assertEqual(build_category_phrase("For Him"), "the perfect gift for him")
         self.assertEqual(
-            build_category_phrase("For a Techy"),
+            build_category_phrase("For a Techy"),< codex/revise-product-titles-and-descriptions-nopw04
             "the perfect gift for tech enthusiasts",
+
+            "the perfect gift for a techy",
+ main
         )
 
     def test_build_category_phrase_handles_homebody_upgrades(self) -> None:
         self.assertEqual(
             build_category_phrase("Homebody Upgrades"),
+ codex/revise-product-titles-and-descriptions-nopw04
             "a homebody upgrade they'll appreciate",
         )
 
@@ -42,6 +46,9 @@ class BlogTests(unittest.TestCase):
         self.assertEqual(
             build_category_phrase("For Fandom"),
             "the perfect gift for devoted superfans",
+=======
+            "a homebody upgrade worth gifting",
+>>>>>> main
         )
 
     def test_generate_blog_post_builds_rich_html(self) -> None:

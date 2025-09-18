@@ -58,6 +58,7 @@ def build_category_phrase(category_name: str) -> str:
     if not normalized:
         return "a standout gift"
     lower = normalized.lower()
+ codex/revise-product-titles-and-descriptions-nopw04
 
     audience_rewrites = {
         "fandom": "devoted superfans",
@@ -88,6 +89,19 @@ def build_category_phrase(category_name: str) -> str:
         base = lower[: -len(" upgrades")].strip()
         if base:
             return f"{_article(base)} {base} upgrade they'll appreciate"
+    if lower.startswith("gifts for "):
+        audience = lower[len("gifts for ") :].strip()
+        if audience:
+            return f"the perfect gift for {audience}"
+    if lower.startswith("for "):
+        audience = lower[len("for ") :].strip()
+        if audience:
+            return f"the perfect gift for {audience}"
+    if lower.endswith(" upgrades"):
+        base = lower[: -len(" upgrades")].strip()
+        if base:
+            return f"{_article(base)} {base} upgrade worth gifting"
+
     if lower.endswith(" power-ups"):
         base = lower[: -len(" power-ups")].strip()
         if base:
@@ -174,7 +188,11 @@ def generate_summary(product: Product, category_name: str, features: Iterable[st
         highlights.append(_to_sentence_fragment(trimmed))
     highlight_phrase = _join_with_and(highlights)
     return (
-        f"{product.title} is {phrase} with notable details such as {highlight_phrase}."
+ codex/revise-product-titles-and-descriptions-nopw04
+       f"{product.title} is {phrase} with notable details such as {highlight_phrase}."
+
+        f"{product.title} is {phrase} thanks to smart details like {highlight_phrase}."
+ main
     )
 
 
