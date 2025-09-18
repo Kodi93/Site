@@ -1,7 +1,9 @@
 """Tests for the Netlify marketplace account deletion handler."""
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
 import subprocess
 import textwrap
@@ -116,8 +118,17 @@ def test_head_request_returns_empty_body() -> None:
     assert result["body"] == ""
 
 
-def test_post_invalid_token_is_rejected() -> None:
-    """POST requests missing the verification token must be rejected."""
+def sign_payload(payload: str) -> str:
+    """Return the base64-encoded HMAC signature for the payload."""
+
+    digest = hmac.new(
+        EXPECTED_TOKEN.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).digest()
+    return base64.b64encode(digest).decode("ascii")
+
+
+def test_post_missing_signature_is_rejected() -> None:
+    """POST requests without a signature must be rejected."""
 
     event = {
         "httpMethod": "POST",
@@ -129,3 +140,70 @@ def test_post_invalid_token_is_rejected() -> None:
     result = invoke_handler(event)
     assert result["statusCode"] == 403
     assert json.loads(result["body"]) == {"message": "Forbidden"}
+
+
+def test_post_invalid_signature_is_rejected() -> None:
+    """POST requests with an incorrect signature should be rejected."""
+
+    payload = json.dumps({"userId": "123"})
+    event = {
+        "httpMethod": "POST",
+        "headers": {"x-ebay-signature": "sha256=invalid"},
+        "body": payload,
+        "isBase64Encoded": False,
+    }
+
+    result = invoke_handler(event)
+    assert result["statusCode"] == 403
+    assert json.loads(result["body"]) == {"message": "Forbidden"}
+
+
+def test_post_valid_signature_returns_204() -> None:
+    """Valid signatures should allow the payload to be acknowledged."""
+
+    payload = json.dumps({"userId": "abc-123"})
+    signature = sign_payload(payload)
+    event = {
+        "httpMethod": "POST",
+        "headers": {"x-ebay-signature": f"sha256={signature}"},
+        "body": payload,
+        "isBase64Encoded": False,
+    }
+
+    result = invoke_handler(event)
+    assert result["statusCode"] == 204
+    assert result["body"] == ""
+
+
+def test_post_valid_signature_handles_base64_body() -> None:
+    """Signatures must be verified against the decoded payload."""
+
+    payload = json.dumps({"userId": "encoded"})
+    signature = sign_payload(payload)
+    encoded_body = base64.b64encode(payload.encode("utf-8")).decode("ascii")
+    event = {
+        "httpMethod": "POST",
+        "headers": {"x-ebay-signature": signature},
+        "body": encoded_body,
+        "isBase64Encoded": True,
+    }
+
+    result = invoke_handler(event)
+    assert result["statusCode"] == 204
+    assert result["body"] == ""
+
+
+def test_post_legacy_token_header_still_allows_request() -> None:
+    """Fallback token header support eases manual testing flows."""
+
+    payload = json.dumps({"userId": "legacy"})
+    event = {
+        "httpMethod": "POST",
+        "headers": {"x-verification-token": EXPECTED_TOKEN},
+        "body": payload,
+        "isBase64Encoded": False,
+    }
+
+    result = invoke_handler(event)
+    assert result["statusCode"] == 204
+    assert result["body"] == ""
