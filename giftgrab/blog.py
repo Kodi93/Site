@@ -8,11 +8,6 @@ from .models import Product
 from .text import IntroParams, MetaParams, make_intro, make_meta
 from .utils import parse_price_string
 
-CTA_TEMPLATE = (
-    "<a class=\"cta-button\" href=\"{link}\" target=\"_blank\" rel=\"noopener sponsored\">"
-    "Review the listing on Amazon</a>"
-)
-
 
 @dataclass
 class GeneratedContent:
@@ -119,186 +114,206 @@ def _compose_intro_paragraph(
     intro_line = make_intro(
         IntroParams(title=product.title, use=use_hint, price=price_value)
     ).strip()
-    highlight_items = [
-        _to_sentence_fragment(_truncate_highlight(item.rstrip(". ")))
-        for item in _unique_items(features)[:3]
-    ]
+    highlight_items = _unique_items(features)
+    highlight_sentence = ""
     if highlight_items:
-        highlight_phrase = _join_with_and(highlight_items)
-        highlight_sentence = (
-            f"It emphasizes {highlight_phrase} so campaign briefs stay credible and easy to action."
+        fragments = [
+            _to_sentence_fragment(
+                _truncate_highlight(item.rstrip(". "))
+            )
+            for item in highlight_items[:3]
+            if item
+        ]
+        cleaned_fragments = [fragment for fragment in fragments if fragment]
+        if cleaned_fragments:
+            highlight_sentence = (
+                f"Standout details include {_join_with_and(cleaned_fragments)}."
+            )
+    elif product.keywords:
+        keyword_items = [
+            keyword.lower()
+            for keyword in _unique_items(product.keywords)[:3]
+            if keyword
+        ]
+        if keyword_items:
+            highlight_sentence = (
+                f"It leans into {_join_with_and(keyword_items)}."
+            )
+    rating_sentence = ""
+    if product.rating and product.total_reviews:
+        rating_sentence = (
+            f"Amazon shoppers currently rate it {product.rating:.1f} stars across {product.total_reviews:,} reviews."
         )
-    else:
-        highlight_sentence = (
-            "It emphasizes practical touches so campaign briefs stay credible and easy to action."
-        )
-    rating_sentence = (
-        f"Recent Amazon feedback averages {product.rating:.1f} stars across {product.total_reviews:,} reviews, signalling dependable satisfaction."
-        if product.rating and product.total_reviews
-        else "Revisit the Amazon listing before launch to confirm specifications and creative requirements for your teams."
-    )
-    closing_sentence = (
-        "Use the checklist below to validate pricing, positioning, and caveats before you pitch or publish."
-    )
+    closing_sentence = "Check the listing for the latest details before you add it to cart."
     sentences = [intro_line, highlight_sentence, rating_sentence, closing_sentence]
     return " ".join(sentence.strip() for sentence in sentences if sentence.strip())
 
 
-def _build_bullet_points(
-    product: Product,
-    category_name: str,
-    features: Sequence[str],
-    price: str | None,
-) -> List[str]:
-    bullets: List[str] = []
-    for feature in _unique_items(features)[:4]:
-        cleaned = _truncate_highlight(feature.rstrip(". "))
-        if cleaned:
-            bullets.append(f"Key spec: {cleaned}.")
-    if product.brand:
-        bullets.append(f"Brand: {product.brand.strip()}.")
-    if price:
-        bullets.append(f"Typical price: {price.strip()} (subject to change).")
-    if product.rating and product.total_reviews:
-        bullets.append(
-            f"Feedback: {product.rating:.1f}-star average across {product.total_reviews:,} Amazon reviews."
-        )
-    bullets.append(f"Category fit: {category_name.strip()}.")
-    fallback = [
-        "Availability: Monitor the listing and confirm stock before campaign launch.",
-        "Positioning: Works in curated guides, email features, and remarketing without heavy edits.",
-        "Compliance: Include pricing disclaimers and confirm assets prior to creative handoff.",
-    ]
-    deduped: List[str] = []
-    seen: set[str] = set()
-    for bullet in bullets + fallback:
-        normalized = " ".join(bullet.split())
-        if normalized and normalized not in seen:
-            deduped.append(normalized)
-            seen.add(normalized)
-        if len(deduped) >= 7:
+def _build_highlights(product: Product, features: Sequence[str]) -> List[str]:
+    highlights = _unique_items(features)
+    if not highlights:
+        highlights = _unique_items(product.keywords)
+    cleaned: List[str] = []
+    for item in highlights:
+        trimmed = _truncate_highlight(item.rstrip(". "), limit=80)
+        if trimmed:
+            cleaned.append(trimmed)
+        if len(cleaned) >= 5:
             break
-    return deduped[:7]
+    return cleaned
 
 
-def _render_bullet_list(items: Sequence[str]) -> str:
+def _render_highlights(items: Sequence[str]) -> str:
     if not items:
         return ""
     lis = "".join(f"<li>{item}</li>" for item in items)
-    return f"<h3>Key takeaways</h3><ul class=\"feature-list\">{lis}</ul>"
-
-
-def _good_for_text(category_name: str, product: Product) -> str:
-    use_hint = _category_use_hint(category_name, product) or "versatile gifting"
     return (
-        f"{use_hint.capitalize()} who appreciate practical, well-reviewed finds.".replace("  ", " ")
+        "<section class=\"highlights\">"
+        "<h3>Highlights</h3>"
+        f"<ul class=\"feature-list\">{lis}</ul>"
+        "</section>"
     )
 
 
-def _consider_points() -> List[str]:
-    return [
-        "Confirm availability, shipping windows, and region-specific details before finalizing campaigns.",
-        "Double-check compatibility, sizing, or installation needs to avoid customer support surprises.",
-    ]
+def _contains_keyword(values: Iterable[str], keywords: Sequence[str]) -> bool:
+    for value in values:
+        lower = value.lower()
+        for keyword in keywords:
+            if keyword.lower() in lower:
+                return True
+    return False
+
+
+def _build_pros(
+    product: Product, highlights: Sequence[str], price: str | None
+) -> List[str]:
+    pros: List[str] = []
+    for highlight in highlights[:3]:
+        fragment = highlight.rstrip(". ")
+        if fragment:
+            pros.append(f"{fragment} stands out on this pick.")
+    if product.brand:
+        pros.append(f"Made by {product.brand.strip()} with Amazon-ready convenience.")
+    if product.rating and product.total_reviews:
+        pros.append(
+            f"Backed by a {product.rating:.1f}-star average from {product.total_reviews:,} Amazon reviews."
+        )
+    if price:
+        pros.append(f"Captured at {price.strip()} when listed; competitive for the category.")
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for item in pros:
+        normalized = " ".join(item.split())
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+    return deduped[:4]
+
+
+def _build_cons(product: Product, features: Sequence[str]) -> List[str]:
+    texts = list(features) + list(product.keywords)
+    cons: List[str] = []
+    if product.rating is None or product.total_reviews is None:
+        cons.append("Not enough Amazon reviews yet to gauge long-term satisfaction.")
+    else:
+        cons.append("Read the latest Amazon reviews to confirm it still meets expectations.")
+    if product.price:
+        cons.append("Pricing and availability can change quickly on Amazon—double-check before checkout.")
+    else:
+        cons.append("Check the Amazon listing for current pricing and stock details.")
+    if _contains_keyword(texts, ["usb"]):
+        cons.append("Requires access to USB power during use.")
+    if _contains_keyword(texts, ["battery"]):
+        cons.append("May need charged or replaced batteries right out of the box.")
+    if _contains_keyword(texts, ["outdoor", "weather"]):
+        cons.append("Verify the weather-readiness specs before planning outdoor use.")
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for item in cons:
+        normalized = " ".join(item.split())
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+        if len(deduped) >= 5:
+            break
+    return deduped
+
+
+def _render_pros_cons(pros: Sequence[str], cons: Sequence[str]) -> str:
+    if not pros and not cons:
+        return ""
+    blocks: List[str] = []
+    if pros:
+        lis = "".join(f"<li>{item}</li>" for item in pros)
+        blocks.append(f"<div class=\"pros\"><h3>Pros</h3><ul>{lis}</ul></div>")
+    if cons:
+        lis = "".join(f"<li>{item}</li>" for item in cons)
+        blocks.append(f"<div class=\"cons\"><h3>Cons</h3><ul>{lis}</ul></div>")
+    inner = "".join(blocks)
+    return f"<section class=\"pros-cons\">{inner}</section>"
+
+
+def _build_usage_tips(
+    product: Product, category_name: str, features: Sequence[str]
+) -> List[str]:
+    texts = list(features) + list(product.keywords)
+    tips: List[str] = []
+    use_hint = _category_use_hint(category_name, product)
+    if use_hint:
+        tips.append(
+            f"Pair it with other {use_hint} finds to round out your gift list."
+        )
+    if _contains_keyword(texts, ["usb"]):
+        tips.append("Set it up near a USB power source or adapter for the best experience.")
+    if _contains_keyword(texts, ["battery"]):
+        tips.append("Charge or install batteries before wrapping so it's ready to go.")
+    if _contains_keyword(texts, ["kit", "set"]):
+        tips.append("Lay out all pieces before use to make sure nothing is missing.")
+    if _contains_keyword(texts, ["outdoor", "weather"]):
+        tips.append("Check Amazon's care instructions for outdoor or weather considerations.")
+    tips.append("Review Amazon's product description for full specifications and sizing details.")
+    tips.append("Use the Amazon Q&A section if you need clarification from recent buyers.")
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for tip in tips:
+        normalized = " ".join(tip.split())
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+        if len(deduped) >= 5:
+            break
+    return deduped
+
+
+def _render_usage_tips(tips: Sequence[str]) -> str:
+    if not tips:
+        return ""
+    lis = "".join(f"<li>{tip}</li>" for tip in tips)
+    return (
+        "<section class=\"usage-tips\">"
+        "<h3>Usage tips</h3>"
+        f"<ul>{lis}</ul>"
+        "</section>"
+    )
+
+
+def _good_for_text(category_name: str, product: Product) -> str:
+    normalized = _normalized_words(category_name).strip()
+    if normalized.lower().startswith("for "):
+        audience = normalized[len("for ") :].strip().lower()
+        if audience:
+            return f"People shopping for {audience}."
+    if normalized:
+        return f"{normalized} shoppers looking for a reliable Amazon find."
+    if product.keywords:
+        keyword_list = ", ".join(_unique_items(product.keywords)[:2])
+        if keyword_list:
+            return f"Fans of {keyword_list.lower()} looking for a ready-to-gift pick."
+    return "Shoppers who appreciate practical, well-reviewed finds."
 
 
 def _render_good_for(text: str) -> str:
     return f"<p class=\"good-for\"><strong>Good for:</strong> {text}</p>"
-
-
-def _render_consider(points: Sequence[str]) -> str:
-    if not points:
-        return ""
-    lis = "".join(f"<li>{point}</li>" for point in points)
-    return f"<div class=\"consider-block\"><strong>Consider:</strong><ul>{lis}</ul></div>"
-
-
-def _render_campaign_playbook(
-    product: Product, category_name: str, features: Sequence[str]
-) -> str:
-    highlights = _unique_items(features) or _unique_items(product.keywords)
-    trimmed_highlights = [
-        _truncate_highlight(item.rstrip(". ")) for item in highlights[:3]
-    ]
-    highlight_phrase = _join_with_and(
-        [item for item in trimmed_highlights if item]
-    )
-    if highlight_phrase:
-        hero_sentence = (
-            f"Lead with {highlight_phrase} so merchandising teams grasp the hook instantly."
-        )
-    else:
-        hero_sentence = (
-            "Lead with the core value prop so merchandising teams grasp the hook instantly."
-        )
-    audience_phrase = build_category_phrase(category_name)
-    use_hint = _category_use_hint(category_name, product) or "high-intent moments"
-    if product.rating and product.total_reviews:
-        proof_sentence = (
-            f"Reinforce the pitch with {product.rating:.1f}-star proof from {product.total_reviews:,} verified buyers."
-        )
-    else:
-        proof_sentence = (
-            "Surface fresh social proof or testimonials before assets go live."
-        )
-    if product.brand:
-        brand_sentence = (
-            f"Mention {product.brand.strip()} by name—brand credibility boosts conversion in social drops and newsletters."
-        )
-    else:
-        brand_sentence = (
-            "Include brand specifics in your deck so editors can fact-check without slowing launch timelines."
-        )
-    closing_sentence = (
-        "Close with a clear CTA, pricing disclaimer, and the highlights below so your creative brief stays plug-and-play."
-    )
-    paragraphs = [
-        hero_sentence + f" Position it as {audience_phrase} that earns organic placements.",
-        f"Map it to {use_hint} in your calendar and pair it with complementary add-ons to lift average order value. {proof_sentence}",
-        f"{brand_sentence} {closing_sentence}",
-    ]
-    body = "".join(
-        f"<p>{_normalized_words(paragraph)}</p>"
-        for paragraph in paragraphs
-        if paragraph
-    )
-    return f"<section class=\"campaign-playbook\"><h3>Campaign playbook</h3>{body}</section>"
-
-
-def _render_launch_checklist(product: Product, features: Sequence[str]) -> str:
-    highlights = _unique_items(features)
-    checklist: list[str] = []
-    if highlights:
-        spotlight = _truncate_highlight(highlights[0].rstrip(". "))
-        if spotlight:
-            checklist.append(f"Spotlight {spotlight} in hero imagery and subject lines.")
-    if product.rating and product.total_reviews:
-        checklist.append(
-            f"Quote the {product.rating:.1f}-star feedback from {product.total_reviews:,} reviewers to add instant social proof."
-        )
-    else:
-        checklist.append(
-            "Pull recent customer commentary from the listing to strengthen the story before launch."
-        )
-    if product.price:
-        checklist.append(
-            f"Pair the {product.price.strip()} price callout with a clear \"subject to change\" disclaimer."
-        )
-    checklist.append(
-        "Link campaign CTAs directly to the retailer listing with your tracking parameters applied."
-    )
-    checklist.append(
-        "Drop the spec bullets below into your CMS, press notes, or creative brief so stakeholders can copy/paste."
-    )
-    seen: set[str] = set()
-    normalized_items: list[str] = []
-    for item in checklist:
-        normalized = _normalized_words(item)
-        if normalized and normalized not in seen:
-            normalized_items.append(normalized)
-            seen.add(normalized)
-    lis = "".join(f"<li>{entry}</li>" for entry in normalized_items)
-    return f"<section class=\"launch-checklist\"><h3>Launch checklist</h3><ul>{lis}</ul></section>"
 
 
 def _price_line(product: Product) -> str:
@@ -315,12 +330,6 @@ def _review_line(product: Product) -> str:
     return (
         f"<p class=\"review-callout\">Rated {product.rating:.1f} stars by {product.total_reviews:,} shoppers.</p>"
     )
-
-
-def _cta(product: Product) -> str:
-    return CTA_TEMPLATE.format(link=product.link)
-
-
 def build_category_phrase(category_name: str) -> str:
     normalized = _normalized_words(category_name or "").strip()
     if not normalized:
@@ -406,25 +415,34 @@ def generate_blog_post(product: Product, category_name: str, features: List[str]
     summary = generate_summary(product, category_name, features)
     price_value, _currency = _price_components(product.price)
     intro = _compose_intro_paragraph(product, category_name, features, price_value)
-    bullet_html = _render_bullet_list(
-        _build_bullet_points(product, category_name, features, product.price)
-    )
-    playbook_html = _render_campaign_playbook(product, category_name, features)
-    launch_checklist_html = _render_launch_checklist(product, features)
-    good_for_html = _render_good_for(_good_for_text(category_name, product))
-    consider_html = _render_consider(_consider_points())
     price_line = _price_line(product)
     review_line = _review_line(product)
-    cta = _cta(product)
-    html = (
-        f"<p>{intro}</p>"
-        f"{price_line}"
-        f"{review_line}"
-        f"{bullet_html}"
-        f"{playbook_html}"
-        f"{launch_checklist_html}"
-        f"{good_for_html}"
-        f"{consider_html}"
-        f"<p class=\"cta-row\">{cta}</p>"
+    overview_parts = [f"<p>{intro}</p>"]
+    if price_line:
+        overview_parts.append(price_line)
+    if review_line:
+        overview_parts.append(review_line)
+    overview_html = (
+        "<section class=\"product-overview\">"
+        "<h2>Overview</h2>"
+        f"{''.join(overview_parts)}"
+        "</section>"
     )
+    highlights = _build_highlights(product, features)
+    highlights_html = _render_highlights(highlights)
+    pros = _build_pros(product, highlights, product.price)
+    cons = _build_cons(product, features)
+    pros_cons_html = _render_pros_cons(pros, cons)
+    usage_tips_html = _render_usage_tips(
+        _build_usage_tips(product, category_name, features)
+    )
+    good_for_html = _render_good_for(_good_for_text(category_name, product))
+    sections = [
+        overview_html,
+        highlights_html,
+        pros_cons_html,
+        usage_tips_html,
+        good_for_html,
+    ]
+    html = "".join(section for section in sections if section)
     return GeneratedContent(summary=summary, html=html)
