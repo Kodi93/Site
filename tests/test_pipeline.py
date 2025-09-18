@@ -3,6 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from giftgrab.article_repository import ArticleRepository
 from giftgrab.config import CategoryDefinition
 from giftgrab.models import CooldownEntry
 from giftgrab.pipeline import GiftPipeline
@@ -14,7 +15,7 @@ class DummyGenerator:
         self.calls = 0
         self.last_products = None
 
-    def build(self, categories, products) -> None:  # pragma: no cover - simple stub
+    def build(self, categories, products, *, articles=None) -> None:  # pragma: no cover - stub
         self.calls += 1
         self.last_products = list(products)
 
@@ -123,6 +124,26 @@ class PipelineCooldownTests(unittest.TestCase):
         pipeline.run(item_count=2, regenerate_only=False)
         self.assertEqual(retailer.last_item_count, 5)
         self.assertGreaterEqual(len(self.repo.load_products()), 5)
+
+
+def test_pipeline_generate_only_handles_article_repository(tmp_path: Path) -> None:
+    data_file = tmp_path / "products.json"
+    repo = ProductRepository(data_file=data_file)
+    generator = DummyGenerator()
+    article_repo = ArticleRepository(tmp_path / "articles.json")
+    pipeline = GiftPipeline(
+        repository=repo,
+        generator=generator,
+        categories=[TEST_CATEGORY],
+        retailers=[],
+        credentials=None,
+        article_repository=article_repo,
+    )
+
+    result = pipeline.run(item_count=0, regenerate_only=True)
+
+    assert result.products == []
+    assert generator.calls == 1
 
 
 if __name__ == "__main__":

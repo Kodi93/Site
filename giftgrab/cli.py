@@ -9,6 +9,7 @@ from typing import List, Optional
 from urllib.parse import parse_qsl
 
 from .amazon import AmazonCredentials
+from .article_repository import ArticleRepository
 from .config import DEFAULT_CATEGORIES, DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
@@ -266,6 +267,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     settings = load_site_settings()
     repository = ProductRepository(data_file=args.data_file)
     generator = SiteGenerator(settings, output_dir=args.output_dir)
+    article_repository = ArticleRepository(DATA_DIR / "articles.json")
 
     has_products = bool(repository.load_products())
     default_command = getattr(args, "_default_command", get_configured_default_command())
@@ -299,6 +301,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             categories=DEFAULT_CATEGORIES,
             credentials=credentials,
             retailers=retailer_adapters,
+            article_repository=article_repository,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=False)
     else:
@@ -309,6 +312,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             categories=DEFAULT_CATEGORIES,
             credentials=None,
             retailers=retailer_adapters,
+            article_repository=article_repository,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=True)
 

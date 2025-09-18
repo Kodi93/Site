@@ -55,6 +55,7 @@ class Product:
     retailer_name: str = "Amazon"
     retailer_homepage: str | None = None
     call_to_action: str | None = None
+    click_count: int | None = None
     price_history: List[PricePoint] = field(default_factory=list)
     created_at: str = field(default_factory=timestamp)
     updated_at: str = field(default_factory=timestamp)
@@ -81,6 +82,7 @@ class Product:
             "retailer_name": self.retailer_name,
             "retailer_homepage": self.retailer_homepage,
             "call_to_action": self.call_to_action,
+            "click_count": self.click_count,
             "price_history": [point.to_dict() for point in self.price_history],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -105,6 +107,7 @@ class Product:
             retailer_name=data.get("retailer_name", "Amazon"),
             retailer_homepage=data.get("retailer_homepage"),
             call_to_action=data.get("call_to_action"),
+            click_count=data.get("click_count"),
             price_history=[
                 PricePoint.from_dict(point)
                 for point in data.get("price_history", [])
@@ -169,6 +172,8 @@ class Product:
             self.retailer_homepage = other.retailer_homepage
         if other.call_to_action:
             self.call_to_action = other.call_to_action
+        if other.click_count is not None:
+            self.click_count = other.click_count
         combined_keywords: List[str] = []
         for keyword in list(self.keywords) + list(other.keywords):
             if keyword and keyword not in combined_keywords:
