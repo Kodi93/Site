@@ -1,12 +1,27 @@
 const REQUIRED_METHOD = 'POST';
 const EXPECTED_TOKEN = 'gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5';
+const HEALTH_CHECK_METHODS = new Set(['GET', 'HEAD']);
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== REQUIRED_METHOD) {
+  const method = event.httpMethod || '';
+
+  if (HEALTH_CHECK_METHODS.has(method)) {
+    const body = method === 'HEAD' ? '' : JSON.stringify({ status: 'ready' });
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body,
+    };
+  }
+
+  if (method !== REQUIRED_METHOD) {
     return {
       statusCode: 405,
       headers: {
-        Allow: REQUIRED_METHOD,
+        Allow: `${REQUIRED_METHOD}, GET, HEAD`,
       },
       body: JSON.stringify({ message: 'Method Not Allowed' }),
     };
