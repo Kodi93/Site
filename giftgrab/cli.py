@@ -343,7 +343,6 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
         pipeline.run(item_count=args.item_count, regenerate_only=False)
     elif command == "roundups":
-<<<< codex/automate-daily-top-10-product-roundups-utru0g
         roundup_limit = args.roundup_limit
         if roundup_limit <= 0:
             parser.error("--roundup-limit must be positive")
@@ -365,10 +364,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             seed=args.roundup_seed,
             days=roundup_days,
             start_date=roundup_start_date,
-====
-        run_daily_roundups(
-            repository=repository, article_repository=article_repository
->>>>> main
         )
         retailer_adapters = load_static_retailers()
         pipeline = GiftPipeline(
