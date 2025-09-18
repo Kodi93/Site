@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from .utils import parse_price_string, slugify, timestamp
 
@@ -297,3 +297,215 @@ class CooldownEntry:
     def is_active(self, cooldown_days: int, now: datetime | None = None) -> bool:
         reference = now or datetime.now(timezone.utc)
         return reference - self.added_at_datetime() < timedelta(days=cooldown_days)
+
+
+GENERATED_PRODUCT_STATUSES = {"draft", "published"}
+
+
+def _coerce_status(value: str, *, default: str = "draft") -> str:
+    normalized = (value or "").strip().lower()
+    if normalized not in GENERATED_PRODUCT_STATUSES:
+        return default
+    return normalized
+
+
+def _clean_lines(values: Iterable[str] | None) -> List[str]:
+    cleaned: List[str] = []
+    if not values:
+        return cleaned
+    for value in values:
+        if not value:
+            continue
+        text = str(value).strip()
+        if text:
+            cleaned.append(text)
+    return cleaned
+
+
+@dataclass
+class GeneratedProduct:
+    """Synthetic product detail used for roundup landing pages."""
+
+    slug: str
+    name: str
+    query: str
+    affiliate_url: str
+    intro: str
+    bullets: List[str] = field(default_factory=list)
+    caveats: List[str] = field(default_factory=list)
+    category: Optional[str] = None
+    price_cap: Optional[int] = None
+    image: Optional[str] = None
+    status: str = "draft"
+    score: int = 0
+    created_at: str = field(default_factory=timestamp)
+    updated_at: str = field(default_factory=timestamp)
+    published_at: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.slug = slugify(self.slug)
+        self.status = _coerce_status(self.status)
+        self.bullets = _clean_lines(self.bullets)
+        self.caveats = _clean_lines(self.caveats)
+        if self.published_at is not None and not self.published_at.strip():
+            self.published_at = None
+
+    def mark_published(self, when: Optional[str] = None) -> None:
+        when_value = when or timestamp()
+        self.status = "published"
+        self.published_at = when_value
+        self.updated_at = when_value
+
+    def touch(self) -> None:
+        self.updated_at = timestamp()
+
+    def to_dict(self) -> dict:
+        return {
+            "slug": self.slug,
+            "name": self.name,
+            "query": self.query,
+            "affiliate_url": self.affiliate_url,
+            "intro": self.intro,
+            "bullets": list(self.bullets),
+            "caveats": list(self.caveats),
+            "category": self.category,
+            "price_cap": self.price_cap,
+            "image": self.image,
+            "status": self.status,
+            "score": self.score,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "published_at": self.published_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "GeneratedProduct":
+        return cls(
+            slug=data.get("slug", ""),
+            name=data.get("name", ""),
+            query=data.get("query", ""),
+            affiliate_url=data.get("affiliate_url", ""),
+            intro=data.get("intro", ""),
+            bullets=list(data.get("bullets") or []),
+            caveats=list(data.get("caveats") or []),
+            category=data.get("category"),
+            price_cap=data.get("price_cap"),
+            image=data.get("image"),
+            status=data.get("status", "draft"),
+            score=int(data.get("score", 0) or 0),
+            created_at=data.get("created_at", timestamp()),
+            updated_at=data.get("updated_at", timestamp()),
+            published_at=data.get("published_at"),
+        )
+
+
+@dataclass
+class RoundupItem:
+    """Represents a single ranked item inside a roundup article."""
+
+    rank: int
+    title: str
+    product_slug: str
+    summary: str
+
+    def __post_init__(self) -> None:
+        self.rank = int(self.rank)
+        self.product_slug = slugify(self.product_slug)
+        self.summary = self.summary.strip()
+
+    def to_dict(self) -> dict:
+        return {
+            "rank": self.rank,
+            "title": self.title,
+            "product_slug": self.product_slug,
+            "summary": self.summary,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RoundupItem":
+        return cls(
+            rank=data.get("rank", 0),
+            title=data.get("title", ""),
+            product_slug=data.get("product_slug", ""),
+            summary=data.get("summary", ""),
+        )
+
+
+@dataclass
+class RoundupArticle:
+    """Simplified roundup article referencing generated product pages."""
+
+    slug: str
+    title: str
+    description: str
+    topic: str
+    price_cap: Optional[int]
+    intro: str
+    amazon_search_url: str
+    items: List[RoundupItem] = field(default_factory=list)
+    status: str = "draft"
+    created_at: str = field(default_factory=timestamp)
+    updated_at: str = field(default_factory=timestamp)
+    published_at: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.slug = slugify(self.slug)
+        self.status = _coerce_status(self.status)
+        self.items = [item for item in self.items if item.product_slug]
+        if self.published_at is not None and not self.published_at.strip():
+            self.published_at = None
+
+    def mark_published(self, when: Optional[str] = None) -> None:
+        when_value = when or timestamp()
+        self.status = "published"
+        self.published_at = when_value
+        self.updated_at = when_value
+
+    def touch(self) -> None:
+        self.updated_at = timestamp()
+
+    def to_dict(self) -> dict:
+        return {
+            "slug": self.slug,
+            "title": self.title,
+            "description": self.description,
+            "topic": self.topic,
+            "price_cap": self.price_cap,
+            "intro": self.intro,
+            "amazon_search_url": self.amazon_search_url,
+            "items": [item.to_dict() for item in self.items],
+            "status": self.status,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "published_at": self.published_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RoundupArticle":
+        return cls(
+            slug=data.get("slug", ""),
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            topic=data.get("topic", ""),
+            price_cap=data.get("price_cap"),
+            intro=data.get("intro", ""),
+            amazon_search_url=data.get("amazon_search_url", ""),
+            items=[
+                RoundupItem.from_dict(item)
+                for item in (data.get("items") or [])
+                if isinstance(item, dict)
+            ],
+            status=data.get("status", "draft"),
+            created_at=data.get("created_at", timestamp()),
+            updated_at=data.get("updated_at", timestamp()),
+            published_at=data.get("published_at"),
+        )
+
+    @property
+    def body_markdown(self) -> str:
+        sections = [self.intro.strip()]
+        for item in self.items:
+            summary = item.summary.strip()
+            sections.append(f"{item.rank}. **{item.title}** — {summary}")
+        sections.append(f"Amazon searches: {self.amazon_search_url}")
+        return "\n\n".join(section for section in sections if section).strip()

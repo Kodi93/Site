@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+from datetime import date
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import parse_qsl
@@ -15,11 +16,12 @@ from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
 from .retailers import AmazonRetailerAdapter, StaticRetailerAdapter
+from .roundups import run_daily_roundups
 from .utils import load_json
 
 LOGGER = logging.getLogger(__name__)
 
-COMMAND_CHOICES: tuple[str, ...] = ("update", "generate")
+COMMAND_CHOICES: tuple[str, ...] = ("update", "generate", "roundups")
 
 
 def get_configured_default_command() -> str:
@@ -43,12 +45,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.set_defaults(command=None, _default_command=default_command)
 
+    def env_int(name: str, default: int) -> int:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return default
+
     parser.add_argument(
         "command",
         choices=COMMAND_CHOICES,
         nargs="?",
         help=(
-            "Use 'update' to fetch new products and rebuild, or 'generate' to rebuild from stored data. "
+            "Use 'update' to fetch new products and rebuild, 'generate' to rebuild from stored data, "
+            "or 'roundups' to synthesize roundup playbooks and refresh the site. "
             f"When omitted, defaults to '{default_command}' once stored data exists; "
             "if no products have been stored yet, the update command runs automatically."
         ),
@@ -70,6 +82,32 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=OUTPUT_DIR,
         help="Directory where the static site files will be written.",
+    )
+    parser.add_argument(
+        "--roundup-limit",
+        type=int,
+        default=env_int("ROUNDUPS_PER_DAY", 15),
+        help=(
+            "Number of roundup lists to generate per day when running the 'roundups' command."
+        ),
+    )
+    parser.add_argument(
+        "--roundup-days",
+        type=int,
+        default=env_int("ROUNDUPS_DAYS", 1),
+        help="Number of days of roundup content to synthesize when running 'roundups'.",
+    )
+    parser.add_argument(
+        "--roundup-seed",
+        type=str,
+        default=os.getenv("ROUNDUPS_SEED"),
+        help="Optional seed for deterministic roundup output.",
+    )
+    parser.add_argument(
+        "--roundup-start-date",
+        type=str,
+        default=os.getenv("ROUNDUPS_START_DATE"),
+        help="ISO date (YYYY-MM-DD) to start scheduling roundups from.",
     )
     parser.add_argument(
         "--log-level",
@@ -304,6 +342,39 @@ def main(argv: Optional[list[str]] = None) -> None:
             article_repository=article_repository,
         )
         pipeline.run(item_count=args.item_count, regenerate_only=False)
+    elif command == "roundups":
+        roundup_limit = args.roundup_limit
+        if roundup_limit <= 0:
+            parser.error("--roundup-limit must be positive")
+        roundup_days = args.roundup_days
+        if roundup_days <= 0:
+            parser.error("--roundup-days must be positive")
+        roundup_start_date = None
+        if args.roundup_start_date:
+            try:
+                roundup_start_date = date.fromisoformat(args.roundup_start_date)
+            except ValueError:
+                parser.error(
+                    "--roundup-start-date must be in ISO format (YYYY-MM-DD)"
+                )
+        run_daily_roundups(
+            repository=repository,
+            article_repository=article_repository,
+            limit=roundup_limit,
+            seed=args.roundup_seed,
+            days=roundup_days,
+            start_date=roundup_start_date,
+        )
+        retailer_adapters = load_static_retailers()
+        pipeline = GiftPipeline(
+            repository=repository,
+            generator=generator,
+            categories=DEFAULT_CATEGORIES,
+            credentials=None,
+            retailers=retailer_adapters,
+            article_repository=article_repository,
+        )
+        pipeline.run(item_count=args.item_count, regenerate_only=True)
     else:
         retailer_adapters = load_static_retailers()
         pipeline = GiftPipeline(

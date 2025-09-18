@@ -14,9 +14,17 @@ from urllib.parse import quote_plus
 
 from .config import DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
 from .articles import Article, ArticleItem
-from .models import Category, PricePoint, Product
+from .models import Category, GeneratedProduct, PricePoint, Product, RoundupArticle
 from .quality import SeoPayload, passes_seo
-from .text import MetaParams, TitleParams, make_meta, make_title
+from .text import (
+    MetaParams,
+    TitleParams,
+    desc_breakdown,
+    intro_breakdown,
+    make_meta,
+    make_title,
+    title_breakdown,
+)
 from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string, slugify
 
 logger = logging.getLogger(__name__)
@@ -2165,6 +2173,9 @@ class SiteGenerator:
         self._nav_cache: List[Category] = []
         self._category_lookup: dict[str, Category] = {}
         self._product_lookup: dict[str, Product] = {}
+        self._generated_lookup: dict[str, GeneratedProduct] = {}
+        self._roundups: List[RoundupArticle] = []
+        self._best_generated: GeneratedProduct | None = None
         self._has_deals_page = False
         self._deals_products: List[Product] = []
         self._seo_failures: set[str] = set()
@@ -2175,6 +2186,9 @@ class SiteGenerator:
         products: List[Product],
         *,
         articles: Sequence[Article] | None = None,
+        generated_products: Sequence[GeneratedProduct] | None = None,
+        roundups: Sequence[RoundupArticle] | None = None,
+        best_generated: GeneratedProduct | None = None,
     ) -> None:
         logger.info("Generating site with %s products", len(products))
         self._write_assets()
@@ -2185,11 +2199,40 @@ class SiteGenerator:
         self._seo_failures.clear()
         products_sorted = sorted(products, key=lambda p: p.updated_at, reverse=True)
         self._product_lookup = {product.slug: product for product in products_sorted}
+        generated_list = [
+            product
+            for product in (generated_products or [])
+            if getattr(product, "status", "published") == "published"
+        ]
+        self._generated_lookup = {product.slug: product for product in generated_list}
+        self._roundups = [
+            roundup
+            for roundup in (roundups or [])
+            if getattr(roundup, "status", "published") == "published"
+        ]
+        if best_generated is None and generated_list:
+            sorted_candidates = sorted(
+                generated_list,
+                key=lambda item: (
+                    item.score,
+                    item.published_at or item.updated_at,
+                ),
+                reverse=True,
+            )
+            self._best_generated = sorted_candidates[0]
+        else:
+            self._best_generated = best_generated
         self._deals_products = self._select_deals_products(products_sorted)
         self._has_deals_page = bool(self._deals_products)
         if self._has_deals_page:
             self._write_deals_page(self._deals_products)
-        self._write_index(categories, products_sorted[:12], products_sorted)
+        self._write_index(
+            categories,
+            products_sorted[:12],
+            products_sorted,
+            best_generated=self._best_generated,
+            roundups=self._roundups,
+        )
         self._write_latest_page(products_sorted)
         self._write_search_page(categories, products_sorted)
         for category in categories:
@@ -2206,11 +2249,21 @@ class SiteGenerator:
                     if candidate.asin != product.asin
                 ][:3]
                 self._write_product_page(product, category, related)
+        for generated in generated_list:
+            self._write_generated_product_page(generated)
+        for roundup in self._roundups:
+            self._write_roundup_page(roundup)
         articles_list = [article for article in (articles or []) if article.status == "published"]
         if articles_list:
             self._write_articles(articles_list, categories, products_sorted)
-        self._write_feed(products_sorted)
-        self._write_sitemap(categories, products_sorted, articles_list)
+        self._write_feed(products_sorted, generated_list, self._roundups)
+        self._write_sitemap(
+            categories,
+            products_sorted,
+            articles_list,
+            generated_list,
+            self._roundups,
+        )
         self._write_robots()
 
     # ------------------------------------------------------------------
@@ -2796,6 +2849,9 @@ class SiteGenerator:
         categories: List[Category],
         featured_products: List[Product],
         all_products: List[Product],
+        *,
+        best_generated: GeneratedProduct | None = None,
+        roundups: Sequence[RoundupArticle] | None = None,
     ) -> None:
         cta_href = f"/{self._category_path(categories[0].slug)}" if categories else "#"
         total_products = len(all_products)
@@ -2856,6 +2912,8 @@ class SiteGenerator:
             self._category_card(category) for category in categories
         )
         feed_section = self._news_feed_section(all_products)
+        best_gift_section = self._best_gift_section(best_generated)
+        roundup_section = self._roundup_listing(roundups or [])
         category_section = f"""
 <section>
   <div class=\"section-heading\">
@@ -2891,7 +2949,9 @@ class SiteGenerator:
 </section>
 """
         newsletter_banner = self._newsletter_banner()
-        body = f"{hero}{feed_section}{category_section}{newsletter_banner}{value_props}"
+        body = (
+            f"{hero}{best_gift_section}{feed_section}{roundup_section}{category_section}{newsletter_banner}{value_props}"
+        )
         organization_data = self._organization_structured_data()
         website_schema = {
             "@context": "https://schema.org",
@@ -2941,6 +3001,102 @@ class SiteGenerator:
             updated_time=self._format_iso8601(latest_site_update),
         )
         self._write_page(self.output_dir / "index.html", context)
+
+    def _best_gift_section(self, product: GeneratedProduct | None) -> str:
+        if product is None:
+            return ""
+        image_seed = slugify(product.category or product.name or "gift")
+        fallback_image = f"https://source.unsplash.com/600x400/?{html.escape(image_seed)}"
+        image_url = html.escape(product.image or fallback_image)
+        detail_url = f"/{self._generated_product_path(product)}"
+        intro_text = product.intro or intro_breakdown(product.name, product.price_cap)
+        intro = html.escape(intro_text)
+        affiliate = html.escape(product.affiliate_url)
+        bullet_items = "".join(
+            f"<li>{html.escape(line)}</li>" for line in product.bullets
+        )
+        bullets_html = (
+            f"<ul class=\"best-gift-highlights\">{bullet_items}</ul>"
+            if bullet_items
+            else ""
+        )
+        caveat_items = "".join(
+            f"<li>{html.escape(line)}</li>" for line in product.caveats
+        )
+        caveats_html = (
+            f"<div class=\"best-gift-consider\"><h4>Consider</h4><ul>{caveat_items}</ul></div>"
+            if caveat_items
+            else ""
+        )
+        return f"""
+<section class=\"best-gift\">
+  <div class=\"section-heading\">
+    <span class=\"badge\">Weekly spotlight</span>
+    <h2>Best Gift This Week</h2>
+    <p>Highest scoring roundup pick from the past seven days.</p>
+  </div>
+  <article class=\"card best-gift-card\">
+    <a class=\"card-media\" href=\"{detail_url}\">
+      <img src=\"{image_url}\" alt=\"{html.escape(product.name)}\" loading=\"lazy\" decoding=\"async\" />
+    </a>
+    <div class=\"card-content\">
+      <h3><a href=\"{detail_url}\">{html.escape(product.name)}</a></h3>
+      <p>{intro}</p>
+      {bullets_html}
+      {caveats_html}
+      <div class=\"card-actions\">
+        <a class=\"button-link\" href=\"{detail_url}\">See details</a>
+        <a class=\"cta-secondary\" href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Check current price on Amazon</a>
+      </div>
+    </div>
+  </article>
+</section>
+"""
+
+    def _roundup_listing(self, roundups: Sequence[RoundupArticle]) -> str:
+        if not roundups:
+            return ""
+        cards: List[str] = []
+        for roundup in list(roundups)[:6]:
+            image_seed = slugify(roundup.topic or "gifts")
+            fallback_image = f"https://source.unsplash.com/600x400/?{html.escape(image_seed)}"
+            image_url = html.escape(getattr(roundup, "hero_image", None) or fallback_image)
+            url = f"/{self._roundup_path(roundup)}"
+            intro = html.escape(roundup.intro)
+            preview_items = "".join(
+                f"<li>{html.escape(item.title)}</li>" for item in roundup.items[:3]
+            )
+            preview_html = (
+                f"<ul class=\"roundup-preview\">{preview_items}</ul>"
+                if preview_items
+                else ""
+            )
+            cards.append(
+                f"""
+<article class=\"card roundup-card\">
+  <a class=\"card-media\" href=\"{url}\">
+    <img src=\"{image_url}\" alt=\"{html.escape(roundup.title)}\" loading=\"lazy\" decoding=\"async\" />
+  </a>
+  <div class=\"card-content\">
+    <h3><a href=\"{url}\">{html.escape(roundup.title)}</a></h3>
+    <p>{intro}</p>
+    {preview_html}
+    <div class=\"card-actions\"><a class=\"button-link\" href=\"{url}\">See the picks</a></div>
+  </div>
+</article>
+"""
+            )
+        cards_html = "".join(cards)
+        return f"""
+<section class=\"roundup-section\">
+  <div class=\"section-heading\">
+    <span class=\"badge\">Daily automation</span>
+    <h2>Fresh roundup playbooks</h2>
+    <p>Run these pre-built top 10 lists with internal product pages and Amazon search links.</p>
+  </div>
+  <div class=\"grid\">{cards_html}</div>
+</section>
+"""
 
     def _news_feed_section(self, products: List[Product]) -> str:
         now = datetime.now(timezone.utc)
@@ -3575,6 +3731,138 @@ class SiteGenerator:
         path = self.products_dir / product.slug / "index.html"
         path.parent.mkdir(parents=True, exist_ok=True)
         self._write_page(path, context)
+
+    def _write_generated_product_page(self, product: GeneratedProduct) -> None:
+        category_seed = slugify(product.category or "gifts")
+        fallback_image = f"https://source.unsplash.com/1200x630/?{html.escape(category_seed)}"
+        image_url = html.escape(product.image or fallback_image)
+        bullet_items = "".join(
+            f"<li>{html.escape(line)}</li>" for line in product.bullets
+        )
+        bullets_html = (
+            f"<ul class=\"generated-highlights\">{bullet_items}</ul>"
+            if bullet_items
+            else "<p>Quick gifting win with practical utility.</p>"
+        )
+        caveat_items = "".join(
+            f"<li>{html.escape(line)}</li>" for line in product.caveats
+        )
+        caveats_html = (
+            f"<section><h2>Consider</h2><ul>{caveat_items}</ul></section>"
+            if caveat_items
+            else ""
+        )
+        affiliate = html.escape(product.affiliate_url)
+        intro_text = product.intro or intro_breakdown(product.name, product.price_cap)
+        intro = html.escape(intro_text)
+        query = html.escape(product.query)
+        body = f"""
+<article class=\"generated-product\">
+  <header>
+    <h1>{html.escape(product.name)}</h1>
+    <p>{intro}</p>
+    <div class=\"card-actions\">
+      <a class=\"button-link\" href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Check current price on Amazon</a>
+    </div>
+  </header>
+  <div class=\"generated-product__media\">
+    <img src=\"{image_url}\" alt=\"{html.escape(product.name)}\" loading=\"lazy\" decoding=\"async\" />
+  </div>
+  <section>
+    <h2>Highlights</h2>
+    {bullets_html}
+  </section>
+  {caveats_html}
+  <section>
+    <h2>Search it on Amazon</h2>
+    <p><a href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">{query}</a></p>
+  </section>
+</article>
+"""
+        canonical = self._absolute_url(self._generated_product_path(product))
+        structured_data = [
+            {
+                "@context": "https://schema.org",
+                "@type": "Product",
+                "name": product.name,
+                "description": desc_breakdown(product.name),
+                "brand": product.category or "Gift Idea",
+                "offers": {
+                    "@type": "Offer",
+                    "priceCurrency": "USD",
+                    "availability": "https://schema.org/InStock",
+                    "url": product.affiliate_url,
+                },
+            }
+        ]
+        context = PageContext(
+            title=title_breakdown(product.name, product.category, product.price_cap),
+            description=desc_breakdown(product.name),
+            canonical_url=canonical,
+            body=body,
+            og_image=image_url,
+            og_type="article",
+            structured_data=structured_data,
+            updated_time=self._format_iso8601(self._parse_iso_datetime(product.updated_at)),
+            published_time=self._format_iso8601(self._parse_iso_datetime(product.published_at)),
+        )
+        output_path = self.output_dir / self._generated_product_path(product)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._write_page(output_path, context)
+
+    def _write_roundup_page(self, roundup: RoundupArticle) -> None:
+        items_html = []
+        list_items: List[tuple[str, str]] = []
+        for item in roundup.items:
+            target_product = self._generated_lookup.get(item.product_slug)
+            if target_product:
+                product_url = f"/{self._generated_product_path(target_product)}"
+            else:
+                product_url = f"/products/{item.product_slug}/index.html"
+            list_items.append((item.title, self._absolute_url(product_url)))
+            items_html.append(
+                f"""
+<li>
+  <h3><a href=\"{product_url}\">{html.escape(item.title)}</a></h3>
+  <p>{html.escape(item.summary)}</p>
+</li>
+"""
+            )
+        items_markup = "".join(items_html)
+        search_link = html.escape(roundup.amazon_search_url)
+        body = f"""
+<article class=\"roundup-detail\">
+  <header>
+    <h1>{html.escape(roundup.title)}</h1>
+    <p>{html.escape(roundup.intro)}</p>
+  </header>
+  <ol class=\"roundup-list\">{items_markup}</ol>
+  <section class=\"roundup-search\">
+    <a class=\"cta-secondary\" href=\"{search_link}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Search Amazon for {html.escape(roundup.topic)} ideas</a>
+  </section>
+</article>
+"""
+        canonical = self._absolute_url(self._roundup_path(roundup))
+        structured_data = [
+            self._item_list_structured_data(roundup.title, list_items)
+        ]
+        updated_time = self._format_iso8601(self._parse_iso_datetime(roundup.updated_at))
+        published_time = self._format_iso8601(self._parse_iso_datetime(roundup.published_at))
+        og_image = f"https://source.unsplash.com/1200x630/?{html.escape(slugify(roundup.topic or 'gifts'))}"
+        context = PageContext(
+            title=roundup.title,
+            description=roundup.description,
+            canonical_url=canonical,
+            body=body,
+            og_image=og_image,
+            og_type="article",
+            structured_data=structured_data,
+            updated_time=updated_time,
+            published_time=published_time,
+        )
+        output_path = self.output_dir / self._roundup_path(roundup)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._write_page(output_path, context)
 
     def _write_articles(
         self,
@@ -4257,7 +4545,12 @@ retailerSelect.addEventListener('change', () => {{
         )
         self._write_page(self.output_dir / "search.html", context)
 
-    def _write_feed(self, products: List[Product]) -> None:
+    def _write_feed(
+        self,
+        products: List[Product],
+        generated: Sequence[GeneratedProduct] | None = None,
+        roundups: Sequence[RoundupArticle] | None = None,
+    ) -> None:
         item_blocks: List[str] = []
         if self._has_deals_page and self._deals_products:
             first_deal = self._deals_products[0]
@@ -4288,6 +4581,47 @@ retailerSelect.addEventListener('change', () => {{
 """
             for product in products[:30]
         )
+        generated_items = [
+            product
+            for product in (generated or [])
+            if getattr(product, "status", "published") == "published"
+        ]
+        if generated_items:
+            for product in generated_items[:15]:
+                link = self._absolute_url(self._generated_product_path(product))
+                published = product.published_at or product.updated_at or ""
+                description = product.intro or "Check highlights and caveats before gifting."
+                item_blocks.append(
+                    f"""
+    <item>
+      <title>{html.escape(product.name)}</title>
+      <link>{html.escape(link)}</link>
+      <guid>{html.escape(f'generated:{product.slug}')}</guid>
+      <description>{html.escape(description)}</description>
+      <pubDate>{html.escape(published)}</pubDate>
+    </item>
+"""
+                )
+        roundup_items = [
+            roundup
+            for roundup in (roundups or [])
+            if getattr(roundup, "status", "published") == "published"
+        ]
+        if roundup_items:
+            for roundup in roundup_items[:15]:
+                link = self._absolute_url(self._roundup_path(roundup))
+                published = roundup.published_at or roundup.updated_at or ""
+                item_blocks.append(
+                    f"""
+    <item>
+      <title>{html.escape(roundup.title)}</title>
+      <link>{html.escape(link)}</link>
+      <guid>{html.escape(f'roundup:{roundup.slug}')}</guid>
+      <description>{html.escape(roundup.description)}</description>
+      <pubDate>{html.escape(published)}</pubDate>
+    </item>
+"""
+                )
         items = "".join(item_blocks)
         rss = f"""
 <?xml version=\"1.0\" encoding=\"UTF-8\" ?>
@@ -4307,6 +4641,8 @@ retailerSelect.addEventListener('change', () => {{
         categories: List[Category],
         products: List[Product],
         articles: Sequence[Article] | None = None,
+        generated_products: Sequence[GeneratedProduct] | None = None,
+        roundups: Sequence[RoundupArticle] | None = None,
     ) -> None:
         latest_site_update = self._latest_updated_datetime(products)
         if latest_site_update is None:
@@ -4321,6 +4657,30 @@ retailerSelect.addEventListener('change', () => {{
             existing = category_lastmods.get(product.category_slug)
             if existing is None or product_dt > existing:
                 category_lastmods[product.category_slug] = product_dt
+        generated_items = [
+            product
+            for product in (generated_products or [])
+            if getattr(product, "status", "published") == "published"
+        ]
+        roundup_items = [
+            roundup
+            for roundup in (roundups or [])
+            if getattr(roundup, "status", "published") == "published"
+        ]
+        for product in generated_items:
+            updated = (
+                self._parse_iso_datetime(product.updated_at)
+                or self._parse_iso_datetime(product.published_at)
+            )
+            if updated and updated > latest_site_update:
+                latest_site_update = updated
+        for roundup in roundup_items:
+            updated = (
+                self._parse_iso_datetime(roundup.updated_at)
+                or self._parse_iso_datetime(roundup.published_at)
+            )
+            if updated and updated > latest_site_update:
+                latest_site_update = updated
         article_entries: List[dict[str, str | None]] = []
         for article in articles or []:
             if article.status != "published" or article.body_length < 800:
@@ -4378,6 +4738,32 @@ retailerSelect.addEventListener('change', () => {{
                     "lastmod": self._format_iso8601(product_lastmods.get(product.slug)),
                     "changefreq": "weekly",
                     "priority": "0.6",
+                }
+            )
+        for product in generated_items:
+            path = self._generated_product_path(product)
+            updated = self._parse_iso_datetime(product.updated_at) or self._parse_iso_datetime(
+                product.published_at
+            )
+            entries.append(
+                {
+                    "loc": self._absolute_url(path),
+                    "lastmod": self._format_iso8601(updated),
+                    "changefreq": "daily",
+                    "priority": "0.55",
+                }
+            )
+        for roundup in roundup_items:
+            path = self._roundup_path(roundup)
+            updated = self._parse_iso_datetime(roundup.updated_at) or self._parse_iso_datetime(
+                roundup.published_at
+            )
+            entries.append(
+                {
+                    "loc": self._absolute_url(path),
+                    "lastmod": self._format_iso8601(updated),
+                    "changefreq": "daily",
+                    "priority": "0.58",
                 }
             )
         entries.extend(article_entries)
@@ -4855,6 +5241,12 @@ retailerSelect.addEventListener('change', () => {{
 
     def _product_path(self, product: Product) -> str:
         return f"products/{product.slug}/index.html"
+
+    def _generated_product_path(self, product: GeneratedProduct) -> str:
+        return f"products/{product.slug}/index.html"
+
+    def _roundup_path(self, roundup: RoundupArticle) -> str:
+        return f"guides/{roundup.slug}/index.html"
 
     def _absolute_url(self, relative: str) -> str:
         base = self.settings.base_url.rstrip("/")

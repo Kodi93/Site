@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 from .config import DATA_DIR, DEFAULT_CATEGORIES, CategoryDefinition
-from .models import Category, CooldownEntry, Product
+from .models import Category, CooldownEntry, GeneratedProduct, Product
 from .utils import dump_json, load_json, timestamp
 
 logger = logging.getLogger(__name__)
@@ -23,13 +23,19 @@ class ProductRepository:
     def _load_raw_data(self) -> Dict[str, object]:
         data = load_json(
             self.data_file,
-            default={"last_updated": None, "products": [], "cooldowns": []},
+            default={
+                "last_updated": None,
+                "products": [],
+                "cooldowns": [],
+                "generated_products": [],
+            },
         )
         if not isinstance(data, dict):
             data = {}
         data.setdefault("last_updated", None)
         data.setdefault("products", [])
         data.setdefault("cooldowns", [])
+        data.setdefault("generated_products", [])
         return data
 
     def _ensure_file_exists(self) -> None:
@@ -41,6 +47,7 @@ class ProductRepository:
                     "last_updated": None,
                     "products": [],
                     "cooldowns": [],
+                    "generated_products": [],
                 },
             )
 
@@ -55,12 +62,9 @@ class ProductRepository:
 
     def save_products(self, products: Iterable[Product]) -> None:
         data = self._load_raw_data()
-        payload = {
-            "last_updated": timestamp(),
-            "products": [product.to_dict() for product in products],
-            "cooldowns": data.get("cooldowns", []),
-        }
-        dump_json(self.data_file, payload)
+        data["products"] = [product.to_dict() for product in products]
+        data["last_updated"] = timestamp()
+        dump_json(self.data_file, data)
 
     def upsert_products(self, products: Iterable[Product]) -> List[Product]:
         existing = {
@@ -159,6 +163,79 @@ class ProductRepository:
             return datetime.fromisoformat(ts)
         except ValueError:
             return datetime.now(timezone.utc)
+
+    # ------------------------------------------------------------------
+    # Generated product helpers
+
+    def load_generated_products(self) -> List[GeneratedProduct]:
+        data = self._load_raw_data()
+        products: List[GeneratedProduct] = []
+        for raw in data.get("generated_products", []):
+            if isinstance(raw, dict):
+                try:
+                    products.append(GeneratedProduct.from_dict(raw))
+                except Exception as error:  # pragma: no cover - log for visibility
+                    logger.debug("Skipping invalid generated product payload: %s", error)
+        return products
+
+    def save_generated_products(self, products: Iterable[GeneratedProduct]) -> None:
+        data = self._load_raw_data()
+        data["generated_products"] = [product.to_dict() for product in products]
+        dump_json(self.data_file, data)
+
+    def upsert_generated_products(
+        self, products: Iterable[GeneratedProduct]
+    ) -> List[GeneratedProduct]:
+        existing = {product.slug: product for product in self.load_generated_products()}
+        for product in products:
+            stored = existing.get(product.slug)
+            if stored:
+                product.created_at = stored.created_at
+                if stored.published_at and not product.published_at:
+                    product.published_at = stored.published_at
+                if stored.status == "published" and product.status != "published":
+                    product.status = stored.status
+                existing[product.slug] = product
+            else:
+                if product.status == "published" and not product.published_at:
+                    product.published_at = timestamp()
+                existing[product.slug] = product
+        merged = sorted(existing.values(), key=lambda item: item.updated_at, reverse=True)
+        self.save_generated_products(merged)
+        return merged
+
+    def find_generated_product(self, slug: str) -> GeneratedProduct | None:
+        slug = (slug or "").strip().lower()
+        for product in self.load_generated_products():
+            if product.slug == slug:
+                return product
+        return None
+
+    def recent_generated_products(
+        self, *, days: int = 7, now: datetime | None = None
+    ) -> List[GeneratedProduct]:
+        reference = now or datetime.now(timezone.utc)
+        cutoff = reference - timedelta(days=days)
+        recent: List[GeneratedProduct] = []
+        for product in self.load_generated_products():
+            published_raw = product.published_at or product.updated_at
+            try:
+                published_dt = datetime.fromisoformat(published_raw)
+            except (TypeError, ValueError):
+                continue
+            if published_dt.tzinfo is None:
+                published_dt = published_dt.replace(tzinfo=timezone.utc)
+            published_dt = published_dt.astimezone(timezone.utc)
+            if published_dt >= cutoff:
+                recent.append(product)
+        recent.sort(key=lambda item: (item.score, item.updated_at), reverse=True)
+        return recent
+
+    def best_generated_product(
+        self, *, days: int = 7, now: datetime | None = None
+    ) -> GeneratedProduct | None:
+        candidates = self.recent_generated_products(days=days, now=now)
+        return candidates[0] if candidates else None
 
 
 def get_category_definition(slug: str) -> CategoryDefinition | None:
