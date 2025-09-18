@@ -14,10 +14,25 @@ class DummyGenerator:
     def __init__(self) -> None:
         self.calls = 0
         self.last_products = None
+        self.last_generated = None
+        self.last_roundups = None
+        self.last_best = None
 
-    def build(self, categories, products, *, articles=None) -> None:  # pragma: no cover - stub
+    def build(
+        self,
+        categories,
+        products,
+        *,
+        articles=None,
+        generated_products=None,
+        roundups=None,
+        best_generated=None,
+    ) -> None:  # pragma: no cover - stub
         self.calls += 1
         self.last_products = list(products)
+        self.last_generated = list(generated_products or [])
+        self.last_roundups = list(roundups or [])
+        self.last_best = best_generated
 
 
 class FakeRetailerAdapter:

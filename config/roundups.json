@@ -1,0 +1,17 @@
+[
+  {"topic":"funny gifts","caps":[10,25,50]},
+  {"topic":"camping gadgets","caps":[25,50,100]},
+  {"topic":"edc tools","caps":[20,50]},
+  {"topic":"gifts for gamers","caps":[25,50]},
+  {"topic":"coffee lover gifts","caps":[20,50]},
+  {"topic":"pet owner gifts","caps":[20,40]},
+  {"topic":"stocking stuffers","caps":[10,20,30]},
+  {"topic":"desk toys","caps":[15,30]},
+  {"topic":"smart home gadgets","caps":[25,50,100]},
+  {"topic":"car gadgets","caps":[25,50]},
+  {"topic":"fitness gifts","caps":[25,50]},
+  {"topic":"kitchen gadgets","caps":[20,50]},
+  {"topic":"outdoor gifts","caps":[25,50]},
+  {"topic":"tech gifts for dad","caps":[25,50]},
+  {"topic":"gifts for coworkers","caps":[15,25,35]}
+]

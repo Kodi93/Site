@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Sequence
 
 from .articles import Article
+from .models import RoundupArticle
 from .utils import dump_json, load_json, timestamp
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,10 @@ class ArticleRepository:
         if self.data_file.exists():
             return
         logger.debug("Creating article repository at %s", self.data_file)
-        dump_json(self.data_file, {"articles": [], "meta": {"roundup_index": 0}})
+        dump_json(
+            self.data_file,
+            {"articles": [], "meta": {"roundup_index": 0}, "roundups": []},
+        )
 
     def _load_payload(self) -> dict:
         data = load_json(self.data_file, default={})
@@ -30,6 +34,7 @@ class ArticleRepository:
             data = {}
         data.setdefault("articles", [])
         data.setdefault("meta", {"roundup_index": 0})
+        data.setdefault("roundups", [])
         return data
 
     def load_articles(self) -> List[Article]:
@@ -102,6 +107,56 @@ class ArticleRepository:
         if target is not None:
             self.save_articles(updated)
         return target
+
+    # ------------------------------------------------------------------
+    # Roundup helpers
+    def load_roundups(self) -> List[RoundupArticle]:
+        payload = self._load_payload()
+        roundups: List[RoundupArticle] = []
+        for raw in payload.get("roundups", []):
+            if isinstance(raw, dict):
+                try:
+                    roundups.append(RoundupArticle.from_dict(raw))
+                except Exception as error:  # pragma: no cover - log
+                    logger.debug("Skipping invalid roundup payload: %s", error)
+        return roundups
+
+    def save_roundups(self, roundups: Sequence[RoundupArticle]) -> None:
+        payload = self._load_payload()
+        payload["roundups"] = [roundup.to_dict() for roundup in roundups]
+        payload["last_saved"] = timestamp()
+        dump_json(self.data_file, payload)
+
+    def upsert_roundup(self, roundup: RoundupArticle) -> RoundupArticle:
+        roundups = self.load_roundups()
+        updated: List[RoundupArticle] = []
+        replaced = False
+        for existing in roundups:
+            if existing.slug == roundup.slug:
+                updated.append(roundup)
+                replaced = True
+            else:
+                updated.append(existing)
+        if not replaced:
+            updated.append(roundup)
+        self.save_roundups(updated)
+        return roundup
+
+    def find_roundup(self, slug: str) -> RoundupArticle | None:
+        slug = (slug or "").strip().lower()
+        for roundup in self.load_roundups():
+            if roundup.slug == slug:
+                return roundup
+        return None
+
+    def list_published_roundups(self) -> List[RoundupArticle]:
+        published = [
+            roundup
+            for roundup in self.load_roundups()
+            if roundup.status == "published"
+        ]
+        published.sort(key=lambda roundup: roundup.updated_at, reverse=True)
+        return published
 
     # Rotation metadata -------------------------------------------------
     def get_roundup_index(self) -> int:
