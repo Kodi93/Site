@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Sequence
@@ -64,6 +65,7 @@ class GiftPipeline:
         ]
         new_products: List[Product] = []
         new_cooldowns: List[CooldownEntry] = []
+        fallback_products: List[Product] = []
         now = datetime.now(timezone.utc)
         active_cooldown_keys: set[tuple[str, str]] = set()
         if not regenerate_only:
@@ -115,23 +117,145 @@ class GiftPipeline:
                         )
                         new_cooldowns.append(new_entry)
                         active_cooldown_keys.add(key)
-            if new_cooldowns:
-                self.repository.update_cooldowns(
-                    new_cooldowns,
-                    retention_days=self.cooldown_retention_days,
-                    now=now,
-                )
-            unique_new = len({(product.retailer_slug, product.asin) for product in new_products})
+            unique_new = len(
+                {(product.retailer_slug, product.asin) for product in new_products}
+            )
             if self.minimum_daily_posts and unique_new < self.minimum_daily_posts:
+                shortfall = self.minimum_daily_posts - unique_new
                 logger.warning(
-                    "Only %s new products added (minimum target is %s).",
+                    "Only %s new products added (minimum target is %s). Attempting to backfill %s slot%s with existing listings.",
                     unique_new,
                     self.minimum_daily_posts,
+                    shortfall,
+                    "" if shortfall == 1 else "s",
                 )
-        combined = self.repository.upsert_products(new_products) if new_products else existing_products
+                fallback_products = self._select_fallback_products(
+                    existing_products,
+                    required=shortfall,
+                    active_cooldown_keys=active_cooldown_keys,
+                )
+                if fallback_products:
+                    counts = Counter(
+                        product.category_slug for product in fallback_products
+                    )
+                    for product in fallback_products:
+                        if product.price:
+                            product.record_price(product.price)
+                        else:
+                            product.touch()
+                        key = (product.retailer_slug, product.asin)
+                        active_cooldown_keys.add(key)
+                        new_cooldowns.append(
+                            CooldownEntry(
+                                retailer_slug=product.retailer_slug,
+                                asin=product.asin,
+                                category_slug=product.category_slug,
+                            )
+                        )
+                    logger.info(
+                        "Backfilled %s fallback product%s to reach the daily minimum.",
+                        len(fallback_products),
+                        "" if len(fallback_products) == 1 else "s",
+                    )
+                    logger.debug(
+                        "Fallback distribution by category: %s",
+                        dict(counts),
+                    )
+                remaining_shortfall = shortfall - len(fallback_products)
+                if remaining_shortfall > 0:
+                    logger.warning(
+                        "Daily quota remains short by %s item%s after fallback selection.",
+                        remaining_shortfall,
+                        "" if remaining_shortfall == 1 else "s",
+                    )
+        if new_cooldowns:
+            self.repository.update_cooldowns(
+                new_cooldowns,
+                retention_days=self.cooldown_retention_days,
+                now=now,
+            )
+        updates_to_apply: List[Product] = []
+        if new_products:
+            updates_to_apply.extend(new_products)
+        if fallback_products:
+            updates_to_apply.extend(fallback_products)
+        combined = (
+            self.repository.upsert_products(updates_to_apply)
+            if updates_to_apply
+            else existing_products
+        )
         logger.info("Total products stored: %s", len(combined))
         self.generator.build(categories, combined)
         return PipelineResult(products=combined, categories=categories)
+
+    def _select_fallback_products(
+        self,
+        existing_products: List[Product],
+        *,
+        required: int,
+        active_cooldown_keys: set[tuple[str, str]],
+    ) -> List[Product]:
+        if required <= 0:
+            return []
+        pools: dict[str, deque[Product]] = {}
+        for product in existing_products:
+            key = (product.retailer_slug, product.asin)
+            if key in active_cooldown_keys:
+                continue
+            pools.setdefault(product.category_slug, []).append(product)
+
+        def sort_key(item: Product) -> tuple[float, float, float, float]:
+            drop = item.price_drop_percent() or 0.0
+            rating = item.rating or 0.0
+            reviews = float(item.total_reviews or 0)
+            updated = self._parse_timestamp(item.updated_at)
+            updated_ts = updated.timestamp() if updated else 0.0
+            return (-drop, -rating, -reviews, updated_ts)
+
+        ordered_pools: dict[str, deque[Product]] = {}
+        for slug, items in pools.items():
+            ordered = sorted(items, key=sort_key)
+            ordered_pools[slug] = deque(ordered)
+        if not ordered_pools:
+            return []
+
+        ordered_slugs: List[str] = [
+            definition.slug
+            for definition in self.categories_config
+            if definition.slug in ordered_pools
+        ]
+        for slug in ordered_pools:
+            if slug not in ordered_slugs:
+                ordered_slugs.append(slug)
+
+        selected: List[Product] = []
+        while len(selected) < required and ordered_pools:
+            progress = False
+            for slug in ordered_slugs:
+                queue = ordered_pools.get(slug)
+                while queue and len(selected) < required:
+                    candidate = queue.popleft()
+                    selected.append(candidate)
+                    progress = True
+                    break
+            if not progress:
+                break
+            for slug in list(ordered_pools.keys()):
+                if not ordered_pools[slug]:
+                    ordered_pools.pop(slug)
+        return selected[:required]
+
+    @staticmethod
+    def _parse_timestamp(value: str | None) -> datetime | None:
+        if not value:
+            return datetime(1970, 1, 1, tzinfo=timezone.utc)
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return datetime(1970, 1, 1, tzinfo=timezone.utc)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
     def _build_product(
         self, item: dict, definition: CategoryDefinition, retailer: RetailerAdapter
