@@ -14,6 +14,8 @@ from urllib.parse import quote_plus
 
 from .config import DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
 from .models import Category, PricePoint, Product
+from .quality import SeoPayload, passes_seo
+from .text import MetaParams, TitleParams, make_meta, make_title
 from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string
 
 logger = logging.getLogger(__name__)
@@ -1947,6 +1949,7 @@ class SiteGenerator:
         self._category_lookup: dict[str, Category] = {}
         self._has_deals_page = False
         self._deals_products: List[Product] = []
+        self._seo_failures: set[str] = set()
 
     def build(self, categories: List[Category], products: List[Product]) -> None:
         logger.info("Generating site with %s products", len(products))
@@ -1955,6 +1958,7 @@ class SiteGenerator:
         self._category_lookup = {category.slug: category for category in categories}
         self._has_deals_page = False
         self._deals_products = []
+        self._seo_failures.clear()
         products_sorted = sorted(products, key=lambda p: p.updated_at, reverse=True)
         self._deals_products = self._select_deals_products(products_sorted)
         self._has_deals_page = bool(self._deals_products)
@@ -3295,9 +3299,33 @@ class SiteGenerator:
             ),
             self._product_structured_data(product, category),
         ]
+        primary_use = product.keywords[0] if product.keywords else None
+        page_title = make_title(
+            TitleParams(
+                name=product.title,
+                brand=product.brand,
+                category=category.name,
+                use=primary_use,
+            )
+        )
+        if product.summary:
+            description = product.summary
+        else:
+            parsed = parse_price_string(product.price)
+            price_value = parsed[0] if parsed else None
+            currency = parsed[1] if parsed else None
+            description = make_meta(
+                MetaParams(
+                    name=product.title,
+                    price=price_value,
+                    currency=currency,
+                    specs=(product.keywords or [])[:3],
+                    use=primary_use,
+                )
+            )
         context = PageContext(
-            title=f"{product.title} — {category.name} gift idea",
-            description=product.summary or self.settings.description,
+            title=page_title,
+            description=description or self.settings.description,
             canonical_url=f"{self.settings.base_url.rstrip('/')}/{self._product_path(product)}",
             body=body,
             og_image=image_url,
@@ -3308,6 +3336,14 @@ class SiteGenerator:
             published_time=self._format_iso8601(published_dt),
             extra_head=extra_head,
         )
+        if not passes_seo(
+            SeoPayload(title=context.title, description=context.description, body=body)
+        ):
+            logger.warning(
+                "SEO gate failed for product %s; marking page as noindex", product.slug
+            )
+            context.noindex = True
+            self._seo_failures.add(product.slug)
         path = self.products_dir / product.slug / "index.html"
         path.parent.mkdir(parents=True, exist_ok=True)
         self._write_page(path, context)
@@ -3848,6 +3884,8 @@ retailerSelect.addEventListener('change', () => {{
                 }
             )
         for product in products:
+            if product.slug in self._seo_failures:
+                continue
             entries.append(
                 {
                     "loc": self._absolute_url(self._product_path(product)),
