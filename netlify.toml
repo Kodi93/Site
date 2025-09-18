@@ -1,6 +1,6 @@
 [build]
-  command = "npm run build"
-  publish = ".next"
+  command = "python -m giftgrab.cli update"
+  publish = "public"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+[build.environment]
+  PYTHON_VERSION = "3.11"
