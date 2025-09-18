@@ -9,14 +9,15 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Sequence
 from urllib.parse import quote_plus
 
 from .config import DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
+from .articles import Article, ArticleItem
 from .models import Category, PricePoint, Product
 from .quality import SeoPayload, passes_seo
 from .text import MetaParams, TitleParams, make_meta, make_title
-from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string
+from .utils import PRICE_CURRENCY_SYMBOLS, parse_price_string, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -794,6 +795,218 @@ main > section + section {
   transform: translateY(-2px);
   box-shadow: 0 34px 72px rgba(82, 39, 177, 0.38);
   filter: brightness(1.05);
+}
+
+.guide {
+  max-width: 940px;
+  margin: 0 auto 5rem;
+  background: var(--card);
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+}
+
+.guide-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+  padding: 3rem;
+  background: linear-gradient(135deg, rgba(127, 86, 217, 0.18), rgba(249, 115, 22, 0.12));
+}
+
+.guide-hero-media img {
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+  box-shadow: var(--shadow-card);
+}
+
+.guide-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.guide-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--brand);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.guide-toc {
+  margin: 2.5rem auto 0;
+  max-width: 760px;
+  background: var(--card-elevated);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  padding: 1.5rem 2rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.guide-toc strong {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.guide-toc ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.guide-intro,
+.guide-items,
+.guide-section,
+.guide-related {
+  padding: 2.5rem 3rem;
+}
+
+.guide-intro p {
+  font-size: 1.05rem;
+}
+
+.guide-hubs {
+  margin-top: 1.5rem;
+  background: var(--card-elevated);
+  border-radius: 18px;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.guide-hubs h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.guide-hubs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.guide-hubs a {
+  display: inline-flex;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-weight: 600;
+}
+
+.guide-item {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+  background: var(--card);
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  padding: 2rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.guide-item-media img {
+  width: 100%;
+  border-radius: 18px;
+}
+
+.guide-item-body h2 {
+  margin-top: 0;
+  margin-bottom: 0.85rem;
+  font-size: 1.6rem;
+}
+
+.guide-item-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  margin-right: 0.6rem;
+  background: var(--pill-bg);
+  border-radius: 50%;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.guide-item-specs {
+  margin: 1.2rem 0;
+  padding-left: 1.2rem;
+}
+
+.guide-item-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+
+.guide-item-tags {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.guide-item-tags span {
+  background: var(--pill-bg);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+.guide-section h2,
+.guide-related h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 0;
+}
+
+.guide-related ul {
+  list-style: none;
+  margin: 1.2rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.guide-ad {
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 720px) {
+  .guide,
+  .guide-intro,
+  .guide-items,
+  .guide-section,
+  .guide-related {
+    padding: 1.75rem;
+  }
+  .guide-hero {
+    padding: 2rem;
+  }
 }
 
 .cta-secondary {
@@ -1941,17 +2154,28 @@ class SiteGenerator:
         self.assets_dir = self.output_dir / "assets"
         self.categories_dir = self.output_dir / "categories"
         self.products_dir = self.output_dir / "products"
+        self.guides_dir = self.output_dir / "guides"
+        self.weekly_dir = self.output_dir / "weekly"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.assets_dir.mkdir(parents=True, exist_ok=True)
         self.categories_dir.mkdir(parents=True, exist_ok=True)
         self.products_dir.mkdir(parents=True, exist_ok=True)
+        self.guides_dir.mkdir(parents=True, exist_ok=True)
+        self.weekly_dir.mkdir(parents=True, exist_ok=True)
         self._nav_cache: List[Category] = []
         self._category_lookup: dict[str, Category] = {}
+        self._product_lookup: dict[str, Product] = {}
         self._has_deals_page = False
         self._deals_products: List[Product] = []
         self._seo_failures: set[str] = set()
 
-    def build(self, categories: List[Category], products: List[Product]) -> None:
+    def build(
+        self,
+        categories: List[Category],
+        products: List[Product],
+        *,
+        articles: Sequence[Article] | None = None,
+    ) -> None:
         logger.info("Generating site with %s products", len(products))
         self._write_assets()
         self.preload_navigation(categories)
@@ -1960,6 +2184,7 @@ class SiteGenerator:
         self._deals_products = []
         self._seo_failures.clear()
         products_sorted = sorted(products, key=lambda p: p.updated_at, reverse=True)
+        self._product_lookup = {product.slug: product for product in products_sorted}
         self._deals_products = self._select_deals_products(products_sorted)
         self._has_deals_page = bool(self._deals_products)
         if self._has_deals_page:
@@ -1981,8 +2206,11 @@ class SiteGenerator:
                     if candidate.asin != product.asin
                 ][:3]
                 self._write_product_page(product, category, related)
+        articles_list = [article for article in (articles or []) if article.status == "published"]
+        if articles_list:
+            self._write_articles(articles_list, categories, products_sorted)
         self._write_feed(products_sorted)
-        self._write_sitemap(categories, products_sorted)
+        self._write_sitemap(categories, products_sorted, articles_list)
         self._write_robots()
 
     # ------------------------------------------------------------------
@@ -3348,6 +3576,245 @@ class SiteGenerator:
         path.parent.mkdir(parents=True, exist_ok=True)
         self._write_page(path, context)
 
+    def _write_articles(
+        self,
+        articles: Sequence[Article],
+        categories: List[Category],
+        products: List[Product],
+    ) -> None:
+        category_lookup = {category.slug: category for category in categories}
+        product_lookup = {product.slug: product for product in products}
+        for article in articles:
+            output_path = self.output_dir / article.path
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            context = self._article_page_context(article, category_lookup, product_lookup)
+            self._write_page(output_path, context)
+
+    def _article_page_context(
+        self,
+        article: Article,
+        category_lookup: dict[str, Category],
+        product_lookup: dict[str, Product],
+    ) -> PageContext:
+        canonical_url = self._absolute_url(article.path)
+        body = self._render_article_body(article, category_lookup, product_lookup)
+        structured_data = [self._article_structured_data(article, canonical_url)]
+        hero = article.hero_image or DEFAULT_SOCIAL_IMAGE
+        return PageContext(
+            title=article.title,
+            description=article.description,
+            canonical_url=canonical_url,
+            body=body,
+            og_image=hero,
+            structured_data=structured_data,
+            og_type="article",
+            og_image_alt=article.title,
+            updated_time=article.updated_at,
+            published_time=article.published_at,
+        )
+
+    def _render_article_body(
+        self,
+        article: Article,
+        category_lookup: dict[str, Category],
+        product_lookup: dict[str, Product],
+    ) -> str:
+        hero_image = html.escape(article.hero_image or DEFAULT_SOCIAL_IMAGE)
+        hero_html = f"""
+<header class="guide-hero">
+  <div class="guide-hero-media">
+    <img src="{hero_image}" alt="{html.escape(article.title)}" loading="lazy" decoding="async" />
+  </div>
+  <div class="guide-hero-copy">
+    <span class="guide-kind">{html.escape(article.kind.title())}</span>
+    <h1>{html.escape(article.title)}</h1>
+    <p>{html.escape(article.description)}</p>
+  </div>
+</header>
+""".strip()
+        toc_links = ""
+        if article.table_of_contents:
+            links = "".join(
+                f'<li><a href="#{html.escape(anchor, quote=True)}">{html.escape(title)}</a></li>'
+                for anchor, title in article.table_of_contents
+            )
+            toc_links = f"""
+<nav class="guide-toc" aria-label="In this guide">
+  <strong>In this guide</strong>
+  <ol>{links}</ol>
+</nav>
+""".strip()
+        intro_paragraphs = "".join(
+            f"<p>{html.escape(paragraph)}</p>" for paragraph in article.intro
+        )
+        hub_links: List[str] = []
+        for slug in article.hub_slugs:
+            category = category_lookup.get(slug)
+            if not category:
+                continue
+            hub_links.append(
+                f'<li><a href="/{html.escape(self._category_path(category.slug))}">{html.escape(category.name)}</a></li>'
+            )
+        hubs_html = ""
+        if hub_links:
+            hubs_html = (
+                "<div class=\"guide-hubs\">"
+                "<h2>Explore related hubs</h2>"
+                f"<ul>{''.join(hub_links)}</ul>"
+                "</div>"
+            )
+        items_html: List[str] = []
+        ads_enabled = self._adsense_inline_enabled()
+        for index, item in enumerate(article.items, start=1):
+            items_html.append(self._render_article_item(index, item, product_lookup))
+            if ads_enabled and index % 4 == 0:
+                ad_unit = self._adsense_unit(
+                    self.settings.adsense_slot or "",
+                    extra_class="adsense-slot--article",
+                )
+                if ad_unit:
+                    items_html.append(f'<div class="guide-ad">{ad_unit}</div>')
+        items_section = "".join(items_html)
+        who_anchor = slugify("who-its-for")
+        consider_anchor = slugify("consider")
+        related_anchor = slugify("related-picks")
+        who_html = f"""
+<section class="guide-section" id="{html.escape(who_anchor, quote=True)}">
+  <h2>Who it's for</h2>
+  <p>{html.escape(article.who_for)}</p>
+</section>
+""".strip()
+        consider_html = f"""
+<section class="guide-section" id="{html.escape(consider_anchor, quote=True)}">
+  <h2>Consider</h2>
+  <p>{html.escape(article.consider)}</p>
+</section>
+""".strip()
+        related_links: List[str] = []
+        for slug in article.related_product_slugs:
+            product = product_lookup.get(slug)
+            if product:
+                related_links.append(
+                    f'<li><a href="/{html.escape(self._product_path(product))}">{html.escape(product.title)}</a></li>'
+                )
+                continue
+            category = category_lookup.get(slug)
+            if category:
+                related_links.append(
+                    f'<li><a href="/{html.escape(self._category_path(category.slug))}">{html.escape(category.name)}</a></li>'
+                )
+        related_html = ""
+        if related_links:
+            related_html = f"""
+<section class="guide-related" id="{html.escape(related_anchor, quote=True)}">
+  <h2>Related picks</h2>
+  <ul>{''.join(related_links)}</ul>
+</section>
+""".strip()
+        return f"""
+<article class="guide">
+  {hero_html}
+  {toc_links}
+  <section class="guide-intro">
+    {intro_paragraphs}
+    {hubs_html}
+  </section>
+  <section class="guide-items">
+    {items_section}
+  </section>
+  {who_html}
+  {consider_html}
+  {related_html}
+</article>
+""".strip()
+
+    def _render_article_item(
+        self,
+        index: int,
+        item: ArticleItem,
+        product_lookup: dict[str, Product],
+    ) -> str:
+        anchor = html.escape(item.anchor or f"item-{index}", quote=True)
+        image = html.escape(item.image or DEFAULT_SOCIAL_IMAGE)
+        title = html.escape(item.title)
+        blurb = html.escape(item.blurb)
+        specs_html = "".join(
+            f"<li>{html.escape(spec)}</li>" for spec in item.specs if spec
+        )
+        product = product_lookup.get(item.product_slug)
+        if product:
+            product_path = self._product_path(product)
+            internal_url = f"/{product_path}"
+        else:
+            fallback_slug = slugify(item.product_slug)
+            internal_url = f"/products/{fallback_slug}/index.html"
+        internal_link = (
+            f'<a class="pill-link" href="{html.escape(internal_url)}">Read the hype</a>'
+        )
+        outbound_link = ""
+        if item.outbound_url:
+            outbound_link = (
+                f'<a class="cta-secondary" href="{html.escape(item.outbound_url)}" '
+                "target=\"_blank\" rel=\"noopener sponsored\">Shop now</a>"
+            )
+        tags_html = ""
+        if item.tags:
+            tags_html = "".join(
+                f"<span>{html.escape(tag)}</span>" for tag in item.tags[:3]
+            )
+            tags_html = f'<div class="guide-item-tags">{tags_html}</div>'
+        return f"""
+<section class="guide-item" id="{anchor}">
+  <div class="guide-item-media">
+    <img src="{image}" alt="{title}" loading="lazy" decoding="async" />
+  </div>
+  <div class="guide-item-body">
+    <h2><span class="guide-item-index">{index}</span> {title}</h2>
+    <p>{blurb}</p>
+    <ul class="guide-item-specs">{specs_html}</ul>
+    {tags_html}
+    <div class="guide-item-links">{internal_link}{outbound_link}</div>
+  </div>
+</section>
+""".strip()
+
+    def _article_structured_data(self, article: Article, canonical_url: str) -> dict:
+        base_url = self.settings.base_url.rstrip("/")
+        tags = [
+            {"@type": "Thing", "name": tag}
+            for tag in (article.tags[:10] if article.tags else [])
+        ]
+        publisher_logo = self.settings.logo_url or DEFAULT_SOCIAL_IMAGE
+        return {
+            "@context": "https://schema.org",
+            "@type": "BlogPosting",
+            "headline": article.title,
+            "description": article.description,
+            "image": article.hero_image or DEFAULT_SOCIAL_IMAGE,
+            "datePublished": article.published_at or article.updated_at,
+            "dateModified": article.updated_at,
+            "mainEntityOfPage": canonical_url,
+            "isPartOf": {
+                "@type": "WebSite",
+                "name": self.settings.site_name,
+                "url": base_url,
+            },
+            "about": tags,
+            "author": {
+                "@type": "Organization",
+                "name": self.settings.site_name,
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": self.settings.site_name,
+                "url": base_url,
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": publisher_logo,
+                },
+            },
+        }
+
     def _write_latest_page(self, products: List[Product]) -> None:
         cards = self._product_cards_with_ads(products[:60])
         body = f"""
@@ -3835,7 +4302,12 @@ retailerSelect.addEventListener('change', () => {{
 """
         (self.output_dir / "feed.xml").write_text(rss.strip(), encoding="utf-8")
 
-    def _write_sitemap(self, categories: List[Category], products: List[Product]) -> None:
+    def _write_sitemap(
+        self,
+        categories: List[Category],
+        products: List[Product],
+        articles: Sequence[Article] | None = None,
+    ) -> None:
         latest_site_update = self._latest_updated_datetime(products)
         if latest_site_update is None:
             latest_site_update = datetime.now(timezone.utc)
@@ -3849,6 +4321,20 @@ retailerSelect.addEventListener('change', () => {{
             existing = category_lastmods.get(product.category_slug)
             if existing is None or product_dt > existing:
                 category_lastmods[product.category_slug] = product_dt
+        article_entries: List[dict[str, str | None]] = []
+        for article in articles or []:
+            if article.status != "published" or article.body_length < 800:
+                continue
+            updated = self._parse_iso_datetime(article.updated_at)
+            if updated and updated > latest_site_update:
+                latest_site_update = updated
+            entry = {
+                "loc": self._absolute_url(article.path),
+                "lastmod": self._format_iso8601(updated),
+                "changefreq": "weekly",
+                "priority": "0.65",
+            }
+            article_entries.append(entry)
         entries: List[dict[str, str | None]] = [
             {
                 "loc": self._absolute_url("index.html"),
@@ -3894,6 +4380,7 @@ retailerSelect.addEventListener('change', () => {{
                     "priority": "0.6",
                 }
             )
+        entries.extend(article_entries)
         url_tags = "".join(
             "<url>"
             f"<loc>{html.escape(entry['loc'])}</loc>"

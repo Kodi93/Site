@@ -62,14 +62,34 @@ def test_main_without_command_fetches_when_repository_empty(monkeypatch):
             self.settings = settings
             self.output_dir = output_dir
 
+        def build(self, categories, products, *, articles=None):  # pragma: no cover - stub
+            return None
+
+    class DummyArticleRepository:
+        def __init__(self, path):
+            self.path = path
+
+        def list_published(self):  # pragma: no cover - stub
+            return []
+
     class DummyPipeline:
-        def __init__(self, *, repository, generator, categories, credentials, retailers):
+        def __init__(
+            self,
+            *,
+            repository,
+            generator,
+            categories,
+            credentials,
+            retailers,
+            article_repository,
+        ):
             captured["init"] = {
                 "repository": repository,
                 "generator": generator,
                 "categories": categories,
                 "credentials": credentials,
                 "retailers": retailers,
+                "article_repository": article_repository,
             }
 
         def run(self, *, item_count, regenerate_only):
@@ -81,6 +101,7 @@ def test_main_without_command_fetches_when_repository_empty(monkeypatch):
     monkeypatch.setattr(cli, "ProductRepository", DummyRepository)
     monkeypatch.setattr(cli, "SiteGenerator", DummyGenerator)
     monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
+    monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
     monkeypatch.setattr(cli, "load_credentials", lambda: None)
     monkeypatch.setattr(cli, "load_static_retailers", lambda: [static_adapter])
     monkeypatch.setattr(cli, "ensure_directories", lambda: None)
@@ -112,14 +133,34 @@ def test_main_without_command_uses_default_when_products_exist(monkeypatch):
             self.settings = settings
             self.output_dir = output_dir
 
+        def build(self, categories, products, *, articles=None):  # pragma: no cover - stub
+            return None
+
+    class DummyArticleRepository:
+        def __init__(self, path):
+            self.path = path
+
+        def list_published(self):  # pragma: no cover - stub
+            return []
+
     class DummyPipeline:
-        def __init__(self, *, repository, generator, categories, credentials, retailers):
+        def __init__(
+            self,
+            *,
+            repository,
+            generator,
+            categories,
+            credentials,
+            retailers,
+            article_repository,
+        ):
             captured["init"] = {
                 "repository": repository,
                 "generator": generator,
                 "categories": categories,
                 "credentials": credentials,
                 "retailers": retailers,
+                "article_repository": article_repository,
             }
 
         def run(self, *, item_count, regenerate_only):
@@ -134,6 +175,7 @@ def test_main_without_command_uses_default_when_products_exist(monkeypatch):
     monkeypatch.setattr(cli, "ProductRepository", DummyRepository)
     monkeypatch.setattr(cli, "SiteGenerator", DummyGenerator)
     monkeypatch.setattr(cli, "GiftPipeline", DummyPipeline)
+    monkeypatch.setattr(cli, "ArticleRepository", DummyArticleRepository)
     monkeypatch.setattr(cli, "load_credentials", fail_credentials)
     monkeypatch.setattr(cli, "load_static_retailers", lambda: [static_adapter])
     monkeypatch.setattr(cli, "ensure_directories", lambda: None)

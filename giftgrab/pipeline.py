@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Sequence
 from .amazon import AmazonCredentials
+from .article_repository import ArticleRepository
+from .article_scheduler import ArticleAutomation
 from .blog import generate_blog_post
 from .config import CategoryDefinition
 from .models import Category, CooldownEntry, Product
@@ -33,6 +35,7 @@ class GiftPipeline:
         categories: Sequence[CategoryDefinition],
         credentials: AmazonCredentials | None = None,
         retailers: Sequence[RetailerAdapter] | None = None,
+        article_repository: ArticleRepository | None = None,
         cooldown_days: int = 15,
         cooldown_retention_days: int = 30,
         minimum_daily_posts: int = 5,
@@ -47,6 +50,12 @@ class GiftPipeline:
             self.retailers = [AmazonRetailerAdapter(credentials)]
         else:
             self.retailers = []
+        self.article_repository = article_repository
+        self.article_automation = (
+            ArticleAutomation(article_repository)
+            if article_repository is not None
+            else None
+        )
         self.cooldown_days = max(0, cooldown_days)
         self.cooldown_retention_days = max(0, cooldown_retention_days)
         self.minimum_daily_posts = max(0, minimum_daily_posts)
@@ -185,7 +194,14 @@ class GiftPipeline:
             else existing_products
         )
         logger.info("Total products stored: %s", len(combined))
-        self.generator.build(categories, combined)
+        articles = []
+        if self.article_automation and self.article_repository:
+            try:
+                self.article_automation.generate(combined, now=now)
+            except Exception as error:
+                logger.warning("Article automation failed: %s", error)
+            articles = self.article_repository.list_published()
+        self.generator.build(categories, combined, articles=articles)
         return PipelineResult(products=combined, categories=categories)
 
     def _select_fallback_products(
