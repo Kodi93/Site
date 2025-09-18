@@ -33,6 +33,7 @@ class PipelineResult:
 
 
 class GiftPipeline:
+<<<<<< codex/add-ebay-integration-with-oauth-client-y2wodn
     """Coordinate product ingestion, copy generation, and static site rebuilds.
 
     The pipeline now seeds a high-quality catalog up to ``bootstrap_target`` on
@@ -40,6 +41,9 @@ class GiftPipeline:
     for subsequent refreshes. Each run scores potential additions by ratings,
     reviews, and copy depth so the five daily picks stay campaign-ready.
     """
+======
+    """High level workflow that aggregates retailer listings and rebuilds the site."""
+>>>>>> main
 
     def __init__(
         self,
