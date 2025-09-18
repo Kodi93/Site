@@ -64,6 +64,8 @@ class BlogTests(unittest.TestCase):
         self.assertIn("Key takeaways", blog.html)
         self.assertIn("Good for:", blog.html)
         self.assertIn("Consider:", blog.html)
+        self.assertIn("campaign-playbook", blog.html)
+        self.assertIn("Launch checklist", blog.html)
         self.assertIn("cta-button", blog.html)
         self.assertIn("Review the listing on Amazon", blog.html)
 

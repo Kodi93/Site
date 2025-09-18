@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import logging
+import math
+import re
 from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import List, Sequence
+from typing import Dict, List, Sequence, Tuple
 from .amazon import AmazonCredentials
 from .article_repository import ArticleRepository
 from .article_scheduler import ArticleAutomation
@@ -31,7 +33,13 @@ class PipelineResult:
 
 
 class GiftPipeline:
-    """High level workflow that aggregates Amazon items and rebuilds the site."""
+    """Coordinate product ingestion, copy generation, and static site rebuilds.
+
+    The pipeline now seeds a high-quality catalog up to ``bootstrap_target`` on
+    the first few runs and then enforces a tighter ``minimum_daily_posts`` quota
+    for subsequent refreshes. Each run scores potential additions by ratings,
+    reviews, and copy depth so the five daily picks stay campaign-ready.
+    """
 
     def __init__(
         self,
@@ -45,6 +53,7 @@ class GiftPipeline:
         cooldown_days: int = 15,
         cooldown_retention_days: int = 30,
         minimum_daily_posts: int = 5,
+        bootstrap_target: int = 100,
     ) -> None:
         self.repository = repository
         self.generator = generator
@@ -65,6 +74,7 @@ class GiftPipeline:
         self.cooldown_days = max(0, cooldown_days)
         self.cooldown_retention_days = max(0, cooldown_retention_days)
         self.minimum_daily_posts = max(0, minimum_daily_posts)
+        self.bootstrap_target = max(self.minimum_daily_posts, bootstrap_target)
 
     def run(self, *, item_count: int = 6, regenerate_only: bool = False) -> PipelineResult:
         logger.info("Starting pipeline regenerate_only=%s", regenerate_only)
@@ -83,18 +93,41 @@ class GiftPipeline:
         fallback_products: List[Product] = []
         now = datetime.now(timezone.utc)
         active_cooldown_keys: set[tuple[str, str]] = set()
+        existing_count = len(existing_products)
+        target_total = self.minimum_daily_posts
+        if existing_count < self.bootstrap_target:
+            deficit = self.bootstrap_target - existing_count
+            target_total = max(deficit, self.minimum_daily_posts)
+            logger.info(
+                "Bootstrap mode active: aiming for %s net new products (existing=%s, target=%s)",
+                target_total,
+                existing_count,
+                self.bootstrap_target,
+            )
+        else:
+            logger.info(
+                "Daily cadence active: aiming for %s new products", self.minimum_daily_posts
+            )
         if not regenerate_only:
             if not self.retailers:
                 raise RuntimeError(
                     "At least one retailer adapter is required when fetching new products."
                 )
-            if self.minimum_daily_posts and item_count < self.minimum_daily_posts:
-                logger.info(
-                    "Requested item_count %s below minimum %s; adjusting.",
-                    item_count,
-                    self.minimum_daily_posts,
+            desired_item_count = item_count
+            if self.minimum_daily_posts:
+                desired_item_count = max(desired_item_count, self.minimum_daily_posts)
+            if target_total > 0:
+                per_category_target = math.ceil(
+                    target_total / max(1, len(self.categories_config))
                 )
-                item_count = self.minimum_daily_posts
+                desired_item_count = max(desired_item_count, per_category_target)
+            if desired_item_count != item_count:
+                logger.info(
+                    "Requested item_count %s below target %s; adjusting.",
+                    item_count,
+                    desired_item_count,
+                )
+                item_count = desired_item_count
             cooldown_entries = self.repository.prune_cooldowns(
                 self.cooldown_retention_days, now=now
             )
@@ -103,6 +136,7 @@ class GiftPipeline:
                 for entry in cooldown_entries
                 if entry.is_active(self.cooldown_days, now)
             }
+            candidate_pool: Dict[Tuple[str, str], Tuple[Product, float]] = {}
             for retailer in self.retailers:
                 for definition in self.categories_config:
                     items = retailer.search_items(
@@ -124,23 +158,33 @@ class GiftPipeline:
                                 product.retailer_slug,
                             )
                             continue
-                        new_products.append(product)
-                        new_entry = CooldownEntry(
-                            retailer_slug=product.retailer_slug,
-                            asin=product.asin,
-                            category_slug=product.category_slug,
-                        )
-                        new_cooldowns.append(new_entry)
-                        active_cooldown_keys.add(key)
-            unique_new = len(
-                {(product.retailer_slug, product.asin) for product in new_products}
+                        score = self._quality_score(product)
+                        existing = candidate_pool.get(key)
+                        if existing is None or score > existing[1]:
+                            candidate_pool[key] = (product, score)
+            ordered_candidates = sorted(
+                candidate_pool.values(), key=lambda pair: pair[1], reverse=True
             )
-            if self.minimum_daily_posts and unique_new < self.minimum_daily_posts:
-                shortfall = self.minimum_daily_posts - unique_new
+            if target_total:
+                ordered_candidates = ordered_candidates[:target_total]
+            new_products = [product for product, _ in ordered_candidates]
+            for product in new_products:
+                key = (product.retailer_slug, product.asin)
+                new_entry = CooldownEntry(
+                    retailer_slug=product.retailer_slug,
+                    asin=product.asin,
+                    category_slug=product.category_slug,
+                )
+                new_cooldowns.append(new_entry)
+                active_cooldown_keys.add(key)
+            unique_new = len(new_products)
+            desired_new = target_total
+            if desired_new and unique_new < desired_new:
+                shortfall = desired_new - unique_new
                 logger.warning(
                     "Only %s new products added (minimum target is %s). Attempting to backfill %s slot%s with existing listings.",
                     unique_new,
-                    self.minimum_daily_posts,
+                    desired_new,
                     shortfall,
                     "" if shortfall == 1 else "s",
                 )
@@ -283,6 +327,40 @@ class GiftPipeline:
                 if not ordered_pools[slug]:
                     ordered_pools.pop(slug)
         return selected[:required]
+
+    @staticmethod
+    def _blog_word_count(content: str | None) -> int:
+        if not content:
+            return 0
+        text = re.sub(r"<[^>]+>", " ", content)
+        words = [segment for segment in text.split() if segment.strip()]
+        return len(words)
+
+    @classmethod
+    def _quality_score(cls, product: Product) -> float:
+        score = 0.0
+        if product.rating:
+            score += float(product.rating) * 120.0
+        else:
+            score -= 40.0
+        if product.total_reviews:
+            score += min(float(product.total_reviews), 500.0) * 0.6
+        else:
+            score -= 20.0
+        if product.price:
+            score += 12.0
+        if product.image:
+            score += 8.0
+        if product.summary:
+            score += min(len(product.summary.split()), 60)
+        blog_words = cls._blog_word_count(product.blog_content)
+        if blog_words:
+            score += min(blog_words, 400)
+        else:
+            score -= 25.0
+        if product.brand:
+            score += 5.0
+        return score
 
     @staticmethod
     def _parse_timestamp(value: str | None) -> datetime | None:

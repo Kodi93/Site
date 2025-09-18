@@ -213,6 +213,94 @@ def _render_consider(points: Sequence[str]) -> str:
     return f"<div class=\"consider-block\"><strong>Consider:</strong><ul>{lis}</ul></div>"
 
 
+def _render_campaign_playbook(
+    product: Product, category_name: str, features: Sequence[str]
+) -> str:
+    highlights = _unique_items(features) or _unique_items(product.keywords)
+    trimmed_highlights = [
+        _truncate_highlight(item.rstrip(". ")) for item in highlights[:3]
+    ]
+    highlight_phrase = _join_with_and(
+        [item for item in trimmed_highlights if item]
+    )
+    if highlight_phrase:
+        hero_sentence = (
+            f"Lead with {highlight_phrase} so merchandising teams grasp the hook instantly."
+        )
+    else:
+        hero_sentence = (
+            "Lead with the core value prop so merchandising teams grasp the hook instantly."
+        )
+    audience_phrase = build_category_phrase(category_name)
+    use_hint = _category_use_hint(category_name, product) or "high-intent moments"
+    if product.rating and product.total_reviews:
+        proof_sentence = (
+            f"Reinforce the pitch with {product.rating:.1f}-star proof from {product.total_reviews:,} verified buyers."
+        )
+    else:
+        proof_sentence = (
+            "Surface fresh social proof or testimonials before assets go live."
+        )
+    if product.brand:
+        brand_sentence = (
+            f"Mention {product.brand.strip()} by name—brand credibility boosts conversion in social drops and newsletters."
+        )
+    else:
+        brand_sentence = (
+            "Include brand specifics in your deck so editors can fact-check without slowing launch timelines."
+        )
+    closing_sentence = (
+        "Close with a clear CTA, pricing disclaimer, and the highlights below so your creative brief stays plug-and-play."
+    )
+    paragraphs = [
+        hero_sentence + f" Position it as {audience_phrase} that earns organic placements.",
+        f"Map it to {use_hint} in your calendar and pair it with complementary add-ons to lift average order value. {proof_sentence}",
+        f"{brand_sentence} {closing_sentence}",
+    ]
+    body = "".join(
+        f"<p>{_normalized_words(paragraph)}</p>"
+        for paragraph in paragraphs
+        if paragraph
+    )
+    return f"<section class=\"campaign-playbook\"><h3>Campaign playbook</h3>{body}</section>"
+
+
+def _render_launch_checklist(product: Product, features: Sequence[str]) -> str:
+    highlights = _unique_items(features)
+    checklist: list[str] = []
+    if highlights:
+        spotlight = _truncate_highlight(highlights[0].rstrip(". "))
+        if spotlight:
+            checklist.append(f"Spotlight {spotlight} in hero imagery and subject lines.")
+    if product.rating and product.total_reviews:
+        checklist.append(
+            f"Quote the {product.rating:.1f}-star feedback from {product.total_reviews:,} reviewers to add instant social proof."
+        )
+    else:
+        checklist.append(
+            "Pull recent customer commentary from the listing to strengthen the story before launch."
+        )
+    if product.price:
+        checklist.append(
+            f"Pair the {product.price.strip()} price callout with a clear \"subject to change\" disclaimer."
+        )
+    checklist.append(
+        "Link campaign CTAs directly to the retailer listing with your tracking parameters applied."
+    )
+    checklist.append(
+        "Drop the spec bullets below into your CMS, press notes, or creative brief so stakeholders can copy/paste."
+    )
+    seen: set[str] = set()
+    normalized_items: list[str] = []
+    for item in checklist:
+        normalized = _normalized_words(item)
+        if normalized and normalized not in seen:
+            normalized_items.append(normalized)
+            seen.add(normalized)
+    lis = "".join(f"<li>{entry}</li>" for entry in normalized_items)
+    return f"<section class=\"launch-checklist\"><h3>Launch checklist</h3><ul>{lis}</ul></section>"
+
+
 def _price_line(product: Product) -> str:
     if not product.price:
         return ""
@@ -321,6 +409,8 @@ def generate_blog_post(product: Product, category_name: str, features: List[str]
     bullet_html = _render_bullet_list(
         _build_bullet_points(product, category_name, features, product.price)
     )
+    playbook_html = _render_campaign_playbook(product, category_name, features)
+    launch_checklist_html = _render_launch_checklist(product, features)
     good_for_html = _render_good_for(_good_for_text(category_name, product))
     consider_html = _render_consider(_consider_points())
     price_line = _price_line(product)
@@ -331,6 +421,8 @@ def generate_blog_post(product: Product, category_name: str, features: List[str]
         f"{price_line}"
         f"{review_line}"
         f"{bullet_html}"
+        f"{playbook_html}"
+        f"{launch_checklist_html}"
         f"{good_for_html}"
         f"{consider_html}"
         f"<p class=\"cta-row\">{cta}</p>"
