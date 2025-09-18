@@ -234,8 +234,8 @@ Because the output is static, the site is fast, cache-friendly, and inexpensive 
 Deploying the deletion handler follows the same workflow as the static site when using Netlify Functions:
 
 1. **Push the function** – keep `netlify/functions/accountDeletion.js` in your repository so Netlify packages it automatically during deploys (no additional build step is required).
-2. **Configure the secret** – set the marketplace console to send the verification token `gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5` in the `x-verification-token` header so requests pass the function’s authentication check. Update `EXPECTED_TOKEN` in the function before deploying if you need to rotate it.
-3. **Verify with the marketplace** – once your site is live, the function is reachable at `https://<your-site>/.netlify/functions/accountDeletion`. Use the marketplace’s “Send Test Notification” tool to confirm you receive a `204 No Content` response and inspect your Netlify function logs for the recorded payload.
+2. **Configure the secret** – register the verification token `gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5` in the marketplace console. eBay signs each deletion payload with this token and includes the signature in the `X-EBAY-SIGNATURE` header. Update `EXPECTED_TOKEN` in the function before deploying if you need to rotate it.
+3. **Verify with the marketplace** – once your site is live, the function is reachable at `https://<your-site>/.netlify/functions/accountDeletion`. Use the marketplace’s “Send Test Notification” tool to confirm you receive a `204 No Content` response and inspect your Netlify function logs for the recorded payload. If you are manually testing with `curl`, you can also send the raw token in an `x-verification-token` header – the function keeps that legacy path enabled to make local smoke tests easier.
 
 If you host elsewhere, deploy the handler to any HTTPS endpoint that enforces the same token check and routes to the same logic.
 

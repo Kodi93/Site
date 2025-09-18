@@ -6,6 +6,50 @@ const EXPECTED_TOKEN = 'gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5';
 const HEALTH_CHECK_METHODS = new Set(['GET', 'HEAD']);
 
 const CHALLENGE_PARAM_KEYS = ['challenge_code', 'challengeCode'];
+const SIGNATURE_HEADER_KEY = 'x-ebay-signature';
+
+function normalizeHeaders(headers = {}) {
+  const normalized = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === 'string') {
+      normalized[key.toLowerCase()] = value;
+    }
+  }
+  return normalized;
+}
+
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return false;
+  }
+
+  const bufferA = Buffer.from(a, 'utf8');
+  const bufferB = Buffer.from(b, 'utf8');
+  if (bufferA.length !== bufferB.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(bufferA, bufferB);
+}
+
+function extractSignatureValues(signatureHeader) {
+  if (typeof signatureHeader !== 'string') {
+    return [];
+  }
+
+  return signatureHeader
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => {
+      const match = segment.match(/^sha256=(.+)$/i);
+      if (match) {
+        return match[1].trim();
+      }
+      return segment;
+    })
+    .filter(Boolean);
+}
 
 function extractChallengeCode(event) {
   const query = event.queryStringParameters || {};
@@ -40,24 +84,20 @@ function resolveEndpoint(event) {
     }
   }
 
-  const headers = event.headers || {};
-  const host = headers.host || headers.Host;
+  const headers = normalizeHeaders(event.headers);
+  const host = headers.host;
   const path = event.path || '';
   if (!host) {
     return path;
   }
 
-  const protocol =
-    headers['x-forwarded-proto'] ||
-    headers['X-Forwarded-Proto'] ||
-    headers['x-forwarded_proto'] ||
-    'https';
+  const protocol = headers['x-forwarded-proto'] || headers['x-forwarded_proto'] || 'https';
   return `${protocol}://${host}${path}`;
 }
 
 exports.handler = async (event) => {
   const method = event.httpMethod || '';
-  const headers = event.headers || {};
+  const headers = normalizeHeaders(event.headers);
 
   if (method === 'GET') {
     const challengeCode = extractChallengeCode(event);
@@ -101,23 +141,44 @@ exports.handler = async (event) => {
     };
   }
 
-  const receivedToken =
-    headers['x-verification-token'] ||
-    headers['X-Verification-Token'] ||
-    headers['x-verificationtoken'] ||
-    headers['x-verification_token'];
+  const signatureValues = extractSignatureValues(headers[SIGNATURE_HEADER_KEY]);
+  const verificationToken = headers['x-verification-token'];
 
-  if (receivedToken !== EXPECTED_TOKEN) {
-    console.warn('Received request with invalid verification token.');
+  const rawBodyBuffer = event.isBase64Encoded
+    ? Buffer.from(event.body || '', 'base64')
+    : Buffer.from(event.body || '', 'utf8');
+  const rawBody = rawBodyBuffer.toString('utf8');
+
+  let requestIsAuthorized = false;
+
+  if (signatureValues.length > 0) {
+    try {
+      const hmac = crypto.createHmac('sha256', EXPECTED_TOKEN);
+      hmac.update(rawBodyBuffer);
+      const digestBuffer = hmac.digest();
+      const expectedBase64 = digestBuffer.toString('base64');
+      const expectedHex = digestBuffer.toString('hex');
+
+      requestIsAuthorized = signatureValues.some((candidate) => {
+        const trimmed = candidate.trim();
+        return safeEqual(trimmed, expectedBase64) || safeEqual(trimmed, expectedHex);
+      });
+    } catch (error) {
+      console.error('Failed to verify signature for deletion payload.', error);
+      requestIsAuthorized = false;
+    }
+  }
+
+  if (!requestIsAuthorized && typeof verificationToken === 'string') {
+    requestIsAuthorized = safeEqual(verificationToken.trim(), EXPECTED_TOKEN);
+  }
+
+  if (!requestIsAuthorized) {
+    console.warn('Received request with invalid verification signature.');
     return {
       statusCode: 403,
       body: JSON.stringify({ message: 'Forbidden' }),
     };
-  }
-
-  let rawBody = event.body || '';
-  if (event.isBase64Encoded) {
-    rawBody = Buffer.from(rawBody, 'base64').toString('utf8');
   }
 
   let payload;
