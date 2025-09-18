@@ -77,7 +77,12 @@ def make_item(index: int) -> dict:
     }
 
 
-def build_pipeline(repo: ProductRepository, items, minimum_daily_posts: int = 1):
+def build_pipeline(
+    repo: ProductRepository,
+    items,
+    minimum_daily_posts: int = 1,
+    bootstrap_target: int = 5,
+):
     generator = DummyGenerator()
     retailer = FakeRetailerAdapter(items)
     pipeline = GiftPipeline(
@@ -87,6 +92,7 @@ def build_pipeline(repo: ProductRepository, items, minimum_daily_posts: int = 1)
         retailers=[retailer],
         credentials=None,
         minimum_daily_posts=minimum_daily_posts,
+        bootstrap_target=bootstrap_target,
     )
     return pipeline, generator, retailer
 
@@ -134,11 +140,57 @@ class PipelineCooldownTests(unittest.TestCase):
     def test_minimum_daily_posts_adjusts_item_count(self) -> None:
         items = [make_item(idx) for idx in range(5)]
         pipeline, _, retailer = build_pipeline(
-            self.repo, items, minimum_daily_posts=5
+            self.repo, items, minimum_daily_posts=5, bootstrap_target=5
         )
         pipeline.run(item_count=2, regenerate_only=False)
         self.assertEqual(retailer.last_item_count, 5)
         self.assertGreaterEqual(len(self.repo.load_products()), 5)
+
+    def test_bootstrap_target_drives_initial_pull(self) -> None:
+        items = [make_item(idx) for idx in range(12)]
+        pipeline, _, retailer = build_pipeline(
+            self.repo,
+            items,
+            minimum_daily_posts=5,
+            bootstrap_target=12,
+        )
+        pipeline.run(item_count=3, regenerate_only=False)
+        self.assertEqual(retailer.last_item_count, 12)
+        self.assertEqual(len(self.repo.load_products()), 12)
+
+    def test_daily_quota_limits_new_products(self) -> None:
+        items = [make_item(idx) for idx in range(10)]
+        pipeline, _, retailer = build_pipeline(
+            self.repo,
+            items,
+            minimum_daily_posts=5,
+            bootstrap_target=5,
+        )
+        pipeline.run(item_count=10, regenerate_only=False)
+        self.assertEqual(len(self.repo.load_products()), 5)
+
+        retailer.items = [make_item(idx + 20) for idx in range(10)]
+        pipeline.run(item_count=10, regenerate_only=False)
+        self.assertEqual(len(self.repo.load_products()), 10)
+
+    def test_quality_scoring_prioritizes_high_ratings(self) -> None:
+        items = []
+        for idx in range(10):
+            item = make_item(idx)
+            item["rating"] = 4.0 + idx * 0.1
+            item["total_reviews"] = (idx + 1) * 20
+            items.append(item)
+        pipeline, _, _ = build_pipeline(
+            self.repo,
+            items,
+            minimum_daily_posts=5,
+            bootstrap_target=5,
+        )
+        pipeline.run(item_count=10, regenerate_only=False)
+        stored = self.repo.load_products()
+        self.assertEqual(len(stored), 5)
+        asins = {product.asin for product in stored}
+        self.assertEqual(asins, {f"ASIN{idx}" for idx in range(5, 10)})
 
 
 def test_pipeline_generate_only_handles_article_repository(tmp_path: Path) -> None:
