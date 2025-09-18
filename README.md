@@ -80,11 +80,19 @@ The CLI reads configuration from environment variables so you can keep secrets o
 | `SITE_NEWSLETTER_HIDDEN_INPUTS` | No | Extra hidden inputs encoded as a query string (e.g. `u=123&id=abc`) |
 | `SITE_NEWSLETTER_CTA_COPY` | No | Custom label for the newsletter button/submit action |
 | `STATIC_RETAILER_DIR` | No | Directory containing JSON retailer feeds (defaults to `data/retailers`) |
+<<< codex/create-account-deletion-netlify-function-uz8ih4
 | `DELETION_TOKEN` | Yes (for account deletion webhook) | Shared secret expected in the `x-verification-token` header for `netlify/functions/accountDeletion` |
 
 If both `SITE_ANALYTICS_ID` and `SITE_ANALYTICS_SNIPPET` are present, the raw snippet takes precedence. Hidden newsletter inputs are supplied as a URL query string so you can include provider-specific fields (e.g. `u`, `id`, `form` IDs) without editing templates.
 
 The Netlify Function that receives marketplace deletion notifications lives at `netlify/functions/accountDeletion.js` and is exposed publicly at `/.netlify/functions/accountDeletion`. Configure `DELETION_TOKEN` both in your hosting environment and in the marketplace console so webhook calls include the matching `x-verification-token` header.
+=====
+| `MARKETPLACE_DELETION_TOKEN` | Yes (for account deletion webhook) | Shared secret expected in the `x-verification-token` header for `netlify/functions/accountDeletion` |
+
+If both `SITE_ANALYTICS_ID` and `SITE_ANALYTICS_SNIPPET` are present, the raw snippet takes precedence. Hidden newsletter inputs are supplied as a URL query string so you can include provider-specific fields (e.g. `u`, `id`, `form` IDs) without editing templates.
+
+The Netlify Function that receives marketplace deletion notifications lives at `netlify/functions/accountDeletion.js` and is exposed publicly at `/.netlify/functions/accountDeletion`. Configure `MARKETPLACE_DELETION_TOKEN` both in your hosting environment and in the marketplace console so webhook calls include the matching `x-verification-token` header.
+>>>>> main
 
 ### Newsletter form wiring
 
@@ -232,9 +240,15 @@ Because the output is static, the site is fast, cache-friendly, and inexpensive 
 
 Deploying the deletion handler follows the same workflow as the static site when using Netlify Functions:
 
+<<<< codex/create-account-deletion-netlify-function-uz8ih4
 1. **Push the function** – keep `netlify/functions/accountDeletion.js` (and `netlify.toml` if you use the bundled Next.js plugin) in your repository so Netlify packages it automatically during deploys.
 2. **Configure the secret** – in your Netlify site settings (Site configuration → Build & deploy → Environment), add `DELETION_TOKEN` and reuse that exact value when configuring the marketplace console.
 3. **Verify with the marketplace** – once your site is live, the function is reachable at `https://<your-site>/.netlify/functions/accountDeletion`. Use the marketplace’s “Send Test Notification” tool to confirm you receive a `200 OK` response and inspect your Netlify function logs for the recorded payload.
+====
+1. **Push the function** – keep `netlify/functions/accountDeletion.js` in your repository so Netlify packages it automatically during deploys (no additional build step is required).
+2. **Configure the secret** – in your Netlify site settings (Site configuration → Build & deploy → Environment), add `MARKETPLACE_DELETION_TOKEN` and reuse that exact value when configuring the marketplace console.
+3. **Verify with the marketplace** – once your site is live, the function is reachable at `https://<your-site>/.netlify/functions/accountDeletion`. Use the marketplace’s “Send Test Notification” tool to confirm you receive a `204 No Content` response and inspect your Netlify function logs for the recorded payload.
+>>>> main
 
 If you host elsewhere, deploy the handler to any HTTPS endpoint that enforces the same token check and routes to the same logic.
 
