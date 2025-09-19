@@ -331,6 +331,10 @@ p {
   margin: 0;
 }
 
+.guide-grid {
+  grid-auto-rows: 1fr;
+}
+
 .card {
   background: var(--card);
   border: 1px solid #2a2340;
@@ -380,10 +384,80 @@ p {
   gap: 1.5rem;
 }
 
+.feed-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feed-header-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .feed-header {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.feed-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.feed-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(17, 7, 32, 0.65);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feed-tab:hover,
+.feed-tab:focus-visible {
+  color: var(--fg);
+  border-color: rgba(255, 61, 158, 0.45);
+  background: rgba(255, 61, 158, 0.18);
+}
+
+.feed-tab:focus-visible {
+  outline: 2px solid rgba(255, 143, 207, 0.65);
+  outline-offset: 2px;
+}
+
+.feed-tab.is-active {
+  background: var(--accent);
+  color: #120914;
+  border-color: transparent;
+  box-shadow: 0 10px 26px rgba(255, 61, 158, 0.35);
+}
+
+.feed-tab[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (min-width: 640px) {
+  .feed-header-top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .feed-tabs {
+    justify-content: flex-end;
+  }
 }
 
 .feed-header p {
@@ -469,6 +543,24 @@ p {
   margin: 0;
   font-weight: 600;
   color: var(--fg);
+}
+
+.guide-card a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+}
+
+.guide-card-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.guide-card-meta time {
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .feed-card-link:hover .feed-card-media img,

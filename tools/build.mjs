@@ -14,8 +14,44 @@ const HEADER_PATH = path.join("templates", "partials", "header.html");
 const FOOTER_PATH = path.join("templates", "partials", "footer.html");
 const THEME_PATH = path.join(PUB, "assets", "theme.css");
 const FEED_DIR = path.join(PUB, "assets", "feed");
-const FEED_MANIFEST = path.join(FEED_DIR, "manifest.json");
 const FEED_PAGE_SIZE = 18;
+const GUIDE_LEDGER_PATH = path.join("data", "guides.json");
+
+const FEED_MODES = [
+  {
+    id: "recent",
+    label: "Most Recent",
+    description: "Catch the newest arrivals as soon as we publish them.",
+    empty: "New gifts are loading soon—check back for fresh picks.",
+    sort: (items) =>
+      items
+        .slice()
+        .sort((a, b) => {
+          const diff = parseTimestamp(b.updated_at || b.updatedAt) - parseTimestamp(a.updated_at || a.updatedAt);
+          if (diff !== 0) return diff;
+          return (a.title || "").localeCompare(b.title || "");
+        }),
+  },
+  {
+    id: "trending",
+    label: "Trending",
+    description: "Browse the crowd-pleasers rising to the top of our catalog.",
+    empty: "No trending picks right now—check back after the next refresh.",
+    sort: (items) =>
+      items
+        .slice()
+        .sort((a, b) => {
+          const reviewDiff = Number(b.rating_count || b.ratingCount || 0) - Number(a.rating_count || a.ratingCount || 0);
+          if (reviewDiff !== 0) return reviewDiff;
+          const ratingDiff = Number(b.rating || 0) - Number(a.rating || 0);
+          if (ratingDiff !== 0) return ratingDiff;
+          const updatedDiff =
+            parseTimestamp(b.updated_at || b.updatedAt) - parseTimestamp(a.updated_at || a.updatedAt);
+          if (updatedDiff !== 0) return updatedDiff;
+          return (a.title || "").localeCompare(b.title || "");
+        }),
+  },
+];
 const PROTECTED_FILES = new Set(
   [BASE_TEMPLATE_PATH, HEADER_PATH, FOOTER_PATH, THEME_PATH].map((p) =>
     path.resolve(p),
@@ -68,6 +104,22 @@ function parseTimestamp(value) {
   if (!value) return 0;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function loadGuideLedger() {
+  try {
+    return JSON.parse(fs.readFileSync(GUIDE_LEDGER_PATH, "utf8"));
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      console.warn("Failed to read guide ledger", error);
+    }
+    return [];
+  }
+}
+
+function saveGuideLedger(entries) {
+  fs.mkdirSync(path.dirname(GUIDE_LEDGER_PATH), { recursive: true });
+  fs.writeFileSync(GUIDE_LEDGER_PATH, `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 function compactObject(payload) {
@@ -182,6 +234,16 @@ function polishGuideTitle(title) {
   return text.trim();
 }
 
+function formatGuideDate(value) {
+  const timestamp = parseTimestamp(value);
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function renderGuideCard(item) {
   if (!item.image) return "";
   const parts = ["<li class=\"card\">"];
@@ -231,9 +293,17 @@ function renderGuidePreview(guide) {
     ? escapeHtml(stripBannedPhrases(guide.summary))
     : "Explore thoughtful ideas for every list.";
   const title = polishGuideTitle(guide.title);
+  const timestamp = guide.createdAt ? parseTimestamp(guide.createdAt) : 0;
+  const isoDate = timestamp ? new Date(timestamp).toISOString() : "";
+  const published = timestamp ? formatGuideDate(guide.createdAt) : "";
+  const meta =
+    isoDate && published
+      ? `<p class=\"guide-card-meta\"><time datetime=\"${escapeHtml(isoDate)}\">${escapeHtml(published)}</time></p>`
+      : "";
   return [
-    '<li class="card">',
+    '<li class="card guide-card">',
     `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
+    meta,
     `<h3>${escapeHtml(title)}</h3>`,
     `<p>${summary}</p>`,
     "</a>",
@@ -256,19 +326,21 @@ function renderGuidePage(title, slug, items) {
   return renderWithBase(sections.join("\n"));
 }
 
-function writeFeedData(items) {
-  fs.rmSync(FEED_DIR, { recursive: true, force: true });
-  const feedItems = items
+function buildFeedForMode(items, mode) {
+  const sorted = mode.sort(items);
+  const feedItems = sorted
     .filter((item) => item && item.image && item.url && item.title)
-    .map((item) => toFeedEntry(item))
-    .sort((a, b) => {
-      const diff = parseTimestamp(b.updatedAt) - parseTimestamp(a.updatedAt);
-      if (diff !== 0) return diff;
-      return (a.title || "").localeCompare(b.title || "");
-    });
+    .map((item) => toFeedEntry(item));
+
+  const baseDir = path.join(FEED_DIR, mode.id);
+  const baseHref = `/assets/feed/${mode.id}`;
+  fs.mkdirSync(baseDir, { recursive: true });
 
   const totalPages = Math.ceil(feedItems.length / FEED_PAGE_SIZE);
   const manifest = {
+    mode: mode.id,
+    label: mode.label,
+    description: mode.description,
     pageSize: FEED_PAGE_SIZE,
     totalItems: feedItems.length,
     totalPages,
@@ -279,10 +351,10 @@ function writeFeedData(items) {
   for (let index = 0; index < feedItems.length; index += FEED_PAGE_SIZE) {
     const page = Math.floor(index / FEED_PAGE_SIZE) + 1;
     const slice = feedItems.slice(index, index + FEED_PAGE_SIZE);
-    const href = `/assets/feed/page-${page}.json`;
+    const href = `${baseHref}/page-${page}.json`;
     manifest.pages.push({ page, href });
     writeFile(
-      path.join(FEED_DIR, `page-${page}.json`),
+      path.join(baseDir, `page-${page}.json`),
       `${JSON.stringify(
         {
           page,
@@ -297,111 +369,179 @@ function writeFeedData(items) {
     );
   }
 
-  writeFile(FEED_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFile(path.join(baseDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   return {
-    initialItems: feedItems.slice(0, FEED_PAGE_SIZE),
-    initialPage: feedItems.length ? 1 : 0,
-    nextPage: totalPages > 1 ? `/assets/feed/page-2.json` : "",
+    id: mode.id,
+    label: mode.label,
+    description: mode.description,
+    empty: mode.empty,
+    baseHref,
+    manifestHref: `${baseHref}/manifest.json`,
     pageSize: FEED_PAGE_SIZE,
-    totalPages,
     totalItems: feedItems.length,
-    manifestHref: "/assets/feed/manifest.json",
+    totalPages,
+    initialPage: feedItems.length ? 1 : 0,
+    nextPage: totalPages > 1 ? `${baseHref}/page-2.json` : "",
+    initialItems: feedItems.slice(0, FEED_PAGE_SIZE),
   };
 }
 
-function renderHomePage(guides, feed) {
-  const hero = [
-    '<section class="hero">',
-    `<h1>${escapeHtml(SITE_NAME)}</h1>`,
-    `<p>${escapeHtml(stripBannedPhrases(SITE_DESCRIPTION))}</p>`,
-  ];
-  if (feed.totalItems) {
-    hero.push(
-      '<div class="hero-actions">',
-      '<a class="button" href="#latest">Shop the live feed</a>',
-      '<a class="button button-ghost" href="/guides/">Browse guides</a>',
-      "</div>",
-    );
-  } else if (guides.length) {
-    hero.push(
-      '<div class="hero-actions">',
-      '<a class="button" href="/guides/">Browse guides</a>',
-      "</div>",
-    );
-  }
-  hero.push("</section>");
+function writeFeedData(items) {
+  fs.rmSync(FEED_DIR, { recursive: true, force: true });
+  const modes = FEED_MODES.map((mode) => buildFeedForMode(items, mode));
+  const fallback = modes[0] || null;
+  const defaultMode = modes.find((mode) => mode.totalItems > 0) || fallback;
+  return {
+    defaultMode: defaultMode ? defaultMode.id : null,
+    modes,
+  };
+}
 
-  const feedItemsMarkup = feed.initialItems
-    .map((item) => renderFeedItem(item))
+function renderHomePage(recentGuides, feed) {
+  const hero = ['<section class="hero">', `<h1>${escapeHtml(SITE_NAME)}</h1>`];
+  const description = stripBannedPhrases(SITE_DESCRIPTION);
+  if (description) {
+    hero.push(`<p>${escapeHtml(description)}</p>`);
+  }
+  const hasFeed = Array.isArray(feed?.modes) && feed.modes.some((mode) => mode.totalItems > 0);
+  const heroActions = [];
+  if (recentGuides.length) {
+    heroActions.push('<a class="button" href="#guides">Catch this week\'s guides</a>');
+  }
+  if (hasFeed) {
+    heroActions.push('<a class="button button-secondary" href="#latest">Scroll the gift feed</a>');
+  }
+  heroActions.push('<a class="button button-ghost" href="/guides/">View all guides</a>');
+  if (heroActions.length) {
+    hero.push('<div class="hero-actions">');
+    hero.push(heroActions.join('\n'));
+    hero.push('</div>');
+  }
+  hero.push('</section>');
+  const heroMarkup = hero.filter(Boolean).join('\n');
+
+  const guideCards = recentGuides
+    .map((guide) => renderGuidePreview(guide))
     .filter(Boolean)
-    .join("\n");
-  const feedListMarkup =
-    feedItemsMarkup ||
-    '<p class="feed-empty">More gifts are loading soon—check back for fresh picks.</p>';
-  const feedAttributes = [
-    'class="item-feed"',
-    "data-feed",
-    `data-feed-page=\"${feed.initialPage}\"`,
-    `data-feed-page-size=\"${feed.pageSize}\"`,
-    `data-feed-total=\"${feed.totalPages}\"`,
-    `data-feed-total-items=\"${feed.totalItems}\"`,
-    `data-feed-manifest=\"${escapeHtml(feed.manifestHref)}\"`,
-  ];
-  if (feed.nextPage) {
-    feedAttributes.push(`data-feed-next=\"${escapeHtml(feed.nextPage)}\"`);
-  } else {
-    feedAttributes.push("data-feed-complete");
-  }
-
-  const feedSection = [
-    '<section class="feed-section" id="latest">',
+    .join('\n');
+  const guidesSectionParts = [
+    '<section class="feed-section" id="guides">',
     '<div class="feed-header">',
-    "<h2>Trending gifts now</h2>",
-    "<p>Scroll through new arrivals as they hit our catalog. We keep the feed fresh so you're never short on ideas.</p>",
-    "</div>",
-    `<div ${feedAttributes.join(" ")}>`,
-    `<div class=\"feed-list\" data-feed-list>${feedListMarkup}</div>`,
+    "<h2>This week\'s guides</h2>",
+    "<p>Catch up on everything we published across the last seven days.</p>",
+    '</div>',
   ];
-  if (feed.totalPages > 1) {
-    feedSection.push(
-      '<button class="button feed-load-more" type="button" data-feed-more>Load more gifts</button>',
-      '<p class="feed-status" data-feed-status aria-live="polite" hidden>Loading new picks…</p>',
-    );
+  if (guideCards) {
+    guidesSectionParts.push(`<ol class="grid guide-grid">${guideCards}</ol>`);
   } else {
-    feedSection.push(
-      '<p class="feed-status" data-feed-status aria-live="polite">You\'re all caught up.</p>',
+    guidesSectionParts.push(
+      '<p class="feed-empty">Our next guides are publishing soon. Check back tomorrow for fresh picks.</p>',
     );
   }
-  feedSection.push(
-    '<div class="feed-sentinel" data-feed-sentinel></div>',
-    "</div>",
-    '<noscript><p class="feed-status">Enable JavaScript to load more gifts from the feed.</p></noscript>',
-    "</section>",
+  guidesSectionParts.push(
+    '<div class="hero-actions"><a class="button button-ghost" href="/guides/">Browse every guide</a></div>',
   );
+  guidesSectionParts.push('</section>');
+  const guidesSection = guidesSectionParts.join('\n');
 
-  let guidesSection = "";
-  if (guides.length) {
-    const guideCards = guides
-      .slice(0, 6)
-      .map((guide) => renderGuidePreview(guide))
-      .filter(Boolean)
-      .join("\n");
-    if (guideCards) {
-      guidesSection = [
-        '<section class="feed-section">',
-        '<div class="feed-header">',
-        "<h2>Featured guides</h2>",
-        "<p>Dive into curated collections powered by the same inventory as our live feed.</p>",
-        "</div>",
-        `<ol class=\"grid\">${guideCards}</ol>`,
-        '<div class="hero-actions"><a class="button button-ghost" href="/guides/">View all guides</a></div>',
-        "</section>",
-      ].join("\n");
+  let feedSection = '';
+  if (Array.isArray(feed?.modes) && feed.modes.length) {
+    const defaultModeId = feed.defaultMode || (feed.modes[0] && feed.modes[0].id) || '';
+    const defaultMode = feed.modes.find((mode) => mode.id === defaultModeId) || feed.modes[0] || null;
+    const tabs = feed.modes
+      .map((mode) => {
+        const isActive = defaultMode && mode.id === defaultMode.id;
+        const disabled = mode.totalItems === 0 ? ' disabled' : '';
+        const classes = ['feed-tab'];
+        if (isActive) classes.push('is-active');
+        const ariaSelected = isActive ? 'true' : 'false';
+        const tabIndex = isActive ? '0' : '-1';
+        return `<button class="${classes.join(' ')}" type="button" role="tab" aria-selected="${ariaSelected}" tabindex="${tabIndex}" data-feed-tab="${escapeHtml(mode.id)}"${disabled}>${escapeHtml(mode.label)}</button>`;
+      })
+      .join('');
+    const defaultMarkup = defaultMode && defaultMode.initialItems.length
+      ? defaultMode.initialItems.map((item) => renderFeedItem(item)).filter(Boolean).join('\n')
+      : `<p class="feed-empty">${escapeHtml(defaultMode ? defaultMode.empty : 'More gifts are loading soon—check back for fresh picks.')}</p>`;
+    const templates = feed.modes
+      .filter((mode) => !defaultMode || mode.id !== defaultMode.id)
+      .map((mode) => {
+        const markup = mode.initialItems.length
+          ? mode.initialItems.map((item) => renderFeedItem(item)).filter(Boolean).join('\n')
+          : `<p class="feed-empty">${escapeHtml(mode.empty)}</p>`;
+        return `<template data-feed-template="${escapeHtml(mode.id)}">${markup}</template>`;
+      })
+      .join('\n');
+    const configs = feed.modes
+      .map((mode) => {
+        const payload = {
+          id: mode.id,
+          label: mode.label,
+          description: mode.description,
+          pageSize: mode.pageSize,
+          totalItems: mode.totalItems,
+          totalPages: mode.totalPages,
+          currentPage: mode.initialPage,
+          nextPage: mode.nextPage,
+          baseHref: mode.baseHref,
+          manifestHref: mode.manifestHref,
+          empty: mode.empty,
+        };
+        return `<script type="application/json" data-feed-state="${escapeHtml(mode.id)}">${escapeHtml(
+          JSON.stringify(payload),
+        )}</script>`;
+      })
+      .join('\n');
+    const feedAttributes = ['class="item-feed"', 'data-feed'];
+    if (defaultMode) {
+      feedAttributes.push(`data-feed-mode="${escapeHtml(defaultMode.id)}"`);
+      feedAttributes.push(`data-feed-page="${defaultMode.initialPage}"`);
+      feedAttributes.push(`data-feed-total="${defaultMode.totalPages}"`);
+      feedAttributes.push(`data-feed-total-items="${defaultMode.totalItems}"`);
+      feedAttributes.push(`data-feed-page-size="${defaultMode.pageSize}"`);
+      if (defaultMode.nextPage) {
+        feedAttributes.push(`data-feed-next="${escapeHtml(defaultMode.nextPage)}"`);
+      } else {
+        feedAttributes.push('data-feed-complete');
+      }
+    } else {
+      feedAttributes.push('data-feed-mode=""');
+      feedAttributes.push('data-feed-page="0"');
+      feedAttributes.push('data-feed-total="0"');
+      feedAttributes.push('data-feed-total-items="0"');
+      feedAttributes.push(`data-feed-page-size="${FEED_PAGE_SIZE}"`);
+      feedAttributes.push('data-feed-complete');
     }
+    const descriptionText =
+      (defaultMode && defaultMode.description) ||
+      'Scroll through the latest gifts from across the catalog.';
+    feedSection = [
+      '<section class="feed-section" id="latest">',
+      `<div class="feed-wrapper" data-feed-root data-feed-default="${escapeHtml(defaultMode ? defaultMode.id : '')}">`,
+      '<div class="feed-header">',
+      '<div class="feed-header-top">',
+      '<h2>Live gift feed</h2>',
+      `<div class="feed-tabs" role="tablist">${tabs}</div>`,
+      '</div>',
+      `<p data-feed-description>${escapeHtml(descriptionText)}</p>`,
+      '</div>',
+      `<div ${feedAttributes.join(' ')}>`,
+      `<div class="feed-list" data-feed-list>${defaultMarkup}</div>`,
+      '<button class="button feed-load-more" type="button" data-feed-more>Load more gifts</button>',
+      '<p class="feed-status" data-feed-status aria-live="polite" hidden></p>',
+      '<div class="feed-sentinel" data-feed-sentinel></div>',
+      '</div>',
+      templates,
+      configs,
+      '</div>',
+      '<noscript><p class="feed-status">Enable JavaScript to load more gifts from the feed.</p></noscript>',
+      '</section>',
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
-  const content = [...hero, ...feedSection, guidesSection].filter(Boolean).join("\n");
+  const content = [heroMarkup, guidesSection, feedSection].filter(Boolean).join('\n');
   return renderWithBase(content);
 }
 
@@ -435,7 +575,12 @@ function main() {
   const items = JSON.parse(fs.readFileSync(IN, "utf8"));
   const plan = pickTopics(items, 15);
 
-  const guidesForHome = [];
+  const ledgerEntries = loadGuideLedger();
+  const ledgerMap = new Map(
+    ledgerEntries
+      .filter((entry) => entry && entry.slug)
+      .map((entry) => [entry.slug, entry]),
+  );
   let made = 0;
   for (const { title, slug } of plan.topics) {
     const picks = filterByTopic(title, items);
@@ -444,16 +589,35 @@ function main() {
     const polishedTitle = polishGuideTitle(title);
     const html = renderGuidePage(polishedTitle, slug, picksWithImages);
     writeFile(path.join(PUB, "guides", slug, "index.html"), html);
-    guidesForHome.push({
+    const summary = stripBannedPhrases(picksWithImages[0]?.title || `Top picks for ${polishedTitle}`);
+    ledgerMap.set(slug, {
       title: polishedTitle,
       slug,
-      summary: picksWithImages[0]?.title || `Top picks for ${polishedTitle}`,
+      summary,
+      createdAt: new Date().toISOString(),
     });
     made++;
   }
 
+  const updatedLedger = Array.from(ledgerMap.values())
+    .filter((entry) => entry && entry.slug && entry.title)
+    .map((entry) => ({
+      slug: entry.slug,
+      title: polishGuideTitle(entry.title),
+      summary: entry.summary ? stripBannedPhrases(entry.summary) : '',
+      createdAt: entry.createdAt || new Date().toISOString(),
+    }))
+    .sort((a, b) => parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt));
+  const trimmedLedger = updatedLedger.slice(0, 120);
+  saveGuideLedger(trimmedLedger);
+
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const guidesForHome = trimmedLedger.filter((entry) => parseTimestamp(entry.createdAt) >= oneWeekAgo);
+  const guidesFallback = guidesForHome.length ? guidesForHome : trimmedLedger.slice(0, 6);
+  const guidesForDisplay = guidesFallback.slice(0, 12);
+
   const feedState = writeFeedData(items);
-  const homeHtml = renderHomePage(guidesForHome, feedState);
+  const homeHtml = renderHomePage(guidesForDisplay, feedState);
   writeFile(path.join(PUB, "index.html"), homeHtml);
   const faqHtml = renderFaqPage();
   writeFile(path.join(PUB, "faq", "index.html"), faqHtml);
