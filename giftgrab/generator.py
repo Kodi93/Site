@@ -1,7 +1,5 @@
 """Static site generator for the GiftGrab catalog."""
 from __future__ import annotations
-
-import json
 import logging
 import os
 import re
@@ -27,6 +25,16 @@ PROTECTED_FILES = {
     FOOTER_PATH.resolve(),
     THEME_PATH.resolve(),
 }
+
+
+_BANNED_PHRASES = ("fresh drops", "active vibes")
+
+
+def _strip_banned_phrases(text: str) -> str:
+    result = text or ""
+    for phrase in _BANNED_PHRASES:
+        result = re.sub(re.escape(phrase), "", result, flags=re.IGNORECASE)
+    return result.strip()
 
 
 def _read_markup(path: Path) -> str:
@@ -60,20 +68,14 @@ BASE_TEMPLATE = _apply_includes(
     BASE_TEMPLATE_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
 )
 
-_PAGE_TITLE_PATTERN = re.compile(r"\{\{\s*page_title\s+or\s+\"GrabGifts\"\s*\}\}")
 _CONTENT_SAFE_PATTERN = re.compile(r"\{\{\s*content\|safe\s*\}\}")
 _CONTENT_PATTERN = re.compile(r"\{\{\s*content\s*\}\}")
 
 
-def _render_with_base(*, page_title: str, content: str, head_parts: Sequence[str]) -> str:
+def _render_with_base(*, content: str) -> str:
     html = BASE_TEMPLATE
-    safe_title = html_escape(page_title)
-    html = _PAGE_TITLE_PATTERN.sub(safe_title, html)
     html = _CONTENT_SAFE_PATTERN.sub(content, html)
     html = _CONTENT_PATTERN.sub(html_escape(content), html)
-    if head_parts:
-        injection = "\n".join(f"  {part}" for part in head_parts)
-        html = html.replace("</head>", f"{injection}\n</head>", 1)
     return html
 
 LOGGER = logging.getLogger(__name__)
@@ -144,20 +146,6 @@ class SiteGenerator:
         self.settings = settings or load_settings()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._sitemap_entries: List[tuple[str, str]] = []
-        self._website_json_ld = json.dumps(
-            {
-                "@context": "https://schema.org",
-                "@type": "WebSite",
-                "name": self.settings.name,
-                "url": self.settings.base_url,
-                "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": f"{self.settings.base_url}/search?q={{query}}",
-                    "query-input": "required name=query",
-                },
-            },
-            separators=(",", ":"),
-        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -170,6 +158,7 @@ class SiteGenerator:
         self._write_guides(guides)
         self._write_categories(products)
         self._write_products(products)
+        self._write_faq()
         self._write_sitemap()
         self._write_robots()
         self._write_rss(guides)
@@ -184,13 +173,7 @@ class SiteGenerator:
         return f"{base}/{path}"
 
     def _adsense_unit(self, slot: str | None) -> str:
-        if not self.settings.adsense_client_id or not slot:
-            return ""
-        return (
-            f"<ins class=\"adsbygoogle\" style=\"display:block\" data-ad-client=\"{self.settings.adsense_client_id}\" "
-            f"data-ad-slot=\"{slot}\" data-ad-format=\"auto\" data-full-width-responsive=\"true\"></ins>"
-            "<script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>"
-        )
+        return ""
 
     def _safe_write(self, target: Path, content: str) -> None:
         resolved = target.resolve()
@@ -206,75 +189,6 @@ class SiteGenerator:
         self._safe_write(file_path, content)
 
 
-    def _head_parts(
-        self,
-        *,
-        page_title: str,
-        description: str,
-        canonical_url: str,
-        extra_json_ld: Iterable[dict] | None = None,
-    ) -> list[str]:
-        site_name = self.settings.name or "GrabGifts"
-        safe_title = html_escape(page_title)
-        safe_description = html_escape(description)
-        safe_canonical = html_escape(canonical_url)
-        safe_site = html_escape(site_name)
-        rss_url = html_escape(self._abs_url("/rss.xml"))
-        parts = [
-            f"<link rel=\"canonical\" href=\"{safe_canonical}\">",
-            f"<meta name=\"description\" content=\"{safe_description}\">",
-            "<meta name=\"robots\" content=\"index,follow\">",
-            "<meta property=\"og:type\" content=\"website\">",
-            f"<meta property=\"og:title\" content=\"{safe_title}\">",
-            f"<meta property=\"og:description\" content=\"{safe_description}\">",
-            f"<meta property=\"og:url\" content=\"{safe_canonical}\">",
-            f"<meta property=\"og:site_name\" content=\"{safe_site}\">",
-            "<meta name=\"twitter:card\" content=\"summary_large_image\">",
-            f"<meta name=\"twitter:title\" content=\"{safe_title}\">",
-            f"<meta name=\"twitter:description\" content=\"{safe_description}\">",
-            f"<meta name=\"twitter:url\" content=\"{safe_canonical}\">",
-            f"<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{safe_site} RSS\" href=\"{rss_url}\">",
-            f"<script type=\"application/ld+json\">{self._website_json_ld}</script>",
-        ]
-        if self.settings.logo_url:
-            logo = html_escape(self.settings.logo_url)
-            parts.append(f"<meta property=\"og:image\" content=\"{logo}\">")
-            parts.append(f"<meta name=\"twitter:image\" content=\"{logo}\">")
-        if self.settings.favicon_url:
-            parts.append(
-                f"<link rel=\"icon\" href=\"{html_escape(self.settings.favicon_url)}\">"
-            )
-        if self.settings.twitter:
-            parts.append(
-                f"<meta name=\"twitter:site\" content=\"{html_escape(self.settings.twitter)}\">"
-            )
-        if self.settings.keywords:
-            keywords = ", ".join(self.settings.keywords)
-            parts.append(
-                f"<meta name=\"keywords\" content=\"{html_escape(keywords)}\">"
-            )
-        if self.settings.analytics_snippet:
-            parts.append(self.settings.analytics_snippet)
-        elif self.settings.analytics_id:
-            gid = html_escape(self.settings.analytics_id)
-            parts.append(
-                f"<script async src=\"https://www.googletagmanager.com/gtag/js?id={gid}\"></script>"
-            )
-            parts.append(
-                "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
-                f"gtag('js', new Date());gtag('config','{gid}');</script>"
-            )
-        if self.settings.adsense_client_id:
-            client = html_escape(self.settings.adsense_client_id)
-            parts.append(
-                f"<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={client}\" crossorigin=\"anonymous\"></script>"
-            )
-        for obj in extra_json_ld or []:
-            parts.append(
-                f"<script type=\"application/ld+json\">{json.dumps(obj, separators=(',', ':'))}</script>"
-            )
-        return parts
-
     def _render_document(
         self,
         *,
@@ -284,20 +198,8 @@ class SiteGenerator:
         body: str,
         extra_json_ld: Iterable[dict] | None = None,
     ) -> str:
-        canonical_url = self._abs_url(canonical_path)
-        head_parts = self._head_parts(
-            page_title=page_title,
-            description=description,
-            canonical_url=canonical_url,
-            extra_json_ld=extra_json_ld,
-        )
         body_html = body if body.endswith("\n") else f"{body}\n"
-        display_title = page_title or (self.settings.name or "GrabGifts")
-        return _render_with_base(
-            page_title=display_title,
-            content=body_html,
-            head_parts=head_parts,
-        )
+        return _render_with_base(content=body_html)
 
     def _guide_json_ld(self, guide: Guide, canonical_path: str) -> dict:
         return {
@@ -343,7 +245,9 @@ class SiteGenerator:
             }
         return payload
 
-    def _product_card(self, product: Product) -> tuple[str, dict]:
+    def _product_card(self, product: Product) -> tuple[str, dict] | None:
+        if not product.image:
+            return None
         description = blurb(product)
         link = prepare_affiliate_url(product.url, product.source)
         price_display = product.price_text
@@ -358,13 +262,10 @@ class SiteGenerator:
             meta_parts.append(product.brand)
         if product.category:
             meta_parts.append(product.category)
-        if product.rating:
-            meta_parts.append(f"{product.rating:.1f}★")
         body = ["<article class=\"card\">"]
-        if product.image:
-            body.append(
-                f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
-            )
+        body.append(
+            f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
+        )
         body.append(f"<h2>{product.title}</h2>")
         if price_display:
             body.append(f"<p class=\"price\">{price_display}</p>")
@@ -381,18 +282,19 @@ class SiteGenerator:
         cards_html = []
         json_ld: List[dict] = []
         for product in guide.products:
-            card_html, payload = self._product_card(product)
+            card = self._product_card(product)
+            if not card:
+                continue
+            card_html, payload = card
             cards_html.append(card_html)
             json_ld.append(payload)
         cards = "".join(cards_html)
-        ad_block = self._adsense_unit(self.settings.adsense_slot)
-        parts = [f"<h1>{guide.title}</h1>", f"<p>{guide.description}</p>"]
-        if ad_block:
-            parts.append(ad_block)
-        parts.append(f"<section class=\"grid\">{cards}</section>")
-        parts.append(
-            "<p class=\"disclosure\">Affiliate links may earn commissions. Prices and availability can change.</p>"
-        )
+        guide_description = _strip_banned_phrases(guide.description)
+        parts = [f"<h1>{guide.title}</h1>", f"<p>{guide_description}</p>"]
+        if cards:
+            parts.append(f"<section class=\"grid\">{cards}</section>")
+        else:
+            parts.append("<p>No items are available for this guide right now.</p>")
         return "\n".join(parts), json_ld
 
     def _write_homepage(self, guides: Sequence[Guide]) -> None:
@@ -408,6 +310,7 @@ class SiteGenerator:
         for guide in guides[:12]:
             first = guide.products[0] if guide.products else None
             teaser = blurb(first) if first else guide.description
+            teaser = _strip_banned_phrases(teaser)
             cards.append(
                 "<article class=\"card\">"
                 f"<h2><a href=\"/guides/{guide.slug}/\">{guide.title}</a></h2>"
@@ -416,26 +319,19 @@ class SiteGenerator:
                 "</article>"
             )
         cards_html = "".join(cards)
-        ad_block = self._adsense_unit(self.settings.adsense_slot)
+        home_description = _strip_banned_phrases(self.settings.description)
         parts = [
             f"<h1>{self.settings.name}</h1>",
-            f"<p>{self.settings.description}</p>",
+            f"<p>{home_description}</p>",
         ]
-        if ad_block:
-            parts.append(ad_block)
         if cards_html:
             parts.append(f"<section class=\"grid\">{cards_html}</section>")
         else:
-            parts.append(
-                "<p class=\"disclosure\">Guides are being prepared. Check back soon.</p>"
-            )
-        parts.append(
-            "<p class=\"disclosure\">As an Amazon Associate and eBay Partner Network member we earn from qualifying purchases.</p>"
-        )
+            parts.append("<p>Guides are being prepared. Check back soon.</p>")
         body = "\n".join(parts)
         html = self._render_document(
             page_title=self.settings.name,
-            description=self.settings.description,
+            description=home_description,
             canonical_path="/",
             body=body,
         )
@@ -445,10 +341,11 @@ class SiteGenerator:
     def _write_guides(self, guides: Sequence[Guide]) -> None:
         for guide in guides:
             body, product_json_ld = self._guide_body(guide)
+            page_description = _strip_banned_phrases(guide.description)
             ld_objects = [self._guide_json_ld(guide, f"/guides/{guide.slug}/")] + product_json_ld
             html = self._render_document(
                 page_title=f"{guide.title} – {self.settings.name}",
-                description=guide.description,
+                description=page_description,
                 canonical_path=f"/guides/{guide.slug}/",
                 body=body,
                 extra_json_ld=ld_objects,
@@ -472,16 +369,23 @@ class SiteGenerator:
             cards = []
             product_json = []
             for product in ranked[:GUIDE_ITEM_TARGET]:
-                card_html, payload = self._product_card(product)
+                card = self._product_card(product)
+                if not card:
+                    continue
+                card_html, payload = card
                 cards.append(card_html)
                 product_json.append(payload)
-            description = f"Trending picks from the {name} category updated daily."
+            description = _strip_banned_phrases(
+                f"Trending picks from the {name} category updated daily."
+            )
             parts = [
                 f"<h1>{name}</h1>",
                 f"<p>{description}</p>",
-                f"<section class=\"grid\">{''.join(cards)}</section>",
-                "<p class=\"disclosure\">Prices and availability are subject to change.</p>",
             ]
+            if cards:
+                parts.append(f"<section class=\"grid\">{''.join(cards)}</section>")
+            else:
+                parts.append("<p>No items are available for this category right now.</p>")
             body = "\n".join(parts)
             html = self._render_document(
                 page_title=f"{name} Gifts – {self.settings.name}",
@@ -512,7 +416,7 @@ class SiteGenerator:
 
     def _write_products(self, products: Sequence[Product]) -> None:
         for product in products:
-            description = blurb(product)
+            description = _strip_banned_phrases(blurb(product))
             link = prepare_affiliate_url(product.url, product.source)
             price_display = product.price_text
             if not price_display and product.price is not None:
@@ -526,8 +430,6 @@ class SiteGenerator:
                 details.append(product.brand)
             if product.category:
                 details.append(product.category)
-            if product.rating:
-                details.append(f"{product.rating:.1f}★")
             body_parts = [f"<h1>{product.title}</h1>", f"<p>{description}</p>"]
             if product.image:
                 body_parts.append(
@@ -540,12 +442,6 @@ class SiteGenerator:
             body_parts.append(
                 f"<p><a class=\"button\" rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{link}\">Shop now</a></p>"
             )
-            rail = self._adsense_unit(self.settings.adsense_rail_slot)
-            if rail:
-                body_parts.append(rail)
-            body_parts.append(
-                "<p class=\"disclosure\">Affiliate links may earn commissions. Always verify current pricing and availability.</p>"
-            )
             body = "\n".join(body_parts)
             html = self._render_document(
                 page_title=f"{product.title} – {self.settings.name}",
@@ -556,6 +452,23 @@ class SiteGenerator:
             )
             self._write_file(f"/products/{product.slug}/index.html", html)
             self._sitemap_entries.append((f"/products/{product.slug}/", product.updated_at))
+
+    def _write_faq(self) -> None:
+        body = "\n".join(
+            [
+                "<h1>Affiliate disclosure</h1>",
+                "<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>",
+                "<p>Questions? Contact us at support@grabgifts.net.</p>",
+            ]
+        )
+        html = self._render_document(
+            page_title="Affiliate disclosure",
+            description="Affiliate disclosure",
+            canonical_path="/faq/",
+            body=body,
+        )
+        self._write_file("/faq/index.html", html)
+        self._sitemap_entries.append(("/faq/", datetime.now(timezone.utc).isoformat()))
 
     # ------------------------------------------------------------------
     # Static assets

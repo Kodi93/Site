@@ -6,7 +6,6 @@ import { priceNumber } from "./util.mjs";
 const IN = path.join("data", "items.json");
 const PUB = "public";
 const SITE_NAME = "GrabGifts";
-const SITE_URL = "https://grabgifts.net";
 const SITE_DESCRIPTION = "Gift ideas for every fan, friend, and family member.";
 
 const BASE_TEMPLATE_PATH = path.join("templates", "base.html");
@@ -61,14 +60,6 @@ function escapeHtml(input) {
     .replaceAll("'", "&#39;");
 }
 
-function canonicalUrl(pathname) {
-  const base = new URL(SITE_URL);
-  base.pathname = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  base.search = "";
-  base.hash = "";
-  return base.toString();
-}
-
 function ensureNotProtected(targetPath) {
   const resolved = path.resolve(targetPath);
   if (PROTECTED_FILES.has(resolved)) {
@@ -82,111 +73,66 @@ function writeFile(target, html) {
   fs.writeFileSync(target, html);
 }
 
-function renderWithBase({ content, pageTitle, headExtras = [] }) {
-  const safeTitle = (pageTitle && pageTitle.trim()) || SITE_NAME;
+function renderWithBase(content) {
   let html = BASE_TEMPLATE;
-  html = html.replace(
-    /\{\{\s*page_title\s+or\s+"GrabGifts"\s*\}\}/g,
-    escapeHtml(safeTitle),
-  );
   html = html.replace(/\{\{\s*content\|safe\s*\}\}/g, content);
-  html = html.replace(/\{\{\s*content\s*\}\}/g, content);
-  if (headExtras.length) {
-    const block = headExtras.map((tag) => `  ${tag}`).join("\n");
-    html = html.replace("</head>", `${block}\n</head>`);
-  }
+  html = html.replace(/\{\{\s*content\s*\}\}/g, escapeHtml(content));
   return html;
 }
 
-function renderDocument({
-  title,
-  description,
-  canonicalPath,
-  bodyContent,
-  extraHead = [],
-}) {
-  const canonical = canonicalUrl(canonicalPath);
-  const safeDescription = escapeHtml(description);
-  const headParts = [
-    `<link rel=\"canonical\" href=\"${canonical}\">`,
-    `<meta name=\"description\" content=\"${safeDescription}\">`,
-    "<meta name=\"robots\" content=\"index,follow\">",
-    "<meta property=\"og:type\" content=\"website\">",
-    `<meta property=\"og:title\" content=\"${escapeHtml(title)}\">`,
-    `<meta property=\"og:description\" content=\"${safeDescription}\">`,
-    `<meta property=\"og:url\" content=\"${canonical}\">`,
-    `<meta property=\"og:site_name\" content=\"${escapeHtml(SITE_NAME)}\">`,
-    "<meta name=\"twitter:card\" content=\"summary_large_image\">",
-    `<meta name=\"twitter:title\" content=\"${escapeHtml(title)}\">`,
-    `<meta name=\"twitter:description\" content=\"${safeDescription}\">`,
-    `<meta name=\"twitter:url\" content=\"${canonical}\">`,
-    `<link rel=\"alternate\" type=\"application/rss+xml\" title=\"${escapeHtml(
-      SITE_NAME,
-    )} RSS\" href=\"/rss.xml\">`,
-    ...extraHead,
-  ];
-  return renderWithBase({ content: bodyContent, pageTitle: title, headExtras: headParts });
+const BANNED_PHRASES = ["fresh drops", "active vibes"];
+
+function stripBannedPhrases(text) {
+  let output = text;
+  for (const phrase of BANNED_PHRASES) {
+    const pattern = new RegExp(phrase, "ig");
+    output = output.replace(pattern, "");
+  }
+  return output.trim();
 }
 
 function renderGuideCard(item) {
+  if (!item.image) return "";
   const parts = ["<li class=\"card\">"];
   parts.push(
     `<a href=\"${escapeHtml(item.url)}\" rel=\"sponsored nofollow noopener\" target=\"_blank\">`,
   );
-  if (item.image) {
-    parts.push(
-      `<img src=\"${escapeHtml(item.image)}\" alt=\"${escapeHtml(item.title)}\" loading=\"lazy\">`,
-    );
-  }
+  parts.push(
+    `<img src=\"${escapeHtml(item.image)}\" alt=\"${escapeHtml(item.title)}\" loading=\"lazy\">`,
+  );
   parts.push(`<h3>${escapeHtml(item.title)}</h3>`);
   if (item.price) {
     parts.push(`<p class=\"price\">${escapeHtml(item.price)}</p>`);
-  }
-  if (item.updatedAt) {
-    const date = escapeHtml(item.updatedAt.split("T")[0]);
-    parts.push(`<p class=\"updated\">Updated ${date}</p>`);
   }
   parts.push("</a></li>");
   return parts.join("");
 }
 
 function renderGuidePage(title, slug, items) {
-  const cards = items.map((item) => renderGuideCard(item)).join("\n");
-  const disclosure =
-    "<p class=\"disclosure\">Affiliate disclosure: We may earn from qualifying purchases.</p>";
-  const body = [`<h1>${escapeHtml(title)}</h1>`, disclosure, `<ol class=\"grid\">${cards}</ol>`];
-  const ld = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: title,
-    url: canonicalUrl(`/guides/${slug}/`),
-    itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: item.url,
-      name: item.title,
-    })),
-  };
-  const extraHead = [`<script type=\"application/ld+json\">${JSON.stringify(ld)}</script>`];
-  const description = `Top gift ideas for ${title}.`;
-  return renderDocument({
-    title: `${title} — ${SITE_NAME}`,
-    description,
-    canonicalPath: `/guides/${slug}/`,
-    bodyContent: body.join("\n"),
-    extraHead,
-  });
+  const cards = items
+    .map((item) => renderGuideCard(item))
+    .filter(Boolean)
+    .join("\n");
+  const sections = [`<h1>${escapeHtml(title)}</h1>`];
+  if (cards) {
+    sections.push(`<ol class=\"grid\">${cards}</ol>`);
+  } else {
+    sections.push("<p>No items are available for this guide right now.</p>");
+  }
+  return renderWithBase(sections.join("\n"));
 }
 
 function renderHomePage(guides) {
   const intro = [
     `<h1>${escapeHtml(SITE_NAME)}</h1>`,
-    `<p>${escapeHtml(SITE_DESCRIPTION)}</p>`,
+    `<p>${escapeHtml(stripBannedPhrases(SITE_DESCRIPTION))}</p>`,
   ];
-  let cards = "<p class=\"disclosure\">Fresh guides are published daily.</p>";
+  let cards = "";
   if (guides.length) {
     const items = guides.slice(0, 8).map((guide) => {
-      const summary = guide.summary ? escapeHtml(guide.summary) : "Discover our latest picks.";
+      const summary = guide.summary
+        ? escapeHtml(stripBannedPhrases(guide.summary))
+        : "Explore thoughtful ideas for every list.";
       return [
         "<li class=\"card\">",
         `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
@@ -198,12 +144,17 @@ function renderHomePage(guides) {
     });
     cards = `<ol class=\"grid\">${items.join("\n")}\n</ol>`;
   }
-  return renderDocument({
-    title: `${SITE_NAME} — Gift ideas & buying guides`,
-    description: SITE_DESCRIPTION,
-    canonicalPath: "/",
-    bodyContent: [...intro, cards].join("\n"),
-  });
+  const content = cards ? [...intro, cards].join("\n") : intro.join("\n");
+  return renderWithBase(content);
+}
+
+function renderFaqPage() {
+  const body = [
+    "<h1>Affiliate disclosure</h1>",
+    "<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>",
+    "<p>Questions? Contact us at support@grabgifts.net.</p>",
+  ];
+  return renderWithBase(body.join("\n"));
 }
 
 function filterByTopic(title, items) {
@@ -231,19 +182,22 @@ function main() {
   let made = 0;
   for (const { title, slug } of plan.topics) {
     const picks = filterByTopic(title, items);
-    if (picks.length < 10) continue;
-    const html = renderGuidePage(title, slug, picks);
+    const picksWithImages = picks.filter((item) => item.image);
+    if (picksWithImages.length < 10) continue;
+    const html = renderGuidePage(title, slug, picksWithImages);
     writeFile(path.join(PUB, "guides", slug, "index.html"), html);
     guidesForHome.push({
       title,
       slug,
-      summary: picks[0]?.title || `Top picks for ${title}`,
+      summary: picksWithImages[0]?.title || `Top picks for ${title}`,
     });
     made++;
   }
 
   const homeHtml = renderHomePage(guidesForHome);
   writeFile(path.join(PUB, "index.html"), homeHtml);
+  const faqHtml = renderFaqPage();
+  writeFile(path.join(PUB, "faq", "index.html"), faqHtml);
 
   if (made < 15) {
     console.error("Generated guides:", made);
