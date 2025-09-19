@@ -1,8 +1,13 @@
 __pycache__/
 *.pyc
 .env
-public/
+public/*
+!public/
+!public/robots.txt
+!public/sitemap.xml
 data/products.json
 .idea/
 .vscode/
 .DS_Store
+dist/
+node_modules/
