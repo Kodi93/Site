@@ -1,5 +1,5 @@
 [build]
-command = "npm run update && npm run build && npm run check"
+command = "python -m giftgrab.cli update && python -m giftgrab.cli roundups --limit 15"
 publish = "public"
 
 [functions]

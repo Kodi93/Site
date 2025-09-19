@@ -1,248 +1,177 @@
-"""Persistence layer for products stored in JSON."""
+"""Persistence helpers for catalog and history data."""
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Iterable, List, Sequence
 
-from .config import DATA_DIR, DEFAULT_CATEGORIES, CategoryDefinition
-from .models import Category, CooldownEntry, GeneratedProduct, Product
+from .models import Guide, Product, merge_products
 from .utils import dump_json, load_json, timestamp
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
+
+DEFAULT_COOLDOWN_DAYS = 30
 
 
 class ProductRepository:
-    """Store and retrieve product data from a JSON document."""
+    """Store products and history in JSON files under ``data/``."""
 
-    def __init__(self, data_file: Path | None = None) -> None:
-        self.data_file = data_file or DATA_DIR / "products.json"
-        self._ensure_file_exists()
-
-    def _load_raw_data(self) -> Dict[str, object]:
-        data = load_json(
-            self.data_file,
-            default={
-                "last_updated": None,
-                "products": [],
-                "cooldowns": [],
-                "generated_products": [],
-            },
-        )
-        if not isinstance(data, dict):
-            data = {}
-        data.setdefault("last_updated", None)
-        data.setdefault("products", [])
-        data.setdefault("cooldowns", [])
-        data.setdefault("generated_products", [])
-        return data
-
-    def _ensure_file_exists(self) -> None:
-        if not self.data_file.exists():
-            logger.debug("Creating new data file at %s", self.data_file)
-            dump_json(
-                self.data_file,
-                {
-                    "last_updated": None,
-                    "products": [],
-                    "cooldowns": [],
-                    "generated_products": [],
-                },
-            )
-
-    def load_products(self) -> List[Product]:
-        data = self._load_raw_data()
-        products = [
-            Product.from_dict(raw)
-            for raw in data.get("products", [])
-            if isinstance(raw, dict)
-        ]
-        return products
-
-    def save_products(self, products: Iterable[Product]) -> None:
-        data = self._load_raw_data()
-        data["products"] = [product.to_dict() for product in products]
-        data["last_updated"] = timestamp()
-        dump_json(self.data_file, data)
-
-    def upsert_products(self, products: Iterable[Product]) -> List[Product]:
-        existing = {
-            (product.retailer_slug, product.asin): product
-            for product in self.load_products()
-        }
-        for product in products:
-            key = (product.retailer_slug, product.asin)
-            if not product.price_history and product.price:
-                product.record_price(product.price)
-            stored = existing.get(key)
-            if stored:
-                stored.merge_from(product)
-                existing[key] = stored
-            else:
-                product.touch()
-                existing[key] = product
-        merged = list(existing.values())
-        self.save_products(merged)
-        return merged
-
-    def load_cooldowns(self) -> List[CooldownEntry]:
-        data = self._load_raw_data()
-        entries = []
-        for raw in data.get("cooldowns", []):
-            if isinstance(raw, dict) and raw.get("asin"):
-                entries.append(CooldownEntry.from_dict(raw))
-        return entries
-
-    def save_cooldowns(self, cooldowns: Iterable[CooldownEntry]) -> None:
-        data = self._load_raw_data()
-        data["cooldowns"] = [entry.to_dict() for entry in cooldowns]
-        dump_json(self.data_file, data)
-
-    def prune_cooldowns(
-        self, retention_days: int, now: datetime | None = None
-    ) -> List[CooldownEntry]:
-        return self.update_cooldowns(
-            [], retention_days=retention_days, now=now
-        )
-
-    def update_cooldowns(
-        self,
-        new_entries: Iterable[CooldownEntry],
-        *,
-        retention_days: int,
-        now: datetime | None = None,
-    ) -> List[CooldownEntry]:
-        reference = now or datetime.now(timezone.utc)
-        cutoff = reference - timedelta(days=retention_days)
-        active: Dict[tuple[str, str], CooldownEntry] = {}
-        for entry in self.load_cooldowns():
-            if entry.added_at_datetime() >= cutoff:
-                active[entry.key] = entry
-        for entry in new_entries:
-            active[entry.key] = entry
-        remaining = [
-            entry
-            for entry in active.values()
-            if entry.added_at_datetime() >= cutoff
-        ]
-        remaining.sort(key=lambda entry: entry.added_at, reverse=True)
-        self.save_cooldowns(remaining)
-        return remaining
-
-    def list_categories(self) -> List[Category]:
-        return [
-            Category(
-                slug=definition.slug,
-                name=definition.name,
-                blurb=definition.blurb,
-                keywords=list(definition.keywords),
-                image=definition.image,
-                card_image=definition.card_image,
-                hero_image=definition.hero_image,
-            )
-            for definition in DEFAULT_CATEGORIES
-        ]
-
-    def get_products_by_category(self, category_slug: str) -> List[Product]:
-        return [
-            product
-            for product in self.load_products()
-            if product.category_slug == category_slug
-        ]
-
-    def find_by_asin(self, asin: str) -> Optional[Product]:
-        for product in self.load_products():
-            if product.asin == asin:
-                return product
-        return None
-
-    def get_last_updated(self) -> Optional[datetime]:
-        raw = load_json(self.data_file, default={})
-        ts = raw.get("last_updated")
-        if not ts:
-            return None
-        try:
-            return datetime.fromisoformat(ts)
-        except ValueError:
-            return datetime.now(timezone.utc)
+    def __init__(self, base_dir: Path | None = None) -> None:
+        self.base_dir = base_dir or Path("data")
+        self.items_file = self.base_dir / "items.json"
+        self.seen_file = self.base_dir / "seen_items.json"
+        self.topics_file = self.base_dir / "topics_history.json"
+        self.guides_file = self.base_dir / "guides.json"
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        for path, default in (
+            (self.items_file, []),
+            (self.seen_file, {}),
+            (self.topics_file, []),
+            (self.guides_file, []),
+        ):
+            if not path.exists():
+                dump_json(path, default)
 
     # ------------------------------------------------------------------
-    # Generated product helpers
+    # Products
 
-    def load_generated_products(self) -> List[GeneratedProduct]:
-        data = self._load_raw_data()
-        products: List[GeneratedProduct] = []
-        for raw in data.get("generated_products", []):
-            if isinstance(raw, dict):
+    def load_products(self) -> List[Product]:
+        data = load_json(self.items_file, default=[]) or []
+        products: List[Product] = []
+        for entry in data:
+            if isinstance(entry, dict) and "id" in entry:
                 try:
-                    products.append(GeneratedProduct.from_dict(raw))
-                except Exception as error:  # pragma: no cover - log for visibility
-                    logger.debug("Skipping invalid generated product payload: %s", error)
+                    products.append(Product.from_dict(entry))
+                except Exception as error:  # pragma: no cover - log invalid payloads
+                    LOGGER.warning("Skipping invalid product payload: %s", error)
         return products
 
-    def save_generated_products(self, products: Iterable[GeneratedProduct]) -> None:
-        data = self._load_raw_data()
-        data["generated_products"] = [product.to_dict() for product in products]
-        dump_json(self.data_file, data)
+    def save_products(self, products: Sequence[Product]) -> None:
+        payload = [product.to_dict() for product in products]
+        dump_json(self.items_file, payload)
 
-    def upsert_generated_products(
-        self, products: Iterable[GeneratedProduct]
-    ) -> List[GeneratedProduct]:
-        existing = {product.slug: product for product in self.load_generated_products()}
-        for product in products:
-            stored = existing.get(product.slug)
-            if stored:
-                product.created_at = stored.created_at
-                if stored.published_at and not product.published_at:
-                    product.published_at = stored.published_at
-                if stored.status == "published" and product.status != "published":
-                    product.status = stored.status
-                existing[product.slug] = product
-            else:
-                if product.status == "published" and not product.published_at:
-                    product.published_at = timestamp()
-                existing[product.slug] = product
-        merged = sorted(existing.values(), key=lambda item: item.updated_at, reverse=True)
-        self.save_generated_products(merged)
+    def ingest(
+        self,
+        incoming: Iterable[Product],
+        *,
+        cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
+        now: datetime | None = None,
+    ) -> List[Product]:
+        reference = now or datetime.now(timezone.utc)
+        existing = self.load_products()
+        seen_map = self._load_seen()
+        accepted: List[Product] = []
+        cutoff = reference - timedelta(days=cooldown_days)
+        for product in incoming:
+            last_seen_text = seen_map.get(product.id)
+            if last_seen_text:
+                try:
+                    last_seen = datetime.fromisoformat(last_seen_text)
+                    if last_seen.tzinfo is None:
+                        last_seen = last_seen.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    last_seen = None
+                if last_seen and last_seen >= cutoff:
+                    LOGGER.debug("Skipping %s due to cooldown", product.id)
+                    continue
+            product.touch()
+            accepted.append(product)
+            seen_map[product.id] = reference.isoformat()
+        merged = merge_products(existing, accepted)
+        self.save_products(merged)
+        self._save_seen(seen_map)
+        count = len(merged)
+        if count < 50:
+            raise RuntimeError(f"Inventory too small: {count}")
         return merged
 
-    def find_generated_product(self, slug: str) -> GeneratedProduct | None:
-        slug = (slug or "").strip().lower()
-        for product in self.load_generated_products():
-            if product.slug == slug:
-                return product
-        return None
+    def _load_seen(self) -> dict[str, str]:
+        data = load_json(self.seen_file, default={}) or {}
+        result: dict[str, str] = {}
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    result[key] = value
+        return result
 
-    def recent_generated_products(
-        self, *, days: int = 7, now: datetime | None = None
-    ) -> List[GeneratedProduct]:
-        reference = now or datetime.now(timezone.utc)
-        cutoff = reference - timedelta(days=days)
-        recent: List[GeneratedProduct] = []
-        for product in self.load_generated_products():
-            published_raw = product.published_at or product.updated_at
-            try:
-                published_dt = datetime.fromisoformat(published_raw)
-            except (TypeError, ValueError):
-                continue
-            if published_dt.tzinfo is None:
-                published_dt = published_dt.replace(tzinfo=timezone.utc)
-            published_dt = published_dt.astimezone(timezone.utc)
-            if published_dt >= cutoff:
-                recent.append(product)
-        recent.sort(key=lambda item: (item.score, item.updated_at), reverse=True)
-        return recent
+    def _save_seen(self, payload: dict[str, str]) -> None:
+        dump_json(self.seen_file, payload)
 
-    def best_generated_product(
-        self, *, days: int = 7, now: datetime | None = None
-    ) -> GeneratedProduct | None:
-        candidates = self.recent_generated_products(days=days, now=now)
-        return candidates[0] if candidates else None
+    # ------------------------------------------------------------------
+    # Topics
+
+    def load_topic_history(self) -> List[dict]:
+        data = load_json(self.topics_file, default=[]) or []
+        history: List[dict] = []
+        for entry in data:
+            if isinstance(entry, dict) and entry.get("slug"):
+                history.append(entry)
+        return history
+
+    def append_topic_history(self, slug: str, title: str, when: datetime | None = None) -> None:
+        record = {
+            "slug": slug,
+            "title": title,
+            "date": (when or datetime.now(timezone.utc)).isoformat(),
+        }
+        history = self.load_topic_history()
+        history.append(record)
+        dump_json(self.topics_file, history)
+
+    # ------------------------------------------------------------------
+    # Guides
+
+    def save_guides(self, guides: Sequence[Guide]) -> None:
+        dump_json(self.guides_file, [guide.to_dict() for guide in guides])
+
+    def load_guides(self) -> List[Guide]:
+        data = load_json(self.guides_file, default=[]) or []
+        guides: List[Guide] = []
+        for entry in data:
+            if isinstance(entry, dict) and entry.get("slug"):
+                try:
+                    products = [
+                        Product.from_dict(item)
+                        for item in entry.get("products", [])
+                        if isinstance(item, dict) and item.get("id")
+                    ]
+                    guides.append(
+                        Guide(
+                            slug=entry["slug"],
+                            title=entry.get("title", entry["slug"]),
+                            description=entry.get("description", ""),
+                            products=products,
+                            created_at=entry.get("created_at", timestamp()),
+                        )
+                    )
+                except Exception as error:  # pragma: no cover - log invalid payloads
+                    LOGGER.warning("Skipping invalid guide entry: %s", error)
+        return guides
+
+    def count_guides(self) -> int:
+        return len(self.load_guides())
+
+    def clear_guides(self) -> None:
+        dump_json(self.guides_file, [])
 
 
-def get_category_definition(slug: str) -> CategoryDefinition | None:
-    for definition in DEFAULT_CATEGORIES:
-        if definition.slug == slug:
-            return definition
-    return None
+def ensure_recent(entries: Sequence[dict], *, days: int) -> List[dict]:
+    reference = datetime.now(timezone.utc)
+    cutoff = reference - timedelta(days=days)
+    results: List[dict] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        date_text = entry.get("date")
+        if not isinstance(date_text, str):
+            continue
+        try:
+            value = datetime.fromisoformat(date_text)
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        if value >= cutoff:
+            results.append(entry)
+    return results
