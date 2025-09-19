@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ page_title or "GrabGifts" }}</title>
+
+  <!-- REMOVE any other CSS links before this line -->
+  <link rel="stylesheet" href="/assets/theme.css" />
+
+  <!-- Kill inline theming: -->
+  <script>
+    // Remove any previously injected theme <style> tags
+    document.addEventListener('DOMContentLoaded', () => {
+      [...document.querySelectorAll('style[data-injected], style[id*=theme], style[id*=tailwind]')].forEach(s=>s.remove());
+    });
+  </script>
+</head>
+<body>
+  {% include "partials/header.html" %}
+  <main class="wrap">
+    {{ content|safe }}
+  </main>
+  {% include "partials/footer.html" %}
+</body>
+</html>

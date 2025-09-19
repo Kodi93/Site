@@ -1,30 +1,14 @@
-:root{
-  --bg:#0b0b0b; --fg:#e6e6e6; --muted:#9aa0a6;
-  --accent:#00e676; /* ZephTech green if desired */
-  --card:#141414; --border:#222;
-}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,"Segoe UI",Roboto,Arial,sans-serif;}
-.wrap{max-width:1100px;margin:0 auto;padding:16px;}
-main{padding:32px 0;}
-h1{margin:0 0 12px;font-size:2rem;}
-h2{margin:0 0 10px;font-size:1.35rem;}
-h3{margin:0 0 8px;font-size:1.1rem;}
-p{margin:0 0 16px;}
-a{color:var(--accent);}
-a:hover{color:var(--accent);}
-.site-header,.site-footer{background:#0e0e0e;border-bottom:1px solid var(--border);}
-.site-footer{border-top:1px solid var(--border);border-bottom:none;}
-.site-nav a,.site-footer a{color:var(--fg);text-decoration:none;margin:0 10px;}
-.site-nav a:hover,.site-footer a:hover{color:var(--accent);}
-.brand{font-weight:700;font-size:1.1rem;color:var(--fg);text-decoration:none}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin:0;padding:0;}
-.grid > *{list-style:none;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;}
-.card a{color:var(--fg);text-decoration:none;display:block;}
-.card a:hover{color:var(--accent);}
-.card img{width:100%;height:auto;border-radius:8px;display:block;margin-bottom:8px;}
-.card .price{font-weight:600;color:var(--accent);}
-.card .updated{color:var(--muted);font-size:0.85rem;margin-top:8px;}
-.button{display:inline-block;margin-top:12px;padding:10px 14px;border-radius:8px;background:var(--accent);color:#0b0b0b;font-weight:600;text-align:center;transition:background 0.2s ease;text-decoration:none;}
-.button:hover{background:#1bff87;color:#0b0b0b;}
-.disclosure{color:var(--muted);font-size:0.9rem;}
+:root{--bg:#0b0b0b;--fg:#e6e6e6;--muted:#9aa0a6;--accent:#00e676;--card:#141414;--border:#222}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,Segoe UI,Roboto,Arial}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.site-header,.site-footer{background:#0e0e0e;border-bottom:1px solid var(--border)}
+.brand{font-weight:700;font-size:1.1rem;text-decoration:none;color:var(--fg)}
+.site-nav a,.site-footer a{color:var(--fg);text-decoration:none;margin:0 10px}
+.site-nav a:hover,.site-footer a:hover{color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+img{max-width:100%;height:auto;border-radius:8px}
+button,a.button{background:var(--accent);color:#000;padding:.6rem .9rem;border-radius:10px;border:0;cursor:pointer}
+.badge,.hero,.gradient,.glow{display:none !important} /* kill old theme blocks */

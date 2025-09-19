@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+from html import escape as html_escape
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,31 +17,64 @@ from .models import Guide, Product
 from .utils import slugify
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+BASE_TEMPLATE_PATH = ROOT_DIR / "templates" / "base.html"
 HEADER_PATH = ROOT_DIR / "templates" / "partials" / "header.html"
 FOOTER_PATH = ROOT_DIR / "templates" / "partials" / "footer.html"
 THEME_PATH = ROOT_DIR / "public" / "assets" / "theme.css"
 PROTECTED_FILES = {
+    BASE_TEMPLATE_PATH.resolve(),
     HEADER_PATH.resolve(),
     FOOTER_PATH.resolve(),
     THEME_PATH.resolve(),
 }
 
 
-def _load_partials() -> tuple[str, str, str]:
-    header_raw = HEADER_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
-    match = re.match(r"^\s*<!doctype html>\s*", header_raw, flags=re.IGNORECASE)
-    if match:
-        doctype = match.group(0).strip()
-        header_markup = header_raw[match.end():]
-    else:
-        doctype = "<!doctype html>"
-        header_markup = header_raw
-    header_markup = header_markup.strip()
-    footer_markup = FOOTER_PATH.read_text(encoding="utf-8").strip()
-    return doctype, f"{header_markup}\n", f"{footer_markup}\n"
+def _read_markup(path: Path) -> str:
+    return path.read_text(encoding="utf-8").lstrip("\ufeff").strip()
 
 
-HEADER_DOCTYPE, HEADER_PARTIAL, FOOTER_PARTIAL = _load_partials()
+def _apply_includes(template: str) -> str:
+    includes = {
+        "partials/header.html": _read_markup(HEADER_PATH),
+        "partials/footer.html": _read_markup(FOOTER_PATH),
+    }
+
+    for include_path, markup in includes.items():
+        pattern = re.compile(
+            rf"(?P<indent>[\t ]*)\{{%\s*include\s+[\"']{re.escape(include_path)}[\"']\s*%\}}"
+        )
+
+        def _replace(match: re.Match[str]) -> str:
+            indent = match.group("indent")
+            lines = markup.splitlines()
+            if not lines:
+                return ""
+            return "\n".join(f"{indent}{line}" if line else "" for line in lines)
+
+        template = pattern.sub(_replace, template)
+
+    return template
+
+
+BASE_TEMPLATE = _apply_includes(
+    BASE_TEMPLATE_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
+)
+
+_PAGE_TITLE_PATTERN = re.compile(r"\{\{\s*page_title\s+or\s+\"GrabGifts\"\s*\}\}")
+_CONTENT_SAFE_PATTERN = re.compile(r"\{\{\s*content\|safe\s*\}\}")
+_CONTENT_PATTERN = re.compile(r"\{\{\s*content\s*\}\}")
+
+
+def _render_with_base(*, page_title: str, content: str, head_parts: Sequence[str]) -> str:
+    html = BASE_TEMPLATE
+    safe_title = html_escape(page_title)
+    html = _PAGE_TITLE_PATTERN.sub(safe_title, html)
+    html = _CONTENT_SAFE_PATTERN.sub(content, html)
+    html = _CONTENT_PATTERN.sub(html_escape(content), html)
+    if head_parts:
+        injection = "\n".join(f"  {part}" for part in head_parts)
+        html = html.replace("</head>", f"{injection}\n</head>", 1)
+    return html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -161,7 +195,7 @@ class SiteGenerator:
     def _safe_write(self, target: Path, content: str) -> None:
         resolved = target.resolve()
         if resolved in PROTECTED_FILES:
-            raise RuntimeError("Protected layout files may not be modified by content builds.")
+            raise RuntimeError("Protected layout file")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
@@ -171,76 +205,98 @@ class SiteGenerator:
             file_path = file_path / "index.html"
         self._safe_write(file_path, content)
 
-    def _page_head(
+
+    def _head_parts(
         self,
         *,
-        title: str,
+        page_title: str,
         description: str,
-        canonical_path: str,
+        canonical_url: str,
         extra_json_ld: Iterable[dict] | None = None,
-    ) -> str:
-        canonical_url = self._abs_url(canonical_path)
-        pieces = [
-            "<meta charset=\"utf-8\">",
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-            f"<title>{title}</title>",
-            f"<link rel=\"canonical\" href=\"{canonical_url}\">",
-            f"<meta name=\"description\" content=\"{description}\">",
-            f"<meta property=\"og:type\" content=\"website\">",
-            f"<meta property=\"og:title\" content=\"{title}\">",
-            f"<meta property=\"og:description\" content=\"{description}\">",
-            f"<meta property=\"og:url\" content=\"{canonical_url}\">",
-            f"<meta property=\"og:site_name\" content=\"{self.settings.name}\">",
+    ) -> list[str]:
+        site_name = self.settings.name or "GrabGifts"
+        safe_title = html_escape(page_title)
+        safe_description = html_escape(description)
+        safe_canonical = html_escape(canonical_url)
+        safe_site = html_escape(site_name)
+        rss_url = html_escape(self._abs_url("/rss.xml"))
+        parts = [
+            f"<link rel=\"canonical\" href=\"{safe_canonical}\">",
+            f"<meta name=\"description\" content=\"{safe_description}\">",
+            "<meta name=\"robots\" content=\"index,follow\">",
+            "<meta property=\"og:type\" content=\"website\">",
+            f"<meta property=\"og:title\" content=\"{safe_title}\">",
+            f"<meta property=\"og:description\" content=\"{safe_description}\">",
+            f"<meta property=\"og:url\" content=\"{safe_canonical}\">",
+            f"<meta property=\"og:site_name\" content=\"{safe_site}\">",
             "<meta name=\"twitter:card\" content=\"summary_large_image\">",
-            f"<meta name=\"twitter:title\" content=\"{title}\">",
-            f"<meta name=\"twitter:description\" content=\"{description}\">",
-            f"<meta name=\"twitter:url\" content=\"{canonical_url}\">",
-            f"<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{self.settings.name} RSS\" href=\"{self._abs_url('/rss.xml')}\">",
-            "<link rel=\"stylesheet\" href=\"/assets/theme.css\">",
+            f"<meta name=\"twitter:title\" content=\"{safe_title}\">",
+            f"<meta name=\"twitter:description\" content=\"{safe_description}\">",
+            f"<meta name=\"twitter:url\" content=\"{safe_canonical}\">",
+            f"<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{safe_site} RSS\" href=\"{rss_url}\">",
             f"<script type=\"application/ld+json\">{self._website_json_ld}</script>",
         ]
         if self.settings.logo_url:
-            pieces.append(f"<meta property=\"og:image\" content=\"{self.settings.logo_url}\">")
-            pieces.append(f"<meta name=\"twitter:image\" content=\"{self.settings.logo_url}\">")
+            logo = html_escape(self.settings.logo_url)
+            parts.append(f"<meta property=\"og:image\" content=\"{logo}\">")
+            parts.append(f"<meta name=\"twitter:image\" content=\"{logo}\">")
         if self.settings.favicon_url:
-            pieces.append(f"<link rel=\"icon\" href=\"{self.settings.favicon_url}\">")
+            parts.append(
+                f"<link rel=\"icon\" href=\"{html_escape(self.settings.favicon_url)}\">"
+            )
         if self.settings.twitter:
-            pieces.append(f"<meta name=\"twitter:site\" content=\"{self.settings.twitter}\">")
+            parts.append(
+                f"<meta name=\"twitter:site\" content=\"{html_escape(self.settings.twitter)}\">"
+            )
         if self.settings.keywords:
-            pieces.append(
-                f"<meta name=\"keywords\" content=\"{', '.join(self.settings.keywords)}\">"
+            keywords = ", ".join(self.settings.keywords)
+            parts.append(
+                f"<meta name=\"keywords\" content=\"{html_escape(keywords)}\">"
             )
         if self.settings.analytics_snippet:
-            pieces.append(self.settings.analytics_snippet)
+            parts.append(self.settings.analytics_snippet)
         elif self.settings.analytics_id:
-            gid = self.settings.analytics_id
-            pieces.append(
-                "<script async src=\"https://www.googletagmanager.com/gtag/js?id="
-                f"{gid}\"></script>"
+            gid = html_escape(self.settings.analytics_id)
+            parts.append(
+                f"<script async src=\"https://www.googletagmanager.com/gtag/js?id={gid}\"></script>"
             )
-            pieces.append(
+            parts.append(
                 "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}"
-                "gtag('js', new Date());gtag('config','" + gid + "');</script>"
+                f"gtag('js', new Date());gtag('config','{gid}');</script>"
             )
         if self.settings.adsense_client_id:
-            pieces.append(
-                "<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client="
-                f"={self.settings.adsense_client_id}\" crossorigin=\"anonymous\"></script>"
+            client = html_escape(self.settings.adsense_client_id)
+            parts.append(
+                f"<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={client}\" crossorigin=\"anonymous\"></script>"
             )
         for obj in extra_json_ld or []:
-            pieces.append(
+            parts.append(
                 f"<script type=\"application/ld+json\">{json.dumps(obj, separators=(',', ':'))}</script>"
             )
-        return "\n".join(pieces)
+        return parts
 
-    def _page_shell(self, *, head: str, body: str) -> str:
+    def _render_document(
+        self,
+        *,
+        page_title: str,
+        description: str,
+        canonical_path: str,
+        body: str,
+        extra_json_ld: Iterable[dict] | None = None,
+    ) -> str:
+        canonical_url = self._abs_url(canonical_path)
+        head_parts = self._head_parts(
+            page_title=page_title,
+            description=description,
+            canonical_url=canonical_url,
+            extra_json_ld=extra_json_ld,
+        )
         body_html = body if body.endswith("\n") else f"{body}\n"
-        return (
-            f"{HEADER_DOCTYPE}\n"
-            f"<html lang=\"en\"><head>{head}</head><body>\n"
-            f"{HEADER_PARTIAL}"
-            f"<main><div class=\"wrap\">{body_html}</div></main>\n"
-            f"{FOOTER_PARTIAL}</body></html>"
+        display_title = page_title or (self.settings.name or "GrabGifts")
+        return _render_with_base(
+            page_title=display_title,
+            content=body_html,
+            head_parts=head_parts,
         )
 
     def _guide_json_ld(self, guide: Guide, canonical_path: str) -> dict:
@@ -377,12 +433,12 @@ class SiteGenerator:
             "<p class=\"disclosure\">As an Amazon Associate and eBay Partner Network member we earn from qualifying purchases.</p>"
         )
         body = "\n".join(parts)
-        head = self._page_head(
-            title=self.settings.name,
+        html = self._render_document(
+            page_title=self.settings.name,
             description=self.settings.description,
             canonical_path="/",
+            body=body,
         )
-        html = self._page_shell(head=head, body=body)
         self._write_file("/index.html", html)
         self._sitemap_entries.append(("/", last_updated))
 
@@ -390,13 +446,13 @@ class SiteGenerator:
         for guide in guides:
             body, product_json_ld = self._guide_body(guide)
             ld_objects = [self._guide_json_ld(guide, f"/guides/{guide.slug}/")] + product_json_ld
-            head = self._page_head(
-                title=f"{guide.title} – {self.settings.name}",
+            html = self._render_document(
+                page_title=f"{guide.title} – {self.settings.name}",
                 description=guide.description,
                 canonical_path=f"/guides/{guide.slug}/",
+                body=body,
                 extra_json_ld=ld_objects,
             )
-            html = self._page_shell(head=head, body=body)
             self._write_file(f"/guides/{guide.slug}/index.html", html)
             if guide.products:
                 latest = max(product.updated_at for product in guide.products)
@@ -427,10 +483,11 @@ class SiteGenerator:
                 "<p class=\"disclosure\">Prices and availability are subject to change.</p>",
             ]
             body = "\n".join(parts)
-            head = self._page_head(
-                title=f"{name} Gifts – {self.settings.name}",
+            html = self._render_document(
+                page_title=f"{name} Gifts – {self.settings.name}",
                 description=description,
                 canonical_path=f"/categories/{slug}/",
+                body=body,
                 extra_json_ld=[
                     {
                         "@context": "https://schema.org",
@@ -449,7 +506,6 @@ class SiteGenerator:
                     *product_json,
                 ],
             )
-            html = self._page_shell(head=head, body=body)
             self._write_file(f"/categories/{slug}/index.html", html)
             latest = max(product.updated_at for product in items)
             self._sitemap_entries.append((f"/categories/{slug}/", latest))
@@ -491,13 +547,13 @@ class SiteGenerator:
                 "<p class=\"disclosure\">Affiliate links may earn commissions. Always verify current pricing and availability.</p>"
             )
             body = "\n".join(body_parts)
-            head = self._page_head(
-                title=f"{product.title} – {self.settings.name}",
+            html = self._render_document(
+                page_title=f"{product.title} – {self.settings.name}",
                 description=description,
                 canonical_path=f"/products/{product.slug}/",
+                body=body,
                 extra_json_ld=[self._product_json_ld(product, description)],
             )
-            html = self._page_shell(head=head, body=body)
             self._write_file(f"/products/{product.slug}/index.html", html)
             self._sitemap_entries.append((f"/products/{product.slug}/", product.updated_at))
 
