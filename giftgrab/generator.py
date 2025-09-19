@@ -121,12 +121,16 @@ BASE_TEMPLATE = _apply_includes(
     BASE_TEMPLATE_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
 )
 
+_HEAD_SAFE_PATTERN = re.compile(r"\{\{\s*head\|safe\s*\}\}")
+_HEAD_PATTERN = re.compile(r"\{\{\s*head\s*\}\}")
 _CONTENT_SAFE_PATTERN = re.compile(r"\{\{\s*content\|safe\s*\}\}")
 _CONTENT_PATTERN = re.compile(r"\{\{\s*content\s*\}\}")
 
 
-def _render_with_base(*, content: str) -> str:
+def _render_with_base(*, content: str, head: str = "") -> str:
     html = BASE_TEMPLATE
+    html = _HEAD_SAFE_PATTERN.sub(head, html)
+    html = _HEAD_PATTERN.sub(html_escape(head), html)
     html = _CONTENT_SAFE_PATTERN.sub(content, html)
     html = _CONTENT_PATTERN.sub(html_escape(content), html)
     return html
@@ -253,8 +257,50 @@ class SiteGenerator:
         body: str,
         extra_json_ld: Iterable[dict] | None = None,
     ) -> str:
+        head_parts: list[str] = []
+        title_text = (page_title or "").strip()
+        if title_text:
+            head_parts.append(f"<title>{html_escape(title_text)}</title>")
+
+        description_text = (description or "").strip()
+        if description_text:
+            head_parts.append(
+                "<meta name=\"description\" content=\""
+                + html_escape(description_text)
+                + "\">"
+            )
+
+        canonical = (canonical_path or "").strip()
+        if canonical:
+            head_parts.append(
+                "<link rel=\"canonical\" href=\""
+                + html_escape(self._abs_url(canonical))
+                + "\">"
+            )
+
+        for payload in extra_json_ld or ():
+            if not payload:
+                continue
+            try:
+                json_ld = json.dumps(payload, ensure_ascii=False)
+            except (TypeError, ValueError):
+                LOGGER.exception("Failed to encode JSON-LD payload")
+                continue
+            json_ld = json_ld.replace("</", "<\\/")
+            head_parts.append(
+                "<script type=\"application/ld+json\">"
+                + json_ld
+                + "</script>"
+            )
+
+        head_html = ""
+        if head_parts:
+            head_lines = [head_parts[0]]
+            head_lines.extend(f"  {part}" for part in head_parts[1:])
+            head_html = "\n".join(head_lines)
+
         body_html = body if body.endswith("\n") else f"{body}\n"
-        return _render_with_base(content=body_html)
+        return _render_with_base(content=body_html, head=head_html)
 
     def _guide_json_ld(self, guide: Guide, canonical_path: str) -> dict:
         title = polish_guide_title(guide.title)
