@@ -167,7 +167,28 @@ class GiftPipeline:
                 candidate_pool.values(), key=lambda pair: pair[1], reverse=True
             )
             if target_total:
-                ordered_candidates = ordered_candidates[:target_total]
+                reserved: List[Tuple[Product, float]] = []
+                reserved_keys: set[Tuple[str, str]] = set()
+                seen_retailers: set[str] = set()
+
+                for product, score in ordered_candidates:
+                    if product.retailer_slug in seen_retailers:
+                        continue
+                    reserved.append((product, score))
+                    reserved_keys.add((product.retailer_slug, product.asin))
+                    seen_retailers.add(product.retailer_slug)
+
+                if len(reserved) < target_total:
+                    for product, score in ordered_candidates:
+                        key = (product.retailer_slug, product.asin)
+                        if key in reserved_keys:
+                            continue
+                        reserved.append((product, score))
+                        reserved_keys.add(key)
+                        if len(reserved) >= target_total:
+                            break
+
+                ordered_candidates = reserved
             new_products = [product for product, _ in ordered_candidates]
             for product in new_products:
                 key = (product.retailer_slug, product.asin)
