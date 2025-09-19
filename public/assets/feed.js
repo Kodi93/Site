@@ -87,6 +87,8 @@ function initFeed(root) {
       seenIds: new Set(),
       isLoading: false,
       statusMessage: "",
+      hasVisited: false,
+      scrollTop: null,
       done,
     });
   }
@@ -379,6 +381,11 @@ function initFeed(root) {
       const previous = modes.get(activeModeId);
       if (previous) {
         previous.savedHtml = listEl.innerHTML;
+        if (typeof window !== "undefined") {
+          const top = typeof window.scrollY === "number" ? window.scrollY : window.pageYOffset || 0;
+          previous.scrollTop = top;
+        }
+        previous.hasVisited = true;
       }
     }
 
@@ -392,6 +399,16 @@ function initFeed(root) {
     mode.statusMessage = "";
     applyState(mode);
     updateObserver(mode);
+    if (mode.hasVisited && typeof mode.scrollTop === "number" && typeof window !== "undefined") {
+      const target = mode.scrollTop;
+      const scroll = () => window.scrollTo({ top: target });
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(scroll);
+      } else {
+        scroll();
+      }
+    }
+    mode.hasVisited = true;
   }
 
   tabs.forEach((tab) => {
