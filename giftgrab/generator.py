@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from html import escape as html_escape
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -469,6 +470,8 @@ class SiteGenerator:
         self, guides: Sequence[Guide], products: Sequence[Product]
     ) -> None:
         timestamps: list[datetime] = []
+        category_counts: Counter[str] = Counter()
+        brand_set: set[str] = set()
         for guide in guides:
             if guide.products:
                 timestamps.extend(
@@ -478,6 +481,10 @@ class SiteGenerator:
             else:
                 timestamps.append(_parse_iso_datetime(guide.created_at))
         for product in products:
+            if product.category:
+                category_counts[product.category] += 1
+            if product.brand:
+                brand_set.add(product.brand)
             timestamps.append(
                 max(
                     _parse_iso_datetime(product.created_at),
@@ -488,6 +495,7 @@ class SiteGenerator:
             last_updated = max(timestamps).isoformat()
         else:
             last_updated = datetime.now(timezone.utc).isoformat()
+        updated_label = _format_updated_label(last_updated)
         sorted_guides = sorted(
             guides,
             key=lambda item: (
@@ -496,6 +504,21 @@ class SiteGenerator:
             ),
             reverse=True,
         )
+        live_guides = [guide for guide in sorted_guides if guide.products]
+        guides_live_count = len(live_guides)
+        total_products = len(products)
+        unique_brands = len(brand_set)
+        top_categories = [name for name, _count in category_counts.most_common(3)]
+
+        def _join_with_and(items: Sequence[str]) -> str:
+            cleaned = [item for item in items if item]
+            if not cleaned:
+                return ""
+            if len(cleaned) == 1:
+                return cleaned[0]
+            if len(cleaned) == 2:
+                return f"{cleaned[0]} and {cleaned[1]}"
+            return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
         guide_cards: list[str] = []
         for index, guide in enumerate(sorted_guides):
             display_title = polish_guide_title(guide.title)
@@ -523,6 +546,39 @@ class SiteGenerator:
         ]
         if home_description:
             hero_markup.append(f"<p>{home_description}</p>")
+        hero_stats: list[str] = []
+        if guides_live_count:
+            hero_stats.append(
+                "<li>"
+                f"<span class=\"hero-meta__value\">{guides_live_count:,}</span>"
+                "<span class=\"hero-meta__label\">Guides live</span>"
+                "</li>"
+            )
+        if total_products:
+            hero_stats.append(
+                "<li>"
+                f"<span class=\"hero-meta__value\">{total_products:,}</span>"
+                "<span class=\"hero-meta__label\">Products tracked</span>"
+                "</li>"
+            )
+        if unique_brands:
+            hero_stats.append(
+                "<li>"
+                f"<span class=\"hero-meta__value\">{unique_brands:,}</span>"
+                "<span class=\"hero-meta__label\">Brands covered</span>"
+                "</li>"
+            )
+        if updated_label:
+            hero_stats.append(
+                "<li>"
+                f"<span class=\"hero-meta__value\">{html_escape(updated_label)}</span>"
+                "<span class=\"hero-meta__label\">Last refresh</span>"
+                "</li>"
+            )
+        if hero_stats:
+            hero_markup.append('<ul class=\"hero-meta\" aria-label=\"Grabgifts highlights\">')
+            hero_markup.extend(hero_stats)
+            hero_markup.append("</ul>")
         hero_markup.extend(
             [
                 "<div class=\"hero-actions\">",
@@ -534,6 +590,72 @@ class SiteGenerator:
         )
         hero_markup.append("</section>")
         sections: List[str] = ["\n".join(hero_markup)]
+        freshness_detail = (
+            "Refreshed on "
+            + html_escape(updated_label)
+            + " with manual QA before publish."
+            if updated_label
+            else "Refreshed daily with manual QA before publish."
+        )
+        quality_cards: list[str] = [
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Fresh every morning</h3>"
+                f"<p>{freshness_detail}</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"quality-card\">"
+                f"<h3>{GUIDE_ITEM_TARGET} picks per guide</h3>"
+                "<p>Each roundup ships with ranked blurbs, pricing context, and affiliate-safe links ready to promote.</p>"
+                "</article>"
+            ),
+        ]
+        if total_products:
+            coverage_parts: list[str] = []
+            category_count = len(category_counts)
+            if category_count:
+                coverage_parts.append(f"{category_count} categories")
+            if unique_brands:
+                coverage_parts.append(f"{unique_brands:,} brands")
+            if coverage_parts:
+                coverage_text = _join_with_and(coverage_parts)
+                inventory_detail = f"{total_products:,} gift ideas spanning {coverage_text}."
+            else:
+                inventory_detail = f"{total_products:,} gift ideas are live in today's catalog."
+            quality_cards.append(
+                (
+                    "<article class=\"quality-card\">"
+                    "<h3>Catalog depth</h3>"
+                    f"<p>{inventory_detail}</p>"
+                    "</article>"
+                )
+            )
+        if top_categories:
+            escaped_categories = [html_escape(name) for name in top_categories]
+            categories_text = _join_with_and(escaped_categories)
+            verb = "are" if len(escaped_categories) > 1 else "is"
+            quality_cards.append(
+                (
+                    "<article class=\"quality-card\">"
+                    "<h3>Trending themes</h3>"
+                    f"<p>{categories_text} {verb} resonating with shoppers right now.</p>"
+                    "</article>"
+                )
+            )
+        if quality_cards:
+            quality_section = [
+                '<section class="quality-section" aria-labelledby="quality-heading">',
+                '<div class="page-header">',
+                '<h2 id="quality-heading">Why shoppers trust grabgifts</h2>',
+                '<p>Transparency, testing, and constant refreshes keep our picks sharp.</p>',
+                '</div>',
+                '<div class="quality-grid">',
+                "".join(quality_cards),
+                '</div>',
+                '</section>',
+            ]
+            sections.append("\n".join(quality_section))
         if cards_html:
             guide_section_parts = [
                 '<section id="guide-list" data-home-guides>',
