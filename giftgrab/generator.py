@@ -129,10 +129,12 @@ _CONTENT_PATTERN = re.compile(r"\{\{\s*content\s*\}\}")
 
 def _render_with_base(*, content: str, head: str = "") -> str:
     html = BASE_TEMPLATE
-    html = _HEAD_SAFE_PATTERN.sub(head, html)
-    html = _HEAD_PATTERN.sub(html_escape(head), html)
-    html = _CONTENT_SAFE_PATTERN.sub(content, html)
-    html = _CONTENT_PATTERN.sub(html_escape(content), html)
+    escaped_head = html_escape(head)
+    escaped_content = html_escape(content)
+    html = _HEAD_SAFE_PATTERN.sub(lambda _match: head, html)
+    html = _HEAD_PATTERN.sub(lambda _match: escaped_head, html)
+    html = _CONTENT_SAFE_PATTERN.sub(lambda _match: content, html)
+    html = _CONTENT_PATTERN.sub(lambda _match: escaped_content, html)
     return html
 
 LOGGER = logging.getLogger(__name__)
