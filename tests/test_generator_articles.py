@@ -125,6 +125,42 @@ def test_guides_index_lists_articles(tmp_path: Path) -> None:
     assert "guides/index.html" in sitemap
 
 
+def test_guides_index_placeholder(tmp_path: Path) -> None:
+    products = build_inventory(10)
+    now = datetime(2025, 3, 1, tzinfo=timezone.utc)
+    draft_guide = make_spouse_guide(
+        audience_slug="partner",
+        audience_label="partner",
+        tone="romance-forward surprises",
+        price_cap=75.0,
+        products=products,
+        now=now,
+        holiday="Anniversary",
+        holiday_date=date(2025, 6, 1),
+        related_products=products[5:],
+        hub_slugs=["gifts-for-her", "gifts-for-him"],
+    )
+
+    categories = [
+        Category(slug="gifts-for-her", name="For Her", blurb="For her", keywords=["her"]),
+        Category(slug="gifts-for-him", name="For Him", blurb="For him", keywords=["him"]),
+    ]
+    settings = SiteSettings(
+        site_name="Test Gifts",
+        base_url="https://example.com",
+    )
+    generator = SiteGenerator(settings, output_dir=tmp_path)
+    generator.build(categories, products, articles=[draft_guide])
+
+    index_file = tmp_path / "guides" / "index.html"
+    assert index_file.exists()
+    index_html = index_file.read_text(encoding="utf-8")
+    assert (
+        "Come back soon—we're assembling conversion-ready gift guides and seasonal playbooks for every audience."
+        in index_html
+    )
+
+
 def test_shortlist_page_contains_status_and_nav(tmp_path: Path) -> None:
     products = build_inventory(8)
     categories = build_categories()
