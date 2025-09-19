@@ -1,5 +1,6 @@
-"""Static site generator for the GiftGrab catalog."""
+"""Static site generator for the GrabGifts catalog."""
 from __future__ import annotations
+import json
 import logging
 import os
 import re
@@ -119,13 +120,21 @@ def load_settings() -> SiteSettings:
             if item.strip()
         )
     return SiteSettings(
-        name=_env("SITE_NAME", "GiftGrab") or "GiftGrab",
+        name=_env("SITE_NAME", "GrabGifts") or "GrabGifts",
         base_url=_env("SITE_BASE_URL", "https://example.com"),
         description=_env(
             "SITE_DESCRIPTION",
-            "Daily gift roundups featuring gadgets, home comforts, and fun surprises.",
+            (
+                "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play "
+                "affiliate automation. Launch scroll-stopping gift funnels complete with affiliate "
+                "wiring, ad inventory, and conversion copy."
+            ),
         )
-        or "Daily gift roundups featuring gadgets, home comforts, and fun surprises.",
+        or (
+            "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play "
+            "affiliate automation. Launch scroll-stopping gift funnels complete with affiliate wiring, "
+            "ad inventory, and conversion copy."
+        ),
         logo_url=_env("SITE_LOGO_URL"),
         twitter=_env("SITE_TWITTER"),
         facebook=_env("SITE_FACEBOOK"),
@@ -288,9 +297,14 @@ class SiteGenerator:
             card_html, payload = card
             cards_html.append(card_html)
             json_ld.append(payload)
-        cards = "".join(cards_html)
+        cards = "\n".join(cards_html)
         guide_description = _strip_banned_phrases(guide.description)
-        parts = [f"<h1>{guide.title}</h1>", f"<p>{guide_description}</p>"]
+        parts = [
+            "<section class=\"page-header\">",
+            f"<h1>{guide.title}</h1>",
+            f"<p>{guide_description}</p>",
+            "</section>",
+        ]
         if cards:
             parts.append(f"<section class=\"grid\">{cards}</section>")
         else:
@@ -309,7 +323,8 @@ class SiteGenerator:
         cards = []
         for guide in guides[:12]:
             first = guide.products[0] if guide.products else None
-            teaser = blurb(first) if first else guide.description
+            teaser_source = first if first else guide
+            teaser = blurb(teaser_source) if first else guide.description
             teaser = _strip_banned_phrases(teaser)
             cards.append(
                 "<article class=\"card\">"
@@ -318,17 +333,63 @@ class SiteGenerator:
                 f"<a class=\"button\" href=\"/guides/{guide.slug}/\">View guide</a>"
                 "</article>"
             )
-        cards_html = "".join(cards)
+        cards_html = "\n".join(cards)
         home_description = _strip_banned_phrases(self.settings.description)
-        parts = [
-            f"<h1>{self.settings.name}</h1>",
-            f"<p>{home_description}</p>",
+        hero_lines: List[str] = []
+        if home_description:
+            segments = [
+                segment.strip()
+                for segment in re.split(r"(?<=[.!?])\s+", home_description)
+                if segment.strip()
+            ]
+            hero_lines = segments[:2] if segments else []
+        if not hero_lines and home_description:
+            hero_lines = [home_description]
+        hero_markup = [
+            "<section class=\"hero\">",
+            "<span class=\"hero-badge\">GIFT COMMERCE DASHBOARD</span>",
+            "<h1>grabgifts</h1>",
         ]
+        hero_markup.extend(f"<p>{line}</p>" for line in hero_lines)
+        hero_markup.append(
+            "<div class=\"hero-actions\">"
+            "<a class=\"button\" href=\"/guides/\">Explore today's drops</a>"
+            "<a class=\"button button-secondary\" href=\"/surprise/\">Spin up a surprise</a>"
+            "<a class=\"button button-ghost\" href=\"/changelog/\">See the live changelog</a>"
+            "</div>"
+        )
+        hero_markup.append("</section>")
+        sections: List[str] = ["\n".join(hero_markup)]
         if cards_html:
-            parts.append(f"<section class=\"grid\">{cards_html}</section>")
+            sections.append(
+                "\n".join(
+                    [
+                        "<section id=\"guide-list\">",
+                        "<div class=\"page-header\">",
+                        "<h2>Today's drops</h2>",
+                        "<p>Browse the guides we refreshed for the latest grabgifts catalog.</p>",
+                        "</div>",
+                        "<div class=\"grid\">",
+                        cards_html,
+                        "</div>",
+                        "</section>",
+                    ]
+                )
+            )
         else:
-            parts.append("<p>Guides are being prepared. Check back soon.</p>")
-        body = "\n".join(parts)
+            sections.append(
+                "\n".join(
+                    [
+                        "<section id=\"guide-list\">",
+                        "<div class=\"page-header\">",
+                        "<h2>Today's drops</h2>",
+                        "<p>Guides are being prepared. Check back soon.</p>",
+                        "</div>",
+                        "</section>",
+                    ]
+                )
+            )
+        body = "\n".join(sections)
         html = self._render_document(
             page_title=self.settings.name,
             description=home_description,
@@ -356,6 +417,131 @@ class SiteGenerator:
             else:
                 latest = datetime.now(timezone.utc).isoformat()
             self._sitemap_entries.append((f"/guides/{guide.slug}/", latest))
+        self._write_guides_index(guides)
+        self._write_surprise_page(guides)
+        self._write_changelog(guides)
+
+    def _write_guides_index(self, guides: Sequence[Guide]) -> None:
+        header = [
+            "<section class=\"page-header\">",
+            "<h1>All guides</h1>",
+            "<p>Every grabgifts collection in one place.</p>",
+            "</section>",
+        ]
+        cards = []
+        for guide in sorted(guides, key=lambda item: item.title.lower()):
+            first = guide.products[0] if guide.products else None
+            teaser = blurb(first) if first else guide.description
+            teaser = _strip_banned_phrases(teaser)
+            cards.append(
+                "<article class=\"card\">"
+                f"<h2><a href=\"/guides/{guide.slug}/\">{guide.title}</a></h2>"
+                f"<p>{teaser}</p>"
+                "</article>"
+            )
+        body_parts = header[:]
+        if cards:
+            body_parts.extend(
+                [
+                    "<div class=\"grid\">",
+                    "\n".join(cards),
+                    "</div>",
+                ]
+            )
+        else:
+            body_parts.append("<p>No guides are available right now.</p>")
+        html = self._render_document(
+            page_title=f"Guides – {self.settings.name}",
+            description="Browse every GrabGifts guide.",
+            canonical_path="/guides/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/guides/index.html", html)
+        self._sitemap_entries.append(("/guides/", datetime.now(timezone.utc).isoformat()))
+
+    def _write_surprise_page(self, guides: Sequence[Guide]) -> None:
+        guide_links = [
+            (f"/guides/{guide.slug}/", guide.title)
+            for guide in guides
+            if guide.products
+        ]
+        guide_urls = [url for url, _ in guide_links]
+        header = [
+            "<section class=\"page-header\">",
+            "<h1>Spin up a surprise</h1>",
+            "<p>We send you to a random guide from today's drops.</p>",
+            "</section>",
+        ]
+        body_parts = header[:]
+        if guide_urls:
+            body_parts.append("<p>Hold tight—we're picking something for you.</p>")
+            body_parts.append(
+                "<script>const guides = "
+                + json.dumps(guide_urls)
+                + ";if(guides.length){const target = guides[Math.floor(Math.random()*guides.length)];window.location.href = target;}</script>"
+            )
+            link_items = "".join(
+                f"<li><a href=\"{url}\">{title}</a></li>" for url, title in guide_links
+            )
+            body_parts.append(
+                "<noscript><p>Enable JavaScript to jump automatically. Until then, pick a guide below.</p>"
+                f"<ul class=\"link-list\">{link_items}</ul></noscript>"
+            )
+        else:
+            body_parts.append("<p>No guides are available right now. Check back soon.</p>")
+        html = self._render_document(
+            page_title=f"Spin up a surprise – {self.settings.name}",
+            description="Jump to a random GrabGifts guide.",
+            canonical_path="/surprise/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/surprise/index.html", html)
+        self._sitemap_entries.append(("/surprise/", datetime.now(timezone.utc).isoformat()))
+
+    def _write_changelog(self, guides: Sequence[Guide]) -> None:
+        entries: List[tuple[datetime, Guide]] = []
+        for guide in guides:
+            if guide.products:
+                latest = max(product.updated_at for product in guide.products)
+            else:
+                latest = guide.created_at
+            parsed = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            entries.append((parsed.astimezone(timezone.utc), guide))
+        entries.sort(key=lambda pair: pair[0], reverse=True)
+        header = [
+            "<section class=\"page-header\">",
+            "<h1>Live changelog</h1>",
+            "<p>Follow every update we push into grabgifts.</p>",
+            "</section>",
+        ]
+        body_parts = header[:]
+        if entries:
+            items = []
+            for timestamp, guide in entries:
+                label = timestamp.strftime("%b %d, %Y %H:%M UTC")
+                items.append(
+                    "<li>"
+                    f"<time datetime=\"{timestamp.isoformat()}\">{label}</time>"
+                    f"<a href=\"/guides/{guide.slug}/\">{guide.title}</a>"
+                    "</li>"
+                )
+            body_parts.append(
+                "<ul class=\"timeline\">"
+                + "\n".join(items)
+                + "</ul>"
+            )
+        else:
+            body_parts.append("<p>No changes logged yet.</p>")
+        html = self._render_document(
+            page_title=f"Live changelog – {self.settings.name}",
+            description="Track the latest GrabGifts updates.",
+            canonical_path="/changelog/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/changelog/index.html", html)
+        self._sitemap_entries.append(("/changelog/", datetime.now(timezone.utc).isoformat()))
 
     def _write_categories(self, products: Sequence[Product]) -> None:
         categories: dict[tuple[str, str], List[Product]] = {}
@@ -379,11 +565,19 @@ class SiteGenerator:
                 f"Trending picks from the {name} category updated daily."
             )
             parts = [
+                "<section class=\"page-header\">",
                 f"<h1>{name}</h1>",
                 f"<p>{description}</p>",
+                "</section>",
             ]
             if cards:
-                parts.append(f"<section class=\"grid\">{''.join(cards)}</section>")
+                parts.extend(
+                    [
+                        "<section class=\"grid\">",
+                        "\n".join(cards),
+                        "</section>",
+                    ]
+                )
             else:
                 parts.append("<p>No items are available for this category right now.</p>")
             body = "\n".join(parts)
@@ -430,7 +624,12 @@ class SiteGenerator:
                 details.append(product.brand)
             if product.category:
                 details.append(product.category)
-            body_parts = [f"<h1>{product.title}</h1>", f"<p>{description}</p>"]
+            body_parts = [
+                "<section class=\"page-header\">",
+                f"<h1>{product.title}</h1>",
+                f"<p>{description}</p>",
+                "</section>",
+            ]
             if product.image:
                 body_parts.append(
                     f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
