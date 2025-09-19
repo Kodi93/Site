@@ -161,6 +161,23 @@ header {
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
+.affiliate-disclosure {
+  margin: 1.4rem auto 1.8rem;
+  padding: 1.1rem 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(127, 86, 217, 0.14);
+  color: var(--muted-strong);
+  font-size: 0.92rem;
+  max-width: 960px;
+  line-height: 1.5;
+  box-shadow: 0 18px 42px rgba(5, 3, 12, 0.46);
+}
+
+.affiliate-disclosure strong {
+  color: var(--text);
+}
+
 nav {
   max-width: 1200px;
   margin: 0 auto;
@@ -1300,6 +1317,19 @@ main > section + section {
   z-index: 1;
 }
 
+.card-updated {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+}
+
+.card-updated time {
+  color: var(--muted-strong);
+}
+
 .card--ad .card-content {
   align-items: center;
   text-align: center;
@@ -2404,7 +2434,7 @@ class SiteGenerator:
         newsletter_attrs = ""
         if getattr(self.settings, "newsletter_url", None):
             newsletter_link = html.escape(self.settings.newsletter_url)
-            newsletter_attrs = ' target="_blank" rel="noopener"'
+            newsletter_attrs = ' target="_blank" rel="sponsored nofollow noopener"'
         elif getattr(self.settings, "newsletter_form_action", None):
             newsletter_link = "#newsletter"
         if newsletter_link:
@@ -2433,7 +2463,7 @@ class SiteGenerator:
             else "<meta name=\"robots\" content=\"index, follow\" />"
         )
         feed_link = (
-            f'<link rel="alternate" type="application/rss+xml" title="{html.escape(self.settings.site_name)} RSS" href="/feed.xml" />'
+            f'<link rel="alternate" type="application/rss+xml" title="{html.escape(self.settings.site_name)} RSS" href="/rss.xml" />'
         )
         favicon_link = ""
         if self.settings.favicon_url:
@@ -2522,6 +2552,12 @@ class SiteGenerator:
         extra_head = context.extra_head or ""
         structured_block = f"\n    {structured_json}" if structured_json else ""
         extra_head_block = f"\n    {extra_head}" if extra_head else ""
+        affiliate_disclosure = (
+            "<section class=\"affiliate-disclosure\" role=\"note\">"
+            "<strong>Affiliate disclosure:</strong> Grab Gifts uses Amazon links tagged with kayce25-20. "
+            "We may earn commissions when you purchase through sponsored recommendations."
+            "</section>"
+        )
         now = datetime.utcnow()
         footer_links_parts = ['<a href="/index.html">Home</a>', '<a href="/latest.html">Latest finds</a>']
         if self._has_deals_page:
@@ -2529,7 +2565,7 @@ class SiteGenerator:
         if getattr(self.settings, "newsletter_url", None):
             newsletter_url = html.escape(self.settings.newsletter_url)
             footer_links_parts.append(
-                f'<a href="{newsletter_url}" target="_blank" rel="noopener">Newsletter</a>'
+                f'<a href="{newsletter_url}" target="_blank" rel="sponsored nofollow noopener">Newsletter</a>'
             )
         elif getattr(self.settings, "newsletter_form_action", None):
             footer_links_parts.append('<a href="#newsletter">Newsletter</a>')
@@ -2583,6 +2619,7 @@ class SiteGenerator:
     </header>
     <div class=\"page-shell\">
       <main id=\"main-content\" class=\"page-main\">
+        {affiliate_disclosure}
         {context.body}
         {adsense_slot}
       </main>{rail_html}
@@ -3018,7 +3055,7 @@ class SiteGenerator:
       {caveats_html}
       <div class=\"card-actions\">
         <a class=\"button-link\" href=\"{detail_url}\">See details</a>
-        <a class=\"cta-secondary\" href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Check current price on Amazon</a>
+        <a class=\"cta-secondary\" href=\"{affiliate}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">Check current price on Amazon</a>
       </div>
     </div>
   </article>
@@ -3059,7 +3096,7 @@ class SiteGenerator:
             if url:
                 safe_url = html.escape(url, quote=True)
                 inner = (
-                    f"<a class=\"press-card__link\" href=\"{safe_url}\" target=\"_blank\" rel=\"noopener\">{inner}</a>"
+                    f"<a class=\"press-card__link\" href=\"{safe_url}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">{inner}</a>"
                 )
             cards.append(f"<article class=\"press-card\">{inner}</article>")
         if not cards:
@@ -3449,7 +3486,7 @@ class SiteGenerator:
             retailer_name_html = html.escape(product.retailer_name)
             if retailer_target:
                 retailer_line = (
-                    f'<p class="retailer-callout">Sourced from <a href="{html.escape(retailer_target)}" target="_blank" rel="noopener">{retailer_name_html}</a>.</p>'
+                    f'<p class="retailer-callout">Sourced from <a href="{html.escape(retailer_target)}" target="_blank" rel="sponsored nofollow noopener">{retailer_name_html}</a>.</p>'
                 )
             else:
                 retailer_line = f'<p class="retailer-callout">Sourced from {retailer_name_html}.</p>'
@@ -3539,8 +3576,8 @@ class SiteGenerator:
     <button class="share-primary" type="button" data-share {analytics_base} data-analytics="share" data-event="share-open" data-placement="product-page" data-label="Open share menu">Share with a friend</button>
     <div class="share-links">
       <button class="share-copy" type="button" data-copy="{html.escape(canonical_url)}" {analytics_base} data-analytics="share" data-event="share-copy" data-placement="product-page" data-label="Copy product link">Copy link</button>
-      <a href="{tweet_url}" target="_blank" rel="noopener" {analytics_base} data-analytics="share" data-event="share-twitter" data-placement="product-page" data-label="Tweet share">Tweet</a>
-      <a href="{facebook_url}" target="_blank" rel="noopener" {analytics_base} data-analytics="share" data-event="share-facebook" data-placement="product-page" data-label="Facebook share">Share</a>
+      <a href="{tweet_url}" target="_blank" rel="sponsored nofollow noopener" {analytics_base} data-analytics="share" data-event="share-twitter" data-placement="product-page" data-label="Tweet share">Tweet</a>
+      <a href="{facebook_url}" target="_blank" rel="sponsored nofollow noopener" {analytics_base} data-analytics="share" data-event="share-facebook" data-placement="product-page" data-label="Facebook share">Share</a>
     </div>
   </div>
 </div>
@@ -3583,7 +3620,7 @@ class SiteGenerator:
         if product.link:
             cta_label = product.call_to_action or f"Shop on {product.retailer_name}"
             cta_block = (
-                f'<p class="cta-row"><a class="cta-button" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored" {analytics_base} data-analytics="product-cta" data-event="cta-click" data-placement="product-page" data-label="{html.escape(cta_label, quote=True)}">{html.escape(cta_label)}</a></p>'
+                f'<p class="cta-row"><a class="cta-button" href="{html.escape(product.link)}" target="_blank" rel="sponsored nofollow noopener" {analytics_base} data-analytics="product-cta" data-event="cta-click" data-placement="product-page" data-label="{html.escape(cta_label, quote=True)}">{html.escape(cta_label)}</a></p>'
             )
         body = f"""
 {breadcrumbs_html}
@@ -3780,7 +3817,7 @@ class SiteGenerator:
     <h1>{html.escape(product.name)}</h1>
     <p>{intro}</p>
     <div class=\"card-actions\">
-      <a class=\"button-link\" href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Check current price on Amazon</a>
+      <a class=\"button-link\" href=\"{affiliate}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">Check current price on Amazon</a>
     </div>
   </header>
   <div class=\"generated-product__media\">
@@ -3793,7 +3830,7 @@ class SiteGenerator:
   {caveats_html}
   <section>
     <h2>Search it on Amazon</h2>
-    <p><a href=\"{affiliate}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">{query}</a></p>
+    <p><a href=\"{affiliate}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">{query}</a></p>
   </section>
 </article>
 """
@@ -3856,7 +3893,7 @@ class SiteGenerator:
   </header>
   <ol class=\"roundup-list\">{items_markup}</ol>
   <section class=\"roundup-search\">
-    <a class=\"cta-secondary\" href=\"{search_link}\" target=\"_blank\" rel=\"nofollow sponsored noopener\">Search Amazon for {html.escape(roundup.topic)} ideas</a>
+    <a class=\"cta-secondary\" href=\"{search_link}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">Search Amazon for {html.escape(roundup.topic)} ideas</a>
   </section>
 </article>
 """
@@ -5169,7 +5206,9 @@ class SiteGenerator:
   </channel>
 </rss>
 """
-        (self.output_dir / "feed.xml").write_text(rss.strip(), encoding="utf-8")
+        rss_xml = rss.strip()
+        (self.output_dir / "rss.xml").write_text(rss_xml, encoding="utf-8")
+        (self.output_dir / "feed.xml").write_text(rss_xml, encoding="utf-8")
 
     def _write_sitemap(
         self,
@@ -5427,7 +5466,7 @@ class SiteGenerator:
 <section class=\"newsletter-banner\" id=\"newsletter\">
   <h3>Get the Grab Gifts insider drop</h3>
   <p>Subscribe for breakout performers, promo angles, and launch reminders straight from the gift commerce lab.</p>
-  <a class=\"button-link\" href=\"{url}\" target=\"_blank\" rel=\"noopener\">{button_label}</a>
+  <a class=\"button-link\" href=\"{url}\" target=\"_blank\" rel=\"sponsored nofollow noopener\">{button_label}</a>
 </section>
 """
         return ""
@@ -5521,8 +5560,8 @@ class SiteGenerator:
                 "ratingValue": f"{product.rating:.1f}",
                 "reviewCount": str(product.total_reviews),
             }
-        if product.brand:
-            data["brand"] = {"@type": "Brand", "name": product.brand}
+        brand_name = product.brand or product.retailer_name or "Amazon"
+        data["brand"] = {"@type": "Brand", "name": brand_name}
         return data
 
     @staticmethod
@@ -5690,6 +5729,15 @@ class SiteGenerator:
         retailer_html = ""
         if product.retailer_name:
             retailer_html = f'<span class="card-retailer">{html.escape(product.retailer_name)}</span>'
+        updated_html = ""
+        updated_iso = self._format_iso8601(
+            self._parse_iso_datetime(getattr(product, "updated_at", None))
+        )
+        if updated_iso:
+            updated_safe = html.escape(updated_iso)
+            updated_html = (
+                f'<span class="card-updated">Updated <time datetime="{updated_safe}">{updated_safe}</time></span>'
+            )
         highlight_badge = ""
         latest_point = product.latest_price_point
         drop_amount = product.price_drop_amount()
@@ -5739,7 +5787,7 @@ class SiteGenerator:
                 )
             analytics_attr_str = " ".join(analytics_attrs)
             outbound_cta = (
-                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="noopener sponsored" {analytics_attr_str}>{html.escape(cta_copy)}</a>'
+                f' <a class="cta-secondary" href="{html.escape(product.link)}" target="_blank" rel="sponsored nofollow noopener" {analytics_attr_str}>{html.escape(cta_copy)}</a>'
             )
         return f"""
 <article class="{classes}"{attr_fragment}>
@@ -5750,6 +5798,7 @@ class SiteGenerator:
   <div class="card-content">
     <h3><a href="/{self._product_path(product)}">{html.escape(product.title)}</a></h3>
     <p>{description}</p>
+    {updated_html}
     {meta_html}
     {highlight_html}
     <div class="card-actions"><a class="button-link" href="/{self._product_path(product)}">Read the hype</a>{outbound_cta}</div>

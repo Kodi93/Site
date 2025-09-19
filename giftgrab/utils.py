@@ -12,6 +12,8 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_AMAZON_ASSOCIATE_TAG = "kayce25-20"
+
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -102,15 +104,22 @@ def parse_price_string(price: str | None) -> Tuple[float, str | None] | None:
 
 
 def apply_partner_tag(url: str | None, partner_tag: str | None) -> str:
-    """Ensure the provided URL contains the given Amazon partner tag."""
+    """Ensure the provided URL contains the Amazon partner tag required by the site."""
 
-    if not url:
-        return "https://www.amazon.com/"
-    if not partner_tag:
-        return url
-    parsed = urlparse(url)
+    effective_url = url or "https://www.amazon.com/"
+    tag = DEFAULT_AMAZON_ASSOCIATE_TAG
+    if partner_tag:
+        candidate = partner_tag.strip()
+        if candidate:
+            if candidate.lower() == DEFAULT_AMAZON_ASSOCIATE_TAG:
+                tag = candidate
+            else:
+                logger.debug(
+                    "Ignoring affiliate tag %s in favor of required %s", candidate, DEFAULT_AMAZON_ASSOCIATE_TAG
+                )
+    parsed = urlparse(effective_url)
     query = dict(parse_qsl(parsed.query))
-    query["tag"] = partner_tag
+    query["tag"] = tag
     new_query = urlencode(query)
     return urlunparse(
         (

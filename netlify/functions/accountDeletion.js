@@ -1,9 +1,18 @@
 const crypto = require('crypto');
 const { URL, URLSearchParams } = require('url');
 
-const accountStoreModule = process.env.ACCOUNT_STORE_MODULE
-  ? require(process.env.ACCOUNT_STORE_MODULE)
-  : require('../lib/accountStore');
+const path = require('path');
+
+const defaultAccountStorePath = path.resolve(
+  process.cwd(),
+  'netlify/lib/accountStore.cjs'
+);
+
+const accountStorePath = process.env.ACCOUNT_STORE_MODULE
+  ? process.env.ACCOUNT_STORE_MODULE
+  : defaultAccountStorePath;
+
+const accountStoreModule = require(accountStorePath);
 
 const { deleteUserById } = accountStoreModule;
 
@@ -12,7 +21,6 @@ if (typeof deleteUserById !== 'function') {
 }
 
 const REQUIRED_METHOD = 'POST';
-const EXPECTED_TOKEN = 'gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5';
 const HEALTH_CHECK_METHODS = new Set(['GET', 'HEAD']);
 
 const CHALLENGE_PARAM_KEYS = ['challenge_code', 'challengeCode'];
@@ -144,17 +152,18 @@ function resolveUserIdFromPayload(payload) {
   return null;
 }
 
-exports.handler = async (event) => {
+const handler = async (event) => {
   const method = event.httpMethod || '';
   const headers = normalizeHeaders(event.headers);
+  const expectedToken = process.env.ACCOUNT_DELETION_TOKEN || '';
 
   if (method === 'GET') {
     const challengeCode = extractChallengeCode(event);
-    if (challengeCode) {
+    if (challengeCode && expectedToken) {
       const endpoint = resolveEndpoint(event);
       const hash = crypto.createHash('sha256');
       hash.update(challengeCode);
-      hash.update(EXPECTED_TOKEN);
+      hash.update(expectedToken);
       hash.update(endpoint);
       const challengeResponse = hash.digest('hex');
 
@@ -190,6 +199,14 @@ exports.handler = async (event) => {
     };
   }
 
+  if (!expectedToken) {
+    console.error('ACCOUNT_DELETION_TOKEN is not configured. Rejecting request.');
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: 'Misconfigured function' }),
+    };
+  }
+
   const signatureValues = extractSignatureValues(headers[SIGNATURE_HEADER_KEY]);
   const verificationToken = headers['x-verification-token'];
 
@@ -202,7 +219,7 @@ exports.handler = async (event) => {
 
   if (signatureValues.length > 0) {
     try {
-      const hmac = crypto.createHmac('sha256', EXPECTED_TOKEN);
+      const hmac = crypto.createHmac('sha256', expectedToken);
       hmac.update(rawBodyBuffer);
       const digestBuffer = hmac.digest();
       const expectedBase64 = digestBuffer.toString('base64');
@@ -219,7 +236,7 @@ exports.handler = async (event) => {
   }
 
   if (!requestIsAuthorized && typeof verificationToken === 'string') {
-    requestIsAuthorized = safeEqual(verificationToken.trim(), EXPECTED_TOKEN);
+    requestIsAuthorized = safeEqual(verificationToken.trim(), expectedToken);
   }
 
   if (!requestIsAuthorized) {
@@ -265,3 +282,6 @@ exports.handler = async (event) => {
     body: '',
   };
 };
+
+exports.handler = handler;
+module.exports = { handler };

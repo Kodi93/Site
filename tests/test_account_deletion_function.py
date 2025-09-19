@@ -33,6 +33,7 @@ def invoke_handler(event: dict, env: dict[str, str] | None = None) -> dict:
     )
 
     run_env = os.environ.copy()
+    run_env.setdefault("ACCOUNT_DELETION_TOKEN", EXPECTED_TOKEN)
     if env:
         run_env.update(env)
 

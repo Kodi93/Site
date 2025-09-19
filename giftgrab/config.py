@@ -11,9 +11,6 @@ OUTPUT_DIR = BASE_DIR / "public"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 
-DEFAULT_ADSENSE_CLIENT_ID = "ca-pub-5720696586394797"
-
-
 @dataclass(frozen=True)
 class SiteSettings:
     """Global site level settings used during generation."""
@@ -23,10 +20,10 @@ class SiteSettings:
     description: str = (
         "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation."
     )
-    adsense_client_id: str | None = DEFAULT_ADSENSE_CLIENT_ID
+    adsense_client_id: str | None = None
     adsense_slot: str | None = None
     adsense_rail_slot: str | None = None
-    amazon_partner_tag: str | None = None
+    amazon_partner_tag: str | None = "kayce25-20"
     twitter_handle: str | None = None
     facebook_page: str | None = None
     keywords: tuple[str, ...] = ()
