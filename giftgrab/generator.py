@@ -80,6 +80,16 @@ def polish_guide_title(title: str) -> str:
     return text.strip()
 
 
+def _parse_iso_datetime(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _read_markup(path: Path) -> str:
     return path.read_text(encoding="utf-8").lstrip("\ufeff").strip()
 
@@ -199,7 +209,7 @@ class SiteGenerator:
         LOGGER.info("Rendering site to %s", self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._sitemap_entries = []
-        self._write_homepage(guides)
+        self._write_homepage(guides, products)
         self._write_guides(guides)
         self._write_categories(products)
         self._write_products(products)
@@ -324,6 +334,48 @@ class SiteGenerator:
         body.append("</article>")
         return "".join(body), self._product_json_ld(product, description)
 
+    def _product_preview_card(self, product: Product) -> str | None:
+        if not product.title or not product.image:
+            return None
+        price_display = product.price_text
+        if not price_display and product.price is not None:
+            currency = product.currency or "USD"
+            if currency.upper() == "USD":
+                price_display = f"${product.price:,.2f}"
+            else:
+                price_display = f"{product.price:,.2f} {currency.upper()}"
+        meta_parts: list[str] = []
+        if product.category:
+            meta_parts.append(html_escape(product.category))
+        if product.brand:
+            meta_parts.append(html_escape(product.brand))
+        meta_html = (
+            "<p class=\"feed-card-meta\">" + " • ".join(meta_parts) + "</p>"
+            if meta_parts
+            else ""
+        )
+        price_html = (
+            f"<p class=\"feed-card-price\">{html_escape(price_display)}</p>"
+            if price_display
+            else ""
+        )
+        id_attr = f" data-product-id=\"{html_escape(product.id)}\"" if product.id else ""
+        slug = html_escape(product.slug)
+        image = html_escape(product.image)
+        title = html_escape(product.title)
+        return (
+            f"<article class=\"feed-card\" data-home-product-card=\"true\"{id_attr}>"
+            f"<a class=\"feed-card-link\" href=\"/products/{slug}/\">"
+            f"<div class=\"feed-card-media\"><img src=\"{image}\" alt=\"{title}\" loading=\"lazy\"></div>"
+            "<div class=\"feed-card-body\">"
+            f"{meta_html}"
+            f"<h3 class=\"feed-card-title\">{title}</h3>"
+            f"{price_html}"
+            "</div>"
+            "</a>"
+            "</article>"
+        )
+
     def _guide_body(self, guide: Guide) -> tuple[str, List[dict]]:
         cards_html = []
         json_ld: List[dict] = []
@@ -349,30 +401,57 @@ class SiteGenerator:
             parts.append("<p>No items are available for this guide right now.</p>")
         return "\n".join(parts), json_ld
 
-    def _write_homepage(self, guides: Sequence[Guide]) -> None:
-        if guides:
-            last_updated = max(
-                product.updated_at
-                for guide in guides
-                for product in guide.products
+    def _write_homepage(
+        self, guides: Sequence[Guide], products: Sequence[Product]
+    ) -> None:
+        timestamps: list[datetime] = []
+        for guide in guides:
+            if guide.products:
+                timestamps.extend(
+                    _parse_iso_datetime(product.updated_at)
+                    for product in guide.products
+                )
+            else:
+                timestamps.append(_parse_iso_datetime(guide.created_at))
+        for product in products:
+            timestamps.append(
+                max(
+                    _parse_iso_datetime(product.created_at),
+                    _parse_iso_datetime(product.updated_at),
+                )
             )
+        if timestamps:
+            last_updated = max(timestamps).isoformat()
         else:
             last_updated = datetime.now(timezone.utc).isoformat()
-        cards = []
-        for guide in guides[:12]:
+        sorted_guides = sorted(
+            guides,
+            key=lambda item: (
+                _parse_iso_datetime(item.created_at),
+                polish_guide_title(item.title).lower(),
+            ),
+            reverse=True,
+        )
+        guide_cards: list[str] = []
+        for index, guide in enumerate(sorted_guides):
             display_title = polish_guide_title(guide.title)
             first = guide.products[0] if guide.products else None
             teaser_source = first if first else guide
             teaser = blurb(teaser_source) if first else guide.description
             teaser = _strip_banned_phrases(teaser)
-            cards.append(
-                "<article class=\"card\">"
-                f"<h2><a href=\"/guides/{guide.slug}/\">{display_title}</a></h2>"
-                f"<p>{teaser}</p>"
-                f"<a class=\"button\" href=\"/guides/{guide.slug}/\">View guide</a>"
-                "</article>"
+            attrs = ['class="card"', 'data-home-guide-card="true"']
+            if index >= 5:
+                attrs.append('hidden')
+                attrs.append('data-home-guide-hidden="true"')
+            guide_cards.append(
+                '<article '
+                + ' '.join(attrs)
+                + '>'
+                + f'<h2><a href="/guides/{guide.slug}/">{display_title}</a></h2>'
+                + f'<p>{teaser}</p>'
+                + '</article>'
             )
-        cards_html = "\n".join(cards)
+        cards_html = "\n".join(guide_cards)
         home_description = _strip_banned_phrases(self.settings.description)
         hero_markup = [
             "<section class=\"hero\">",
@@ -380,31 +459,34 @@ class SiteGenerator:
         ]
         if home_description:
             hero_markup.append(f"<p>{home_description}</p>")
-        hero_markup.append(
-            "<div class=\"hero-actions\">"
-            "<a class=\"button\" href=\"/guides/\">Explore today's drops</a>"
-            "<a class=\"button button-secondary\" href=\"/surprise/\">Spin up a surprise</a>"
-            "<a class=\"button button-ghost\" href=\"/changelog/\">See the live changelog</a>"
-            "</div>"
+        hero_markup.extend(
+            [
+                "<div class=\"hero-actions\">",
+                "<a class=\"button\" href=\"/guides/\">Explore today's drops</a>",
+                "<a class=\"button button-secondary\" href=\"/surprise/\">Spin up a surprise</a>",
+                "<a class=\"button button-ghost\" href=\"/changelog/\">See the live changelog</a>",
+                "</div>",
+            ]
         )
         hero_markup.append("</section>")
         sections: List[str] = ["\n".join(hero_markup)]
         if cards_html:
-            sections.append(
-                "\n".join(
-                    [
-                        "<section id=\"guide-list\">",
-                        "<div class=\"page-header\">",
-                        "<h2>Today's drops</h2>",
-                        "<p>Browse the guides we refreshed for the latest grabgifts catalog.</p>",
-                        "</div>",
-                        "<div class=\"grid\">",
-                        cards_html,
-                        "</div>",
-                        "</section>",
-                    ]
+            guide_section_parts = [
+                '<section id="guide-list" data-home-guides>',
+                '<div class="page-header">',
+                "<h2>Today's drops</h2>",
+                '<p>Browse the guides refreshed for the latest grabgifts catalog.</p>',
+                '</div>',
+                '<div class="grid guide-grid">',
+                cards_html,
+                '</div>',
+            ]
+            if len(guide_cards) > 5:
+                guide_section_parts.append(
+                    '<button class="button" type="button" data-home-guide-toggle="true" aria-expanded="false">See more guides</button>'
                 )
-            )
+            guide_section_parts.append('</section>')
+            sections.append("\n".join(guide_section_parts))
         else:
             sections.append(
                 "\n".join(
@@ -418,6 +500,64 @@ class SiteGenerator:
                     ]
                 )
             )
+
+        product_cards_initial: list[str] = []
+        product_cards_remaining: list[str] = []
+        for product in sorted(
+            products,
+            key=lambda item: (
+                max(
+                    _parse_iso_datetime(item.created_at),
+                    _parse_iso_datetime(item.updated_at),
+                ),
+                item.title.lower() if item.title else "",
+            ),
+            reverse=True,
+        ):
+            card = self._product_preview_card(product)
+            if not card:
+                continue
+            if len(product_cards_initial) < 10:
+                product_cards_initial.append(card)
+            else:
+                product_cards_remaining.append(card)
+
+        if product_cards_initial:
+            product_section_parts = [
+                '<section class="feed-section" id="latest-products" data-home-products data-product-batch="6">',
+                '<div class="page-header">',
+                '<h2>Fresh product drops</h2>',
+                '<p>Catch the newest arrivals across the catalog.</p>',
+                '</div>',
+                '<div class="feed-list" data-product-grid>',
+                "\n".join(product_cards_initial),
+                '</div>',
+            ]
+            if product_cards_remaining:
+                product_section_parts.extend(
+                    [
+                        '<div class="feed-sentinel" data-product-sentinel></div>',
+                        '<script type="application/json" data-product-source>'
+                        + html_escape(json.dumps(product_cards_remaining))
+                        + '</script>',
+                    ]
+                )
+            product_section_parts.append('</section>')
+            sections.append("\n".join(product_section_parts))
+        else:
+            sections.append(
+                "\n".join(
+                    [
+                        '<section class="feed-section" id="latest-products">',
+                        '<div class="page-header">',
+                        '<h2>Fresh product drops</h2>',
+                        '<p>New arrivals will appear here soon.</p>',
+                        '</div>',
+                        '</section>',
+                    ]
+                )
+            )
+
         body = "\n".join(sections)
         html = self._render_document(
             page_title=self.settings.name,
