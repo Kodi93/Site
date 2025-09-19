@@ -33,44 +33,11 @@ CURRENCY_SYMBOL_BY_CODE = {code: symbol for symbol, code in PRICE_CURRENCY_SYMBO
 
 ASSETS_STYLES = """
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   --brand: #7f56d9;
   --brand-dark: #53389e;
   --accent: #f97316;
   --highlight: #12b76a;
-  --bg: #f5f3ff;
-  --bg-muted: #ebe4ff;
-  --text: #1f1147;
-  --muted: #5b4d87;
-  --muted-strong: #362a63;
-  --card: #ffffff;
-  --card-elevated: #f3ecff;
-  --card-sheen: rgba(255, 255, 255, 0.94);
-  --border: rgba(127, 86, 217, 0.14);
-  --border-strong: rgba(127, 86, 217, 0.26);
-  --overlay: rgba(127, 86, 217, 0.12);
-  --pill-bg: rgba(127, 86, 217, 0.14);
-  --pill-bg-hover: rgba(127, 86, 217, 0.24);
-  --badge-bg: rgba(18, 183, 106, 0.16);
-  --badge-color: #047857;
-  --price-bg: rgba(249, 115, 22, 0.16);
-  --rating-bg: rgba(18, 183, 106, 0.16);
-  --newsletter-bg: rgba(127, 86, 217, 0.1);
-  --newsletter-border: rgba(127, 86, 217, 0.28);
-  --input-bg: #ffffff;
-  --input-border: rgba(127, 86, 217, 0.24);
-  --shadow-soft: 0 18px 38px rgba(82, 39, 177, 0.12);
-  --shadow-card: 0 32px 70px rgba(82, 39, 177, 0.16);
-  --shadow-card-hover: 0 40px 90px rgba(82, 39, 177, 0.2);
-  --header-bg: rgba(255, 255, 255, 0.9);
-  --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(127, 86, 217, 0.16) 0%, rgba(249, 115, 22, 0.12) 45%, transparent 100%);
-  --theme-track: rgba(127, 86, 217, 0.28);
-  --theme-thumb: #ffffff;
-  font-family: 'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark light;
   --bg: #0f0a1e;
   --bg-muted: #16112d;
   --text: #f6f4ff;
@@ -97,8 +64,7 @@ ASSETS_STYLES = """
   --shadow-card-hover: 0 44px 94px rgba(5, 3, 12, 0.72);
   --header-bg: rgba(15, 10, 30, 0.92);
   --hero-glow: radial-gradient(120% 120% at 50% 0%, rgba(127, 86, 217, 0.32) 0%, rgba(249, 115, 22, 0.24) 45%, rgba(8, 6, 15, 0.92) 100%);
-  --theme-track: rgba(127, 86, 217, 0.42);
-  --theme-thumb: #1f1440;
+  font-family: 'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 html {
@@ -190,14 +156,9 @@ header {
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid rgba(127, 86, 217, 0.18);
-  box-shadow: 0 20px 44px rgba(82, 39, 177, 0.14);
-  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
-
-:root[data-theme='dark'] header {
+  border-bottom: 1px solid rgba(127, 86, 217, 0.32);
   box-shadow: 0 24px 54px rgba(5, 3, 12, 0.55);
-  border-color: rgba(127, 86, 217, 0.32);
+  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 nav {
@@ -369,8 +330,8 @@ nav {
   justify-content: flex-end;
   padding: 1rem 1.4rem;
   border-radius: 20px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(127, 86, 217, 0.28);
+  background: rgba(24, 18, 45, 0.82);
   box-shadow: var(--shadow-soft);
   justify-self: end;
 }
@@ -420,11 +381,6 @@ nav {
   transform: translateY(-1px);
 }
 
-:root[data-theme='dark'] .nav-groups {
-  background: rgba(24, 18, 45, 0.82);
-  border-color: rgba(127, 86, 217, 0.28);
-}
-
 .pill-link {
   display: inline-flex;
   align-items: center;
@@ -453,17 +409,11 @@ nav {
   align-items: center;
   gap: 0.35rem;
   padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  border: 1px solid rgba(127, 86, 217, 0.2);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(18px);
-}
-
-:root[data-theme='dark'] .search-form {
   background: rgba(24, 18, 45, 0.78);
-  border-color: rgba(249, 115, 22, 0.35);
+  border-radius: 999px;
+  border: 1px solid rgba(249, 115, 22, 0.35);
   box-shadow: 0 20px 42px rgba(5, 3, 12, 0.45);
+  backdrop-filter: blur(18px);
 }
 
 .search-form input {
@@ -532,111 +482,6 @@ nav {
   color: var(--muted);
 }
 
-.theme-toggle {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.theme-toggle-input {
-  position: absolute;
-  opacity: 0;
-  inset: 0;
-}
-
-.theme-toggle-label {
-  display: inline-grid;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: var(--shadow-soft);
-}
-
-:root[data-theme='dark'] .theme-toggle-label {
-  border-color: rgba(127, 86, 217, 0.32);
-  box-shadow: 0 18px 40px rgba(5, 3, 12, 0.45);
-}
-
-.theme-toggle-text {
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--muted);
-  transition: color 0.2s ease;
-}
-
-.theme-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  width: 18px;
-  height: 18px;
-  transition: color 0.2s ease, opacity 0.2s ease;
-  opacity: 0.45;
-}
-
-.theme-toggle-track {
-  position: relative;
-  width: 52px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--theme-track);
-  padding: 3px;
-  display: inline-flex;
-  align-items: center;
-  transition: background 0.25s ease, box-shadow 0.25s ease;
-}
-
-.theme-toggle-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--theme-thumb);
-  box-shadow: 0 4px 10px rgba(82, 39, 177, 0.25);
-  transform: translateX(0);
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
-}
-
-:root[data-theme='dark'] .theme-toggle-thumb {
-  box-shadow: 0 4px 14px rgba(5, 3, 12, 0.5);
-}
-
-.theme-toggle-input:checked + .theme-toggle-label {
-  border-color: rgba(127, 86, 217, 0.36);
-}
-
-.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-text {
-  color: var(--brand);
-}
-
-.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-track {
-  background: linear-gradient(135deg, var(--brand), var(--accent));
-  box-shadow: 0 14px 28px rgba(82, 39, 177, 0.28);
-}
-
-.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-thumb {
-  transform: translateX(26px);
-  box-shadow: 0 10px 20px rgba(82, 39, 177, 0.32);
-}
-
-.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon--moon,
-.theme-toggle-input:not(:checked) + .theme-toggle-label .theme-toggle-icon--sun {
-  color: var(--brand);
-  opacity: 1;
-}
-
-.theme-toggle-label:hover {
-  background: var(--overlay);
-}
-
 main {
   flex: 1;
   width: 100%;
@@ -664,15 +509,11 @@ main > section + section {
 
 .ad-rail {
   background: linear-gradient(180deg, var(--card-sheen) 0%, var(--card) 100%);
-  border: 1px solid rgba(127, 86, 217, 0.16);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 24px;
   box-shadow: var(--shadow-card);
   padding: 1.5rem;
   width: 100%;
-}
-
-:root[data-theme='dark'] .ad-rail {
-  border-color: rgba(249, 115, 22, 0.25);
 }
 
 .ad-rail-inner {
@@ -1055,9 +896,9 @@ main > section + section {
   gap: 0.4rem;
   padding: 1.15rem 1.25rem;
   border-radius: 20px;
-  border: 1px solid rgba(127, 86, 217, 0.18);
-  background: var(--card-sheen);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(127, 86, 217, 0.28);
+  background: rgba(24, 18, 45, 0.82);
+  box-shadow: 0 24px 52px rgba(5, 3, 12, 0.58);
 }
 
 .dashboard-card strong {
@@ -1078,12 +919,6 @@ main > section + section {
   text-transform: uppercase;
   color: var(--muted);
   font-weight: 600;
-}
-
-:root[data-theme='dark'] .dashboard-card {
-  background: rgba(24, 18, 45, 0.82);
-  border-color: rgba(127, 86, 217, 0.28);
-  box-shadow: 0 24px 52px rgba(5, 3, 12, 0.58);
 }
 
 .section-heading {
@@ -1132,14 +967,8 @@ main > section + section {
   gap: 0.75rem;
   padding: 0.6rem;
   border-radius: 999px;
-  background: var(--card-sheen);
-  border: 1px solid var(--border);
-  box-shadow: 0 14px 28px rgba(178, 46, 94, 0.12);
-}
-
-:root[data-theme='dark'] .feed-controls {
   background: rgba(36, 10, 44, 0.78);
-  border-color: rgba(249, 115, 22, 0.38);
+  border: 1px solid rgba(249, 115, 22, 0.38);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.45);
 }
 
@@ -1162,12 +991,8 @@ main > section + section {
 
 .feed-sort.is-active {
   background: linear-gradient(135deg, rgba(127, 86, 217, 0.22), rgba(249, 115, 22, 0.2));
-  color: var(--brand);
-  box-shadow: 0 18px 32px rgba(127, 86, 217, 0.24);
-}
-
-:root[data-theme='dark'] .feed-sort.is-active {
   color: var(--accent);
+  box-shadow: 0 18px 32px rgba(127, 86, 217, 0.24);
 }
 
 .feed-grid {
@@ -1290,11 +1115,7 @@ main > section + section {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   box-shadow: 0 12px 26px rgba(178, 46, 94, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-:root[data-theme='dark'] .card-badge {
-  border-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .card-content {
@@ -1323,13 +1144,9 @@ main > section + section {
   text-transform: uppercase;
   color: var(--muted);
   background: var(--pill-bg);
-  border: 1px solid rgba(127, 86, 217, 0.18);
+  border: 1px solid rgba(249, 115, 22, 0.28);
   border-radius: 999px;
   padding: 0.35rem 0.75rem;
-}
-
-:root[data-theme='dark'] .card-ad-label {
-  border-color: rgba(249, 115, 22, 0.28);
 }
 
 .card-content h3 {
@@ -1765,24 +1582,14 @@ main > section + section {
   gap: 0.25rem;
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(127, 86, 217, 0.18);
+  background: rgba(42, 12, 50, 0.72);
+  border: 1px solid rgba(249, 115, 22, 0.32);
   color: var(--accent);
   font-weight: 500;
   cursor: pointer;
 }
 
 .share-copy {
-  background: rgba(127, 86, 217, 0.08);
-}
-
-:root[data-theme='dark'] .share-links a,
-:root[data-theme='dark'] .share-copy {
-  background: rgba(42, 12, 50, 0.72);
-  border-color: rgba(249, 115, 22, 0.32);
-}
-
-:root[data-theme='dark'] .share-copy {
   background: rgba(127, 86, 217, 0.25);
 }
 
@@ -1933,12 +1740,8 @@ footer {
   text-align: center;
   color: var(--muted);
   font-size: 0.92rem;
-  background: linear-gradient(180deg, rgba(127, 86, 217, 0.08), transparent 45%, rgba(249, 115, 22, 0.08));
-  transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
-}
-
-:root[data-theme='dark'] footer {
   background: linear-gradient(180deg, rgba(12, 15, 34, 0.65), rgba(127, 86, 217, 0.22));
+  transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
 }
 
 .footer-links {
@@ -2047,11 +1850,6 @@ footer {
   .search-form input {
     min-width: 0;
     flex: 1;
-  }
-
-  .theme-toggle-label {
-    justify-content: space-between;
-    width: 100%;
   }
 
   .feed-header {
@@ -2363,23 +2161,8 @@ class SiteGenerator:
             "</button>"
             "</form>"
         )
-        theme_toggle = (
-            "<div class=\"theme-toggle\">"
-            "<input class=\"theme-toggle-input\" type=\"checkbox\" id=\"theme-switch\" role=\"switch\" aria-label=\"Toggle dark mode\" aria-checked=\"false\" />"
-            "<label class=\"theme-toggle-label\" for=\"theme-switch\">"
-            "<span class=\"theme-toggle-text\">Theme</span>"
-            "<span class=\"theme-toggle-icon theme-toggle-icon--sun\" aria-hidden=\"true\">"
-            "<svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"></circle><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"></line><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"></line><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"></line><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"></line><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"></line><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"></line><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"></line><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"></line></svg>"
-            "</span>"
-            "<span class=\"theme-toggle-track\" aria-hidden=\"true\"><span class=\"theme-toggle-thumb\"></span></span>"
-            "<span class=\"theme-toggle-icon theme-toggle-icon--moon\" aria-hidden=\"true\">"
-            "<svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12.79A9 9 0 0 1 11.21 3 7 7 0 0 0 12 21a9 9 0 0 0 9-8.21z\"></path></svg>"
-            "</span>"
-            "</label>"
-            "</div>"
-        )
         nav_actions_html = " ".join(
-            part for part in [theme_toggle, " ".join(nav_action_links), search_form] if part
+            part for part in [" ".join(nav_action_links), search_form] if part
         )
         keywords_meta = ""
         if getattr(self.settings, "keywords", ()):  # type: ignore[attr-defined]
@@ -2398,23 +2181,6 @@ class SiteGenerator:
             favicon_link = (
                 f'<link rel="icon" href="{html.escape(self.settings.favicon_url)}" />'
             )
-        theme_bootstrap = (
-            "<script>"
-            "(function(){"
-            "var storageKey='grabgifts-theme';"
-            "var root=document.documentElement;"
-            "if(!root){return;}"
-            "var stored=null;"
-            "try{stored=window.localStorage.getItem(storageKey);}catch(error){stored=null;}"
-            "var theme=stored;"
-            "if(theme!=='light'&&theme!=='dark'){"
-            "var media=window.matchMedia('(prefers-color-scheme: dark)');"
-            "theme=media&&media.matches?'dark':'light';"
-            "}"
-            "root.setAttribute('data-theme', theme||'light');"
-            "})();"
-            "</script>"
-        )
         og_image_meta = ""
         if context.og_image:
             image = html.escape(context.og_image)
@@ -2516,7 +2282,7 @@ class SiteGenerator:
         if footer_links_parts:
             footer_links = f"<div class=\"footer-links\">{' '.join(footer_links_parts)}</div>"
         return f"""<!DOCTYPE html>
-<html lang=\"{language}\" data-theme=\"light\">
+<html lang=\"{language}\" data-theme=\"dark\">
   <head>
     <meta charset=\"utf-8\" />
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
@@ -2525,7 +2291,6 @@ class SiteGenerator:
     {robots_meta}
     <link rel=\"canonical\" href=\"{canonical}\" />
     {feed_link}
-    {theme_bootstrap}
     <link rel=\"stylesheet\" href=\"/assets/styles.css\" />
     {favicon_link}
     {adsense}{analytics_block}
@@ -2570,68 +2335,10 @@ class SiteGenerator:
     </footer>
     <script>
       (function() {{
-        var storageKey = 'grabgifts-theme';
         var root = document.documentElement;
-        var toggle = document.getElementById('theme-switch');
-        var mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        function setToggleState(theme) {{
-          if (!toggle) {{
-            return;
-          }}
-          var isDark = theme === 'dark';
-          toggle.checked = isDark;
-          toggle.setAttribute('aria-checked', String(isDark));
+        if (root) {{
+          root.setAttribute('data-theme', 'dark');
         }}
-
-        function applyTheme(next) {{
-          var theme = next === 'dark' ? 'dark' : 'light';
-          root.setAttribute('data-theme', theme);
-          setToggleState(theme);
-        }}
-
-        function readPreference() {{
-          try {{
-            return window.localStorage.getItem(storageKey);
-          }} catch (error) {{
-            return null;
-          }}
-        }}
-
-        function storePreference(value) {{
-          try {{
-            window.localStorage.setItem(storageKey, value);
-          }} catch (error) {{
-            return;
-          }}
-        }}
-
-        var saved = readPreference();
-        if (saved === 'dark' || saved === 'light') {{
-          applyTheme(saved);
-        }} else {{
-          applyTheme(mediaQuery.matches ? 'dark' : 'light');
-        }}
-
-        mediaQuery.addEventListener('change', function (event) {{
-          if (!readPreference()) {{
-            applyTheme(event.matches ? 'dark' : 'light');
-          }}
-        }});
-
-        if (toggle) {{
-          toggle.addEventListener('change', function (event) {{
-            var mode = event.target.checked ? 'dark' : 'light';
-            applyTheme(mode);
-            storePreference(mode);
-          }});
-        }}
-
-        window.addEventListener('storage', function (event) {{
-          if (event.key === storageKey) {{
-            applyTheme(event.newValue === 'dark' ? 'dark' : 'light');
-          }}
-        }});
 
         var nav = document.querySelector('[data-nav]');
         var navToggle = document.querySelector('[data-nav-toggle]');
