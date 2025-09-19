@@ -122,65 +122,95 @@ class Product:
 
         self.updated_at = timestamp()
 
-    def record_price(self, price: str | None) -> None:
-        """Append a price snapshot to the history if it changed."""
+    def record_price(self, price: str | None) -> bool:
+        """Append a price snapshot to the history when it changes.
 
+        Returns ``True`` when the captured price differs from the previous
+        snapshot. Callers can use this to decide whether ``updated_at`` should
+        be refreshed.
+        """
+
+        changed = price != self.price
         self.price = price
         parsed = parse_price_string(price)
         if parsed is None:
-            return
+            return changed
         value, currency = parsed
         value = round(value, 2)
         if self.price_history:
             last = self.price_history[-1]
             if abs(last.amount - value) < 0.01 and last.currency == currency:
-                last.display = price or last.display
+                display = price or last.display
+                if display != last.display:
+                    last.display = display
+                    changed = True
                 last.captured_at = timestamp()
-                self.touch()
-                return
+                return changed
         self.price_history.append(
             PricePoint(amount=value, currency=currency, display=price or "")
         )
-        self.touch()
+        return True
 
     def merge_from(self, other: "Product") -> None:
         """Merge updated fields and price history from another product."""
 
-        if other.title:
+        changed = False
+        if other.title and other.title != self.title:
             self.title = other.title
-        if other.link:
+            changed = True
+        if other.link and other.link != self.link:
             self.link = other.link
-        if other.image:
+            changed = True
+        if other.image and other.image != self.image:
             self.image = other.image
-        if other.price is not None:
-            self.record_price(other.price)
-        if other.rating is not None:
+            changed = True
+        if other.price is not None and self.record_price(other.price):
+            changed = True
+        if other.rating is not None and other.rating != self.rating:
             self.rating = other.rating
-        if other.total_reviews is not None:
+            changed = True
+        if (
+            other.total_reviews is not None
+            and other.total_reviews != self.total_reviews
+        ):
             self.total_reviews = other.total_reviews
-        if other.summary:
+            changed = True
+        if other.summary and other.summary != self.summary:
             self.summary = other.summary
-        if other.blog_content:
+            changed = True
+        if other.blog_content and other.blog_content != self.blog_content:
             self.blog_content = other.blog_content
-        if other.brand:
+            changed = True
+        if other.brand and other.brand != self.brand:
             self.brand = other.brand
-        if other.retailer_slug:
+            changed = True
+        if other.retailer_slug and other.retailer_slug != self.retailer_slug:
             self.retailer_slug = other.retailer_slug
-        if other.retailer_name:
+            changed = True
+        if other.retailer_name and other.retailer_name != self.retailer_name:
             self.retailer_name = other.retailer_name
-        if other.retailer_homepage:
+            changed = True
+        if (
+            other.retailer_homepage
+            and other.retailer_homepage != self.retailer_homepage
+        ):
             self.retailer_homepage = other.retailer_homepage
-        if other.call_to_action:
+            changed = True
+        if other.call_to_action and other.call_to_action != self.call_to_action:
             self.call_to_action = other.call_to_action
-        if other.click_count is not None:
+            changed = True
+        if other.click_count is not None and other.click_count != self.click_count:
             self.click_count = other.click_count
+            changed = True
         combined_keywords: List[str] = []
         for keyword in list(self.keywords) + list(other.keywords):
             if keyword and keyword not in combined_keywords:
                 combined_keywords.append(keyword)
-        if combined_keywords:
+        if combined_keywords and combined_keywords != self.keywords:
             self.keywords = combined_keywords
-        self.touch()
+            changed = True
+        if changed:
+            self.touch()
 
     @property
     def latest_price_point(self) -> PricePoint | None:
