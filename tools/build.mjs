@@ -246,7 +246,7 @@ function formatGuideDate(value) {
 
 function renderGuideCard(item) {
   if (!item.image) return "";
-  const parts = ["<li class=\"card\">"];
+  const parts = ['<article class="card">'];
   parts.push(
     `<a href=\"${escapeHtml(item.url)}\" rel=\"sponsored nofollow noopener\" target=\"_blank\">`,
   );
@@ -257,7 +257,8 @@ function renderGuideCard(item) {
   if (item.price) {
     parts.push(`<p class=\"price\">${escapeHtml(item.price)}</p>`);
   }
-  parts.push("</a></li>");
+  parts.push("</a>");
+  parts.push("</article>");
   return parts.join("");
 }
 
@@ -288,38 +289,47 @@ function renderFeedItem(item) {
     .join("\n");
 }
 
-function renderGuidePreview(guide) {
-  const summary = guide.summary
-    ? escapeHtml(stripBannedPhrases(guide.summary))
-    : "Explore thoughtful ideas for every list.";
-  const title = polishGuideTitle(guide.title);
-  const timestamp = guide.createdAt ? parseTimestamp(guide.createdAt) : 0;
-  const isoDate = timestamp ? new Date(timestamp).toISOString() : "";
-  const published = timestamp ? formatGuideDate(guide.createdAt) : "";
-  const meta =
-    isoDate && published
-      ? `<p class=\"guide-card-meta\"><time datetime=\"${escapeHtml(isoDate)}\">${escapeHtml(published)}</time></p>`
-      : "";
+function renderProductPreviewCard(item) {
+  if (!item || !item.title || !item.url || !item.image) return "";
+  const metaParts = [];
+  const category = formatCategory(item);
+  if (category) metaParts.push(escapeHtml(category));
+  if (item.brand) metaParts.push(escapeHtml(item.brand));
+  const meta = metaParts.length
+    ? `<p class=\"feed-card-meta\">${metaParts.join(" • ")}</p>`
+    : "";
+  const price = item.price ? `<p class=\"feed-card-price\">${escapeHtml(item.price)}</p>` : "";
   return [
-    '<li class="card guide-card">',
-    `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
+    '<article class="feed-card" data-home-product-card="true">',
+    `<a class=\"feed-card-link\" href=\"${escapeHtml(item.url)}\" rel=\"sponsored nofollow noopener\" target=\"_blank\">`,
+    `<div class=\"feed-card-media\"><img src=\"${escapeHtml(item.image)}\" alt=\"${escapeHtml(item.title)}\" loading=\"lazy\"></div>`,
+    '<div class="feed-card-body">',
     meta,
-    `<h3>${escapeHtml(title)}</h3>`,
-    `<p>${summary}</p>`,
-    "</a>",
-    "</li>",
-  ].join("\n");
+    `<h3 class=\"feed-card-title\">${escapeHtml(item.title)}</h3>`,
+    price,
+    '</div>',
+    '</a>',
+    '</article>',
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-function renderGuidePage(title, slug, items) {
+function renderGuidePage(title, slug, items, summary) {
   const polishedTitle = polishGuideTitle(title);
+  const description = stripBannedPhrases(summary || `Explore curated picks for ${polishedTitle}.`);
   const cards = items
     .map((item) => renderGuideCard(item))
     .filter(Boolean)
     .join("\n");
-  const sections = [`<h1>${escapeHtml(polishedTitle)}</h1>`];
+  const sections = [
+    '<section class="page-header">',
+    `<h1>${escapeHtml(polishedTitle)}</h1>`,
+    `<p>${escapeHtml(description)}</p>`,
+    '</section>',
+  ];
   if (cards) {
-    sections.push(`<ol class=\"grid\">${cards}</ol>`);
+    sections.push(`<div class=\"grid\">${cards}</div>`);
   } else {
     sections.push("<p>No items are available for this guide right now.</p>");
   }
@@ -398,52 +408,115 @@ function writeFeedData(items) {
   };
 }
 
-function renderHomePage(recentGuides, feed) {
+function renderHomePage(guides, feed, products) {
   const hero = ['<section class="hero">', `<h1>${escapeHtml(SITE_NAME)}</h1>`];
   const description = stripBannedPhrases(SITE_DESCRIPTION);
   if (description) {
     hero.push(`<p>${escapeHtml(description)}</p>`);
   }
-  const hasFeed = Array.isArray(feed?.modes) && feed.modes.some((mode) => mode.totalItems > 0);
-  const heroActions = [];
-  if (recentGuides.length) {
-    heroActions.push('<a class="button" href="#guides">Catch this week\'s guides</a>');
-  }
-  if (hasFeed) {
-    heroActions.push('<a class="button button-secondary" href="#latest">Scroll the gift feed</a>');
-  }
-  heroActions.push('<a class="button button-ghost" href="/guides/">View all guides</a>');
-  if (heroActions.length) {
-    hero.push('<div class="hero-actions">');
-    hero.push(heroActions.join('\n'));
-    hero.push('</div>');
-  }
+  hero.push('<div class="hero-actions">');
+  hero.push('<a class="button" href="/guides/">Explore today\'s drops</a>');
+  hero.push('<a class="button button-secondary" href="/surprise/">Spin up a surprise</a>');
+  hero.push('<a class="button button-ghost" href="/changelog/">See the live changelog</a>');
+  hero.push('</div>');
   hero.push('</section>');
   const heroMarkup = hero.filter(Boolean).join('\n');
 
-  const guideCards = recentGuides
-    .map((guide) => renderGuidePreview(guide))
-    .filter(Boolean)
-    .join('\n');
+  const sortedGuides = Array.isArray(guides) ? guides.slice() : [];
+  sortedGuides.sort((a, b) => {
+    const diff = parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt);
+    if (diff !== 0) return diff;
+    return (polishGuideTitle(a.title) || '').localeCompare(polishGuideTitle(b.title) || '');
+  });
+  const guideCards = [];
+  sortedGuides.forEach((guide, index) => {
+    if (!guide || !guide.slug || !guide.title) return;
+    const attrs = ['class="card"', 'data-home-guide-card="true"'];
+    if (index >= 5) {
+      attrs.push('hidden');
+      attrs.push('data-home-guide-hidden="true"');
+    }
+    const title = polishGuideTitle(guide.title);
+    const teaser = stripBannedPhrases(
+      guide.summary || `Dive into the latest ${title} recommendations.`,
+    );
+    guideCards.push(
+      `<article ${attrs.join(' ')}>` +
+        `<h2><a href=\"/guides/${escapeHtml(guide.slug)}/\">${escapeHtml(title)}</a></h2>` +
+        `<p>${escapeHtml(teaser)}</p>` +
+        '</article>',
+    );
+  });
   const guidesSectionParts = [
-    '<section class="feed-section" id="guides">',
-    '<div class="feed-header">',
-    "<h2>This week\'s guides</h2>",
-    "<p>Catch up on everything we published across the last seven days.</p>",
+    '<section id="guide-list" data-home-guides>',
+    '<div class="page-header">',
+    "<h2>Today's drops</h2>",
+    '<p>Browse the guides refreshed for the latest grabgifts catalog.</p>',
     '</div>',
   ];
-  if (guideCards) {
-    guidesSectionParts.push(`<ol class="grid guide-grid">${guideCards}</ol>`);
+  if (guideCards.length) {
+    guidesSectionParts.push('<div class="grid guide-grid">');
+    guidesSectionParts.push(guideCards.join('\n'));
+    guidesSectionParts.push('</div>');
+    if (guideCards.length > 5) {
+      guidesSectionParts.push(
+        '<button class="button" type="button" data-home-guide-toggle="true" aria-expanded="false">See more guides</button>',
+      );
+    }
   } else {
-    guidesSectionParts.push(
-      '<p class="feed-empty">Our next guides are publishing soon. Check back tomorrow for fresh picks.</p>',
-    );
+    guidesSectionParts.push('<p>Guides are being prepared. Check back soon.</p>');
   }
-  guidesSectionParts.push(
-    '<div class="hero-actions"><a class="button button-ghost" href="/guides/">Browse every guide</a></div>',
-  );
   guidesSectionParts.push('</section>');
   const guidesSection = guidesSectionParts.join('\n');
+
+  const sortedProducts = Array.isArray(products) ? products.slice() : [];
+  sortedProducts.sort((a, b) => {
+    const diff = parseTimestamp(b.updated_at || b.updatedAt) - parseTimestamp(a.updated_at || a.updatedAt);
+    if (diff !== 0) return diff;
+    return (a.title || '').localeCompare(b.title || '');
+  });
+  const productInitial = [];
+  const productRemaining = [];
+  sortedProducts.forEach((item) => {
+    const card = renderProductPreviewCard(item);
+    if (!card) return;
+    if (productInitial.length < 10) {
+      productInitial.push(card);
+    } else {
+      productRemaining.push(card);
+    }
+  });
+
+  let productSection = '';
+  if (productInitial.length) {
+    const sectionParts = [
+      '<section class="feed-section" id="latest-products" data-home-products data-product-batch="6">',
+      '<div class="page-header">',
+      '<h2>Fresh product drops</h2>',
+      '<p>Catch the newest arrivals across the catalog.</p>',
+      '</div>',
+      `<div class="feed-list" data-product-grid>${productInitial.join('\n')}</div>`,
+    ];
+    if (productRemaining.length) {
+      sectionParts.push('<div class="feed-sentinel" data-product-sentinel></div>');
+      sectionParts.push(
+        '<script type="application/json" data-product-source>' +
+          escapeHtml(JSON.stringify(productRemaining)) +
+          '</script>',
+      );
+    }
+    sectionParts.push('</section>');
+    productSection = sectionParts.join('\n');
+  } else {
+    productSection = [
+      '<section class="feed-section" id="latest-products">',
+      '<div class="page-header">',
+      '<h2>Fresh product drops</h2>',
+      '<p>New arrivals will appear here soon.</p>',
+      '</div>',
+      '</section>',
+    ].join('\n');
+  }
 
   let feedSection = '';
   if (Array.isArray(feed?.modes) && feed.modes.length) {
@@ -541,17 +614,135 @@ function renderHomePage(recentGuides, feed) {
       .join('\n');
   }
 
-  const content = [heroMarkup, guidesSection, feedSection].filter(Boolean).join('\n');
+  const content = [heroMarkup, guidesSection, productSection, feedSection].filter(Boolean).join('\n');
   return renderWithBase(content);
 }
 
 function renderFaqPage() {
   const body = [
-    "<h1>Affiliate disclosure</h1>",
-    "<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>",
-    "<p>Questions? Contact us at support@grabgifts.net.</p>",
+    '<section class="page-header">',
+    '<h1>FAQ &amp; disclosure</h1>',
+    '<p>Learn how grabgifts curates daily picks and how affiliate links support the project.</p>',
+    '</section>',
+    '<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>',
+    '<p>Questions? Contact us at <a href="mailto:support@grabgifts.net">support@grabgifts.net</a>.</p>',
   ];
-  return renderWithBase(body.join("\n"));
+  return renderWithBase(body.join('\n'));
+}
+
+function renderGuidesIndexPage(guides) {
+  const header = [
+    '<section class="page-header">',
+    '<h1>All guides</h1>',
+    '<p>Every grabgifts collection in one place.</p>',
+    '</section>',
+  ];
+  const sorted = Array.isArray(guides) ? guides.slice() : [];
+  sorted.sort((a, b) => {
+    return (polishGuideTitle(a.title) || '').localeCompare(polishGuideTitle(b.title) || '');
+  });
+  const cards = sorted
+    .filter((guide) => guide && guide.slug && guide.title)
+    .map((guide) => {
+      const title = polishGuideTitle(guide.title);
+      const teaser = stripBannedPhrases(
+        guide.summary || `Explore what made ${title} trend on grabgifts.`,
+      );
+      return (
+        '<article class="card">' +
+        `<h2><a href=\"/guides/${escapeHtml(guide.slug)}/\">${escapeHtml(title)}</a></h2>` +
+        `<p>${escapeHtml(teaser)}</p>` +
+        '</article>'
+      );
+    });
+  const body = header.slice();
+  if (cards.length) {
+    body.push('<div class="grid">');
+    body.push(cards.join('\n'));
+    body.push('</div>');
+  } else {
+    body.push('<p>No guides are available right now.</p>');
+  }
+  return renderWithBase(body.join('\n'));
+}
+
+function renderSurprisePage(guides) {
+  const header = [
+    '<section class="page-header">',
+    '<h1>Spin up a surprise</h1>',
+    '<p>We send you to a random guide from today\'s drops.</p>',
+    '</section>',
+  ];
+  const entries = Array.isArray(guides) ? guides.filter((guide) => guide && guide.slug) : [];
+  const links = entries.map((guide) => ({
+    url: `/guides/${guide.slug}/`,
+    title: polishGuideTitle(guide.title),
+  }));
+  const body = header.slice();
+  if (links.length) {
+    const urls = links.map((entry) => entry.url);
+    body.push("<p>Hold tight—we're picking something for you.</p>");
+    body.push(
+      `<script>const guides = ${escapeHtml(JSON.stringify(urls))};if(guides.length){const target = guides[Math.floor(Math.random()*guides.length)];window.location.href = target;}</script>`,
+    );
+    const listItems = links
+      .map((entry) => `<li><a href=\"${escapeHtml(entry.url)}\">${escapeHtml(entry.title)}</a></li>`)
+      .join('');
+    body.push(
+      `<noscript><p>Enable JavaScript to jump automatically. Until then, pick a guide below.</p><ul class=\"link-list\">${listItems}</ul></noscript>`,
+    );
+  } else {
+    body.push('<p>No guides are available right now. Check back soon.</p>');
+  }
+  return renderWithBase(body.join('\n'));
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatTimelineLabel(value) {
+  const timestamp = parseTimestamp(value);
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const month = MONTH_NAMES[date.getUTCMonth()] || '';
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${month} ${day}, ${year} ${hours}:${minutes} UTC`;
+}
+
+function renderChangelogPage(guides) {
+  const header = [
+    '<section class="page-header">',
+    '<h1>Live changelog</h1>',
+    '<p>Follow every update we push into grabgifts.</p>',
+    '</section>',
+  ];
+  const entries = Array.isArray(guides) ? guides.slice() : [];
+  entries.sort((a, b) => parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt));
+  const items = entries
+    .filter((guide) => guide && guide.slug && guide.title)
+    .map((guide) => {
+      const timestamp = parseTimestamp(guide.createdAt);
+      const iso = timestamp ? new Date(timestamp).toISOString() : '';
+      const label = formatTimelineLabel(guide.createdAt);
+      const title = polishGuideTitle(guide.title);
+      return (
+        '<li>' +
+        `<time datetime=\"${escapeHtml(iso)}\">${escapeHtml(label)}</time>` +
+        `<a href=\"/guides/${escapeHtml(guide.slug)}/\">${escapeHtml(title)}</a>` +
+        '</li>'
+      );
+    });
+  const body = header.slice();
+  if (items.length) {
+    body.push('<ul class="timeline">');
+    body.push(items.join('\n'));
+    body.push('</ul>');
+  } else {
+    body.push('<p>No updates yet. Check back soon.</p>');
+  }
+  return renderWithBase(body.join('\n'));
 }
 
 function filterByTopic(title, items) {
@@ -587,9 +778,11 @@ function main() {
     const picksWithImages = picks.filter((item) => item.image);
     if (picksWithImages.length < 10) continue;
     const polishedTitle = polishGuideTitle(title);
-    const html = renderGuidePage(polishedTitle, slug, picksWithImages);
+    const summary = stripBannedPhrases(
+      picksWithImages[0]?.title || `Top picks for ${polishedTitle}`,
+    );
+    const html = renderGuidePage(polishedTitle, slug, picksWithImages, summary);
     writeFile(path.join(PUB, "guides", slug, "index.html"), html);
-    const summary = stripBannedPhrases(picksWithImages[0]?.title || `Top picks for ${polishedTitle}`);
     ledgerMap.set(slug, {
       title: polishedTitle,
       slug,
@@ -617,8 +810,14 @@ function main() {
   const guidesForDisplay = guidesFallback.slice(0, 12);
 
   const feedState = writeFeedData(items);
-  const homeHtml = renderHomePage(guidesForDisplay, feedState);
+  const homeHtml = renderHomePage(guidesForDisplay, feedState, items);
   writeFile(path.join(PUB, "index.html"), homeHtml);
+  const guidesIndexHtml = renderGuidesIndexPage(trimmedLedger);
+  writeFile(path.join(PUB, "guides", "index.html"), guidesIndexHtml);
+  const surpriseHtml = renderSurprisePage(trimmedLedger);
+  writeFile(path.join(PUB, "surprise", "index.html"), surpriseHtml);
+  const changelogHtml = renderChangelogPage(trimmedLedger);
+  writeFile(path.join(PUB, "changelog", "index.html"), changelogHtml);
   const faqHtml = renderFaqPage();
   writeFile(path.join(PUB, "faq", "index.html"), faqHtml);
 
