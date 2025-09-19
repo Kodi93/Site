@@ -199,8 +199,12 @@ def title_roundup(topic: str, cap: int) -> str:
 
 def desc_roundup(topic: str, cap: int) -> str:
     copy = clean_text(
-        f"Ten {topic} under ${cap}. Curated picks with quick blurbs and retailer search links."
+        f"Ten {topic} under ${cap}. Quick blurbs, highlight notes, and Amazon search links help you compare prices and pick a thoughtful gift without endless scrolling."
     )
+    if len(copy) < 140:
+        copy = clean_text(
+            f"{copy} Explore the shortlist for context, trade-offs, and a fast price check."
+        )
     return clamp(copy, 155)
 
 
@@ -208,7 +212,8 @@ def intro_roundup(topic: str, cap: int) -> str:
     topic_clean = clean_text(topic)
     return (
         f"Looking for {topic_clean.lower()} under ${cap}? "
-        "Here are ten solid ideas with quick blurbs and links to check current prices."
+        "This shortlist spotlights ten practical picks with quick blurbs and an Amazon search link so you can confirm today's price. "
+        "We may earn a commission from qualifying purchases."
     )
 
 

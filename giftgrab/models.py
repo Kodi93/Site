@@ -543,5 +543,10 @@ class RoundupArticle:
         for item in self.items:
             summary = item.summary.strip()
             sections.append(f"{item.rank}. **{item.title}** — {summary}")
-        sections.append(f"Amazon searches: {self.amazon_search_url}")
+        disclosure = (
+            "_Affiliate disclosure: We may earn commission from Amazon links at no extra cost to you._"
+        )
+        sections.append(
+            f"Amazon searches: {self.amazon_search_url}\n\n{disclosure}"
+        )
         return "\n\n".join(section for section in sections if section).strip()
