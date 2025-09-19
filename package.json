@@ -4,21 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run guard:dedupe && npm run generate:sitemap && npm run compile && npm run copy:public",
-    "compile": "tsc --project tsconfig.json",
-    "generate:sitemap": "node ./scripts/build-sitemap.mjs",
-    "guard:dedupe": "node ./scripts/guard-dedupe.mjs",
-    "copy:public": "node ./scripts/copy-public.mjs"
+    "update": "node tools/update.mjs",
+    "build": "node tools/build.mjs && node tools/sitemap.mjs",
+    "check": "node tools/check.mjs"
   },
   "dependencies": {
-    "@netlify/functions": "^2.0.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "fast-xml-parser": "^4.3.5",
+    "nanoid": "^5.0.6",
+    "node-fetch": "^3.3.2",
+    "slugify": "^1.6.6"
   },
   "devDependencies": {
-    "@types/node": "^20.12.7",
-    "@types/react": "^18.2.74",
-    "@types/react-dom": "^18.2.24",
-    "typescript": "^5.4.5"
+    "eslint": "^9.5.0"
   }
 }

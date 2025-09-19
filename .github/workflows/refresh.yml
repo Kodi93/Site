@@ -1,0 +1,28 @@
+name: Refresh content
+on:
+  schedule: [{ cron: "13 10 * * *" }]   # 10:13 America/New_York
+  workflow_dispatch:
+jobs:
+  build_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm run update
+        env:
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_SCOPE: https://api.ebay.com/oauth/api_scope
+          AMZ_ACCESS_KEY: ${{ secrets.AMZ_ACCESS_KEY }}
+          AMZ_SECRET_KEY: ${{ secrets.AMZ_SECRET_KEY }}
+          AMZ_PARTNER_TAG: kayce25-20
+      - run: npm run build
+      - run: npm run check
+      - uses: nwtgck/actions-netlify@v2
+        with:
+          publish-dir: ./public
+          production-deploy: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
