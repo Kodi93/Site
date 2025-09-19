@@ -5,9 +5,9 @@ import { priceNumber } from "./util.mjs";
 
 const IN = path.join("data", "items.json");
 const PUB = "public";
-const SITE_NAME = "GrabGifts";
+const SITE_NAME = "grabgifts";
 const SITE_DESCRIPTION =
-  "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter.";
+  "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation. Launch scroll-stopping gift funnels that convert on autopilot.";
 
 const BASE_TEMPLATE_PATH = path.join("templates", "base.html");
 const HEADER_PATH = path.join("templates", "partials", "header.html");
