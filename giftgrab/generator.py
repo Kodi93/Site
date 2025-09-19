@@ -183,10 +183,14 @@ def load_settings() -> SiteSettings:
         description=_env(
             "SITE_DESCRIPTION",
             (
-                "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter."
+                "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation. "
+                "Launch scroll-stopping gift funnels that convert on autopilot."
             ),
         )
-        or "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter.",
+        or (
+            "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation. "
+            "Launch scroll-stopping gift funnels that convert on autopilot."
+        ),
         logo_url=_env("SITE_LOGO_URL"),
         twitter=_env("SITE_TWITTER"),
         facebook=_env("SITE_FACEBOOK"),

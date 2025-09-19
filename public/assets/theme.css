@@ -1,7 +1,7 @@
 :root {
-  --bg-start: #16062c;
-  --bg-mid: #571362;
-  --bg-end: #05030d;
+  --bg-start: #2a0c6a;
+  --bg-mid: #9b0f62;
+  --bg-end: #0a0810;
   --bg-aurora-1: rgba(136, 88, 255, 0.55);
   --bg-aurora-2: rgba(255, 106, 207, 0.52);
   --bg-aurora-3: rgba(74, 213, 255, 0.32);
@@ -31,7 +31,7 @@ body {
   font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 16px;
   line-height: 1.6;
-  background: linear-gradient(180deg, rgba(22, 6, 44, 0.98) 0%, rgba(31, 9, 55, 0.92) 55%, var(--bg-end) 100%);
+  background: linear-gradient(180deg, rgba(42, 12, 106, 0.96) 0%, rgba(155, 15, 98, 0.88) 55%, var(--bg-end) 100%);
   background-color: var(--bg-end);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;

@@ -18,7 +18,8 @@ class SiteSettings:
     site_name: str = "Grab Gifts"
     base_url: str = "https://grabgifts.net"
     description: str = (
-        "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation."
+        "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play affiliate automation. "
+        "Launch scroll-stopping gift funnels that convert on autopilot."
     )
     adsense_client_id: str | None = None
     adsense_slot: str | None = None
