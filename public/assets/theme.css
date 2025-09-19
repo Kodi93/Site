@@ -1,7 +1,11 @@
 :root {
-  --bg-start: #2a0c6a;
-  --bg-mid: #9b0f62;
-  --bg-end: #0a0810;
+  --bg-start: #16062c;
+  --bg-mid: #571362;
+  --bg-end: #05030d;
+  --bg-aurora-1: rgba(136, 88, 255, 0.55);
+  --bg-aurora-2: rgba(255, 106, 207, 0.52);
+  --bg-aurora-3: rgba(74, 213, 255, 0.32);
+  --bg-aurora-shadow: rgba(10, 6, 24, 0.94);
   --fg: #f7f1ff;
   --muted: #c9bcde;
   --card: rgba(20, 10, 34, 0.85);
@@ -27,13 +31,14 @@ body {
   font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 16px;
   line-height: 1.6;
-  background:
-    radial-gradient(120% 95% at 10% 0%, rgba(42, 12, 106, 0.85) 0%, rgba(10, 8, 16, 0) 65%),
-    radial-gradient(100% 85% at 90% 5%, rgba(155, 15, 98, 0.85) 0%, rgba(10, 8, 16, 0) 70%),
-    linear-gradient(180deg, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);
+  background: linear-gradient(180deg, rgba(22, 6, 44, 0.98) 0%, rgba(31, 9, 55, 0.92) 55%, var(--bg-end) 100%);
+  background-color: var(--bg-end);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
+  position: relative;
+  z-index: 0;
+  overflow-x: hidden;
 }
 
 body::before {
@@ -46,6 +51,52 @@ body::before {
   pointer-events: none;
   transition: opacity 0.25s ease;
   z-index: 90;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: -25vh -20vw -20vh;
+  background:
+    radial-gradient(80% 90% at 12% 16%, var(--bg-aurora-3) 0%, transparent 68%),
+    radial-gradient(65% 75% at 18% 18%, var(--bg-aurora-1) 0%, transparent 68%),
+    radial-gradient(70% 80% at 82% 20%, var(--bg-aurora-2) 0%, transparent 70%),
+    radial-gradient(120% 120% at 50% 92%, var(--bg-aurora-shadow) 0%, transparent 100%),
+    linear-gradient(180deg, var(--bg-start) 0%, var(--bg-mid) 52%, var(--bg-end) 100%);
+  background-repeat: no-repeat;
+  background-size: 165% 165%, 135% 135%, 150% 150%, 220% 220%, 100% 100%;
+  background-position: 14% 20%, 18% 24%, 82% 22%, 50% 90%, 50% 100%;
+  filter: saturate(1.2);
+  opacity: 0.96;
+  transform: translateZ(0);
+  animation: aurora-shift 36s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes aurora-shift {
+  0% {
+    background-position: 12% 18%, 16% 22%, 84% 18%, 50% 90%, 50% 100%;
+    background-size: 170% 170%, 140% 140%, 145% 145%, 220% 220%, 100% 100%;
+  }
+
+  45% {
+    background-position: 24% 32%, 32% 34%, 72% 26%, 50% 92%, 50% 100%;
+    background-size: 180% 180%, 150% 150%, 160% 160%, 230% 230%, 100% 100%;
+  }
+
+  100% {
+    background-position: 72% 42%, 78% 44%, 42% 32%, 50% 95%, 50% 100%;
+    background-size: 165% 165%, 135% 135%, 155% 155%, 240% 240%, 100% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    animation: none;
+    background-position: 18% 24%, 22% 24%, 78% 24%, 50% 92%, 50% 100%;
+    background-size: 170% 170%, 145% 145%, 155% 155%, 230% 230%, 100% 100%;
+  }
 }
 
 body.nav-open::before {
