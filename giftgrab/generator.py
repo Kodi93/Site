@@ -13,6 +13,7 @@ from typing import Iterable, List, Sequence
 from .affiliates import affiliate_rel, prepare_affiliate_url
 from .blog import blurb
 from .models import Guide, Product
+from .text import title_case
 from .utils import slugify
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -30,12 +31,53 @@ PROTECTED_FILES = {
 
 _BANNED_PHRASES = ("fresh drops", "active vibes")
 
+_STOPWORDS = {"for", "a", "the", "and", "of"}
+_RIGHT_NOW_SUFFIX = re.compile(r"\s+right now\.?$", re.IGNORECASE)
+_BEST_FOR_PATTERN = re.compile(
+    r"(?i)^best\s+for\s+a\s+(?P<subject>.+?)\s+gifts(?P<tail>.*)$"
+)
+_TITLE_REPLACEMENTS = {"Techy": "Tech"}
+
 
 def _strip_banned_phrases(text: str) -> str:
     result = text or ""
     for phrase in _BANNED_PHRASES:
         result = re.sub(re.escape(phrase), "", result, flags=re.IGNORECASE)
     return result.strip()
+
+
+def _apply_stopwords(text: str) -> str:
+    first_word_found = False
+
+    def _lower(match: re.Match[str]) -> str:
+        nonlocal first_word_found
+        word = match.group(0)
+        if not first_word_found:
+            first_word_found = True
+            return word
+        if word.lower() in _STOPWORDS:
+            return word.lower()
+        return word
+
+    return re.sub(r"[A-Za-z]+", _lower, text)
+
+
+def polish_guide_title(title: str) -> str:
+    text = (title or "").strip()
+    if not text:
+        return ""
+    text = _RIGHT_NOW_SUFFIX.sub("", text).strip()
+    match = _BEST_FOR_PATTERN.match(text)
+    if match:
+        subject = match.group("subject").strip()
+        tail = match.group("tail") or ""
+        text = f"Best {subject} Gifts{tail}"
+    text = re.sub(r"\s+", " ", text).strip()
+    text = title_case(text)
+    text = _apply_stopwords(text)
+    for source, target in _TITLE_REPLACEMENTS.items():
+        text = re.sub(rf"\b{source}\b", target, text)
+    return text.strip()
 
 
 def _read_markup(path: Path) -> str:
@@ -125,16 +167,10 @@ def load_settings() -> SiteSettings:
         description=_env(
             "SITE_DESCRIPTION",
             (
-                "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play "
-                "affiliate automation. Launch scroll-stopping gift funnels complete with affiliate "
-                "wiring, ad inventory, and conversion copy."
+                "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter."
             ),
         )
-        or (
-            "Grab Gifts surfaces viral-ready Amazon finds with conversion copy and plug-and-play "
-            "affiliate automation. Launch scroll-stopping gift funnels complete with affiliate wiring, "
-            "ad inventory, and conversion copy."
-        ),
+        or "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter.",
         logo_url=_env("SITE_LOGO_URL"),
         twitter=_env("SITE_TWITTER"),
         facebook=_env("SITE_FACEBOOK"),
@@ -211,10 +247,11 @@ class SiteGenerator:
         return _render_with_base(content=body_html)
 
     def _guide_json_ld(self, guide: Guide, canonical_path: str) -> dict:
+        title = polish_guide_title(guide.title)
         return {
             "@context": "https://schema.org",
             "@type": "ItemList",
-            "name": guide.title,
+            "name": title,
             "itemListElement": [
                 {
                     "@type": "ListItem",
@@ -290,6 +327,7 @@ class SiteGenerator:
     def _guide_body(self, guide: Guide) -> tuple[str, List[dict]]:
         cards_html = []
         json_ld: List[dict] = []
+        guide_title = polish_guide_title(guide.title)
         for product in guide.products:
             card = self._product_card(product)
             if not card:
@@ -301,7 +339,7 @@ class SiteGenerator:
         guide_description = _strip_banned_phrases(guide.description)
         parts = [
             "<section class=\"page-header\">",
-            f"<h1>{guide.title}</h1>",
+            f"<h1>{guide_title}</h1>",
             f"<p>{guide_description}</p>",
             "</section>",
         ]
@@ -322,35 +360,26 @@ class SiteGenerator:
             last_updated = datetime.now(timezone.utc).isoformat()
         cards = []
         for guide in guides[:12]:
+            display_title = polish_guide_title(guide.title)
             first = guide.products[0] if guide.products else None
             teaser_source = first if first else guide
             teaser = blurb(teaser_source) if first else guide.description
             teaser = _strip_banned_phrases(teaser)
             cards.append(
                 "<article class=\"card\">"
-                f"<h2><a href=\"/guides/{guide.slug}/\">{guide.title}</a></h2>"
+                f"<h2><a href=\"/guides/{guide.slug}/\">{display_title}</a></h2>"
                 f"<p>{teaser}</p>"
                 f"<a class=\"button\" href=\"/guides/{guide.slug}/\">View guide</a>"
                 "</article>"
             )
         cards_html = "\n".join(cards)
         home_description = _strip_banned_phrases(self.settings.description)
-        hero_lines: List[str] = []
-        if home_description:
-            segments = [
-                segment.strip()
-                for segment in re.split(r"(?<=[.!?])\s+", home_description)
-                if segment.strip()
-            ]
-            hero_lines = segments[:2] if segments else []
-        if not hero_lines and home_description:
-            hero_lines = [home_description]
         hero_markup = [
             "<section class=\"hero\">",
-            "<span class=\"hero-badge\">GIFT COMMERCE DASHBOARD</span>",
             "<h1>grabgifts</h1>",
         ]
-        hero_markup.extend(f"<p>{line}</p>" for line in hero_lines)
+        if home_description:
+            hero_markup.append(f"<p>{home_description}</p>")
         hero_markup.append(
             "<div class=\"hero-actions\">"
             "<a class=\"button\" href=\"/guides/\">Explore today's drops</a>"
@@ -401,11 +430,12 @@ class SiteGenerator:
 
     def _write_guides(self, guides: Sequence[Guide]) -> None:
         for guide in guides:
+            display_title = polish_guide_title(guide.title)
             body, product_json_ld = self._guide_body(guide)
             page_description = _strip_banned_phrases(guide.description)
             ld_objects = [self._guide_json_ld(guide, f"/guides/{guide.slug}/")] + product_json_ld
             html = self._render_document(
-                page_title=f"{guide.title} – {self.settings.name}",
+                page_title=f"{display_title} – {self.settings.name}",
                 description=page_description,
                 canonical_path=f"/guides/{guide.slug}/",
                 body=body,
@@ -429,13 +459,16 @@ class SiteGenerator:
             "</section>",
         ]
         cards = []
-        for guide in sorted(guides, key=lambda item: item.title.lower()):
+        for guide in sorted(
+            guides, key=lambda item: polish_guide_title(item.title).lower()
+        ):
+            display_title = polish_guide_title(guide.title)
             first = guide.products[0] if guide.products else None
             teaser = blurb(first) if first else guide.description
             teaser = _strip_banned_phrases(teaser)
             cards.append(
                 "<article class=\"card\">"
-                f"<h2><a href=\"/guides/{guide.slug}/\">{guide.title}</a></h2>"
+                f"<h2><a href=\"/guides/{guide.slug}/\">{display_title}</a></h2>"
                 f"<p>{teaser}</p>"
                 "</article>"
             )
@@ -461,7 +494,7 @@ class SiteGenerator:
 
     def _write_surprise_page(self, guides: Sequence[Guide]) -> None:
         guide_links = [
-            (f"/guides/{guide.slug}/", guide.title)
+            (f"/guides/{guide.slug}/", polish_guide_title(guide.title))
             for guide in guides
             if guide.products
         ]
@@ -520,11 +553,12 @@ class SiteGenerator:
         if entries:
             items = []
             for timestamp, guide in entries:
+                display_title = polish_guide_title(guide.title)
                 label = timestamp.strftime("%b %d, %Y %H:%M UTC")
                 items.append(
                     "<li>"
                     f"<time datetime=\"{timestamp.isoformat()}\">{label}</time>"
-                    f"<a href=\"/guides/{guide.slug}/\">{guide.title}</a>"
+                    f"<a href=\"/guides/{guide.slug}/\">{display_title}</a>"
                     "</li>"
                 )
             body_parts.append(
@@ -698,9 +732,10 @@ class SiteGenerator:
         for guide in guides[:20]:
             link = self._abs_url(f"/guides/{guide.slug}/")
             description = guide.description
+            display_title = polish_guide_title(guide.title)
             items.append(
                 "<item>"
-                f"<title>{guide.title}</title>"
+                f"<title>{display_title}</title>"
                 f"<link>{link}</link>"
                 f"<guid>{link}</guid>"
                 f"<description><![CDATA[{description}]]></description>"
