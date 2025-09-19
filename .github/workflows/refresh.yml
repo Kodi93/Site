@@ -1,24 +1,35 @@
 name: Refresh content
+
 on:
-  schedule: [{ cron: "13 10 * * *" }]   # 10:13 America/New_York
+  schedule:
+    - cron: "7 13 * * *" # 09:07 America/New_York
   workflow_dispatch:
+
 jobs:
   build_deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npm run update
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Update catalog
+        run: python -m giftgrab.cli update
         env:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
-          EBAY_SCOPE: https://api.ebay.com/oauth/api_scope
-          AMZ_ACCESS_KEY: ${{ secrets.AMZ_ACCESS_KEY }}
-          AMZ_SECRET_KEY: ${{ secrets.AMZ_SECRET_KEY }}
-          AMZ_PARTNER_TAG: kayce25-20
-      - run: npm run build
-      - run: npm run check
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+          AMAZON_PAAPI_ACCESS_KEY: ${{ secrets.AMAZON_PAAPI_ACCESS_KEY }}
+          AMAZON_PAAPI_SECRET_KEY: ${{ secrets.AMAZON_PAAPI_SECRET_KEY }}
+          AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
+      - name: Generate guides
+        run: python -m giftgrab.cli roundups --limit 15
+        env:
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+          AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
+      - name: Run QA checks
+        run: python -m giftgrab.cli check
       - uses: nwtgck/actions-netlify@v2
         with:
           publish-dir: ./public
