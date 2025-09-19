@@ -37,6 +37,15 @@ def build_inventory(count: int) -> list[Product]:
     ]
 
 
+def build_categories() -> list[Category]:
+    return [
+        Category(slug="tech", name="Tech", blurb="Tech gear.", keywords=["tech"]),
+        Category(slug="coffee", name="Coffee", blurb="Coffee gear.", keywords=["coffee"]),
+        Category(slug="fitness", name="Fitness", blurb="Fitness gear.", keywords=["fitness"]),
+        Category(slug="pets", name="Pets", blurb="Pet gear.", keywords=["pets"]),
+    ]
+
+
 def test_weekly_article_renders_with_adsense(tmp_path: Path) -> None:
     products = build_inventory(14)
     now = datetime(2025, 9, 18, tzinfo=timezone.utc)
@@ -114,3 +123,56 @@ def test_guides_index_lists_articles(tmp_path: Path) -> None:
     assert guide.title in index_html
     sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "guides/index.html" in sitemap
+
+
+def test_shortlist_page_contains_status_and_nav(tmp_path: Path) -> None:
+    products = build_inventory(8)
+    categories = build_categories()
+    settings = SiteSettings(
+        site_name="Test Gifts",
+        base_url="https://example.com",
+    )
+    generator = SiteGenerator(settings, output_dir=tmp_path)
+    generator.build(categories, products)
+
+    shortlist_file = tmp_path / "shortlist.html"
+    assert shortlist_file.exists()
+    shortlist_html = shortlist_file.read_text(encoding="utf-8")
+    assert "data-shortlist-grid" in shortlist_html
+    assert "data-shortlist-status" in shortlist_html
+
+    index_html = (tmp_path / "index.html").read_text(encoding="utf-8")
+    assert '<a href="/shortlist.html">Shortlist</a>' in index_html
+
+
+def test_latest_page_exposes_all_products_and_controls(tmp_path: Path) -> None:
+    products = build_inventory(75)
+    categories = build_categories()
+    settings = SiteSettings(
+        site_name="Test Gifts",
+        base_url="https://example.com",
+    )
+    generator = SiteGenerator(settings, output_dir=tmp_path)
+    generator.build(categories, products)
+
+    latest_html = (tmp_path / "latest.html").read_text(encoding="utf-8")
+    assert "data-latest-sentinel" in latest_html
+    assert "data-latest-more" in latest_html
+    assert "Editor Pick 70" in latest_html
+
+
+def test_search_page_includes_fallback_and_pagination(tmp_path: Path) -> None:
+    products = build_inventory(12)
+    categories = build_categories()
+    settings = SiteSettings(
+        site_name="Test Gifts",
+        base_url="https://example.com",
+    )
+    generator = SiteGenerator(settings, output_dir=tmp_path)
+    generator.build(categories, products)
+
+    search_html = (tmp_path / "search.html").read_text(encoding="utf-8")
+    assert "<li class='search-result'>" in search_html
+    assert "data-search-sentinel" in search_html
+    assert "Show more results" in search_html
+    assert "slice(0, 60)" not in search_html
