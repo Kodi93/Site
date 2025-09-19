@@ -354,10 +354,14 @@ a.button {
   background: transparent;
   border: 1px solid rgba(255, 79, 184, 0.55);
   box-shadow: none;
+  color: var(--fg);
 }
 
-.button-ghost:hover {
+.button-ghost:hover,
+.button-ghost:focus-visible {
   background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
 }
 
 h1,
@@ -722,19 +726,57 @@ p {
 }
 
 .footer-inner {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 2.75rem);
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.footer-brand {
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+}
+
+.footer-brand .brand {
   align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.footer-tagline {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: flex-start;
 }
 
 .footer-nav {
-  display: flex;
+  width: 100%;
+}
+
+.footer-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
   gap: 0.5rem;
 }
 
-.site-footer p {
+.footer-link-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.footer-meta {
   margin: 0;
   color: var(--muted);
 }
