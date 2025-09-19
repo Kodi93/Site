@@ -17,6 +17,7 @@ FALLBACK_TOPICS = [
 ]
 
 PRICE_BREAKS = (25, 50, 100)
+MIN_TOPIC_ITEMS = 10
 
 
 @dataclass
@@ -53,7 +54,7 @@ def _eligible(products: Sequence[Product], threshold: float | None = None) -> Li
     if threshold is None:
         return list(products)
     filtered = [product for product in products if product.price is not None and product.price <= threshold]
-    if len(filtered) >= 10:
+    if len(filtered) >= MIN_TOPIC_ITEMS:
         return filtered
     return []
 
@@ -78,7 +79,7 @@ def generate_topics(products: Sequence[Product], *, history: Sequence[dict], lim
             by_brand[product.brand].append(product)
     candidates: dict[str, Topic] = {}
     for category, items in sorted(by_category.items(), key=lambda pair: len(pair[1]), reverse=True):
-        if len(items) < 12:
+        if len(items) < MIN_TOPIC_ITEMS:
             continue
         title = f"Top 20 {category} Gifts"
         _add_topic(candidates, title, category=category)
@@ -88,7 +89,7 @@ def generate_topics(products: Sequence[Product], *, history: Sequence[dict], lim
             if eligible:
                 _add_topic(candidates, f"Top 20 {category} Gifts Under ${price}", category=category, price_cap=float(price))
     for brand, items in sorted(by_brand.items(), key=lambda pair: len(pair[1]), reverse=True):
-        if len(items) < 10:
+        if len(items) < MIN_TOPIC_ITEMS:
             continue
         _add_topic(candidates, f"Top 20 Gifts from {brand}", brand=brand)
         cheap = _eligible(items, threshold=50)
