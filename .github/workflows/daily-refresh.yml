@@ -1,0 +1,20 @@
+name: Daily Site Refresh
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify build
+        env:
+          NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+        run: |
+          if [ -z "$NETLIFY_BUILD_HOOK" ]; then
+            echo "NETLIFY_BUILD_HOOK is not configured; skipping trigger." >&2
+            exit 0
+          fi
+          curl -fsS -X POST -H 'Content-Type: application/json' -d '{}' "$NETLIFY_BUILD_HOOK"

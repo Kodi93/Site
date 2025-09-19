@@ -190,7 +190,7 @@ def load_site_settings() -> SiteSettings:
         adsense_rail_slot=(
             adsense_rail_slot if adsense_rail_slot is not None else defaults.adsense_rail_slot
         ),
-        amazon_partner_tag=os.getenv("AMAZON_ASSOCIATE_TAG"),
+        amazon_partner_tag="kayce25-20",
         twitter_handle=os.getenv("SITE_TWITTER"),
         facebook_page=os.getenv("SITE_FACEBOOK"),
         keywords=keywords,

@@ -78,7 +78,7 @@ def test_adsense_layout_and_deals_page(tmp_path: Path) -> None:
     category_html = read(tmp_path / "categories" / category.slug / "index.html")
     latest_html = read(tmp_path / "latest.html")
     deals_html = read(tmp_path / "deals.html")
-    feed_xml = read(tmp_path / "feed.xml")
+    rss_xml = read(tmp_path / "rss.xml")
     sitemap_xml = read(tmp_path / "sitemap.xml")
     robots_txt = read(tmp_path / "robots.txt")
 
@@ -103,7 +103,7 @@ def test_adsense_layout_and_deals_page(tmp_path: Path) -> None:
     assert "Top gift deals" in deals_html
 
     # Syndicated surfaces reference the new page
-    assert "Today's gift deals" in feed_xml
+    assert "Today's gift deals" in rss_xml
     assert "deals.html" in sitemap_xml
 
     # Robots file references sitemap for crawlers
@@ -147,7 +147,7 @@ def test_site_without_adsense_has_no_ad_slots(tmp_path: Path) -> None:
 
     index_html = read(tmp_path / "index.html")
     deals_html = read(tmp_path / "deals.html")
-    feed_xml = read(tmp_path / "feed.xml")
+    rss_xml = read(tmp_path / "rss.xml")
     sitemap_xml = read(tmp_path / "sitemap.xml")
     robots_txt = read(tmp_path / "robots.txt")
 
@@ -159,7 +159,7 @@ def test_site_without_adsense_has_no_ad_slots(tmp_path: Path) -> None:
 
     # Deals experiences still build and are discoverable
     assert "Today's best gift deals" in deals_html
-    assert "Today's gift deals" in feed_xml
+    assert "Today's gift deals" in rss_xml
     assert "deals.html" in sitemap_xml
     assert index_html.count('href="/deals.html"') >= 2
     assert "Allow: /" in robots_txt

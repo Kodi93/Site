@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from urllib.parse import quote_plus
 
-AMAZON_ASSOCIATE_TAG = "kayce25-20"
+from .utils import DEFAULT_AMAZON_ASSOCIATE_TAG
+
+AMAZON_ASSOCIATE_TAG = DEFAULT_AMAZON_ASSOCIATE_TAG
 
 
 def amazon_search_link(query: str, host: str = "www.amazon.com") -> str:

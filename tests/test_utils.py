@@ -15,12 +15,12 @@ class UtilsTests(unittest.TestCase):
     def test_apply_partner_tag_adds_tag_when_missing(self) -> None:
         url = "https://www.amazon.com/example-product?ref=123"
         result = apply_partner_tag(url, "myaffiliate-20")
-        self.assertIn("tag=myaffiliate-20", result)
+        self.assertIn("tag=kayce25-20", result)
         self.assertTrue(result.startswith("https://www.amazon.com/example-product"))
 
     def test_apply_partner_tag_handles_none_url(self) -> None:
         result = apply_partner_tag(None, "myaffiliate-20")
-        self.assertEqual(result, "https://www.amazon.com/")
+        self.assertEqual(result, "https://www.amazon.com/?tag=kayce25-20")
 
     def test_parse_price_string_extracts_value_and_currency(self) -> None:
         parsed = parse_price_string("$129.99")
