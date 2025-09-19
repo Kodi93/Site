@@ -9,33 +9,47 @@ const SITE_NAME = "GrabGifts";
 const SITE_URL = "https://grabgifts.net";
 const SITE_DESCRIPTION = "Gift ideas for every fan, friend, and family member.";
 
+const BASE_TEMPLATE_PATH = path.join("templates", "base.html");
 const HEADER_PATH = path.join("templates", "partials", "header.html");
 const FOOTER_PATH = path.join("templates", "partials", "footer.html");
 const THEME_PATH = path.join(PUB, "assets", "theme.css");
 const PROTECTED_FILES = new Set(
-  [HEADER_PATH, FOOTER_PATH, THEME_PATH].map((p) => path.resolve(p)),
+  [BASE_TEMPLATE_PATH, HEADER_PATH, FOOTER_PATH, THEME_PATH].map((p) =>
+    path.resolve(p),
+  ),
 );
 
-const { doctype: DOC_TYPE, markup: HEADER_PARTIAL } = loadHeaderPartial(
-  fs.readFileSync(HEADER_PATH, "utf8"),
+const BASE_TEMPLATE = applyIncludes(
+  fs.readFileSync(BASE_TEMPLATE_PATH, "utf8").replace(/^\ufeff/, ""),
+  {
+    "partials/header.html": readPartial(HEADER_PATH),
+    "partials/footer.html": readPartial(FOOTER_PATH),
+  },
 );
-const FOOTER_PARTIAL = normalizePartial(fs.readFileSync(FOOTER_PATH, "utf8"));
 
-function loadHeaderPartial(raw) {
-  const cleaned = raw.replace(/^\ufeff/, "");
-  const match = cleaned.match(/^\s*<!doctype html>\s*/i);
-  let doctype = "<!doctype html>";
-  let markup = cleaned;
-  if (match) {
-    doctype = match[0].trim();
-    markup = cleaned.slice(match[0].length);
-  }
-  return { doctype, markup: normalizePartial(markup) };
+function readPartial(partialPath) {
+  return fs.readFileSync(partialPath, "utf8").replace(/^\ufeff/, "").trim();
 }
 
-function normalizePartial(markup) {
+function applyIncludes(template, includes) {
+  let output = template;
+  for (const [includePath, markup] of Object.entries(includes)) {
+    const pattern = new RegExp(
+      `([\\t ]*)\{%\\s*include\\s+['"]${includePath.replace(/\//g, "\\/")}['"]\\s*%\}`,
+      "g",
+    );
+    output = output.replace(pattern, (_, indent) => indentMarkup(markup, indent));
+  }
+  return output;
+}
+
+function indentMarkup(markup, indent) {
   const trimmed = markup.trim();
-  return trimmed ? `${trimmed}\n` : "";
+  if (!trimmed) return "";
+  return trimmed
+    .split(/\r?\n/)
+    .map((line) => (line ? `${indent}${line}` : ""))
+    .join("\n");
 }
 
 function escapeHtml(input) {
@@ -58,7 +72,7 @@ function canonicalUrl(pathname) {
 function ensureNotProtected(targetPath) {
   const resolved = path.resolve(targetPath);
   if (PROTECTED_FILES.has(resolved)) {
-    throw new Error("Protected layout files may not be modified by content builds.");
+    throw new Error("Protected layout file");
   }
 }
 
@@ -68,19 +82,50 @@ function writeFile(target, html) {
   fs.writeFileSync(target, html);
 }
 
-function pageShell({ title, description, canonicalPath, bodyContent, extraHead = [] }) {
+function renderWithBase({ content, pageTitle, headExtras = [] }) {
+  const safeTitle = (pageTitle && pageTitle.trim()) || SITE_NAME;
+  let html = BASE_TEMPLATE;
+  html = html.replace(
+    /\{\{\s*page_title\s+or\s+"GrabGifts"\s*\}\}/g,
+    escapeHtml(safeTitle),
+  );
+  html = html.replace(/\{\{\s*content\|safe\s*\}\}/g, content);
+  html = html.replace(/\{\{\s*content\s*\}\}/g, content);
+  if (headExtras.length) {
+    const block = headExtras.map((tag) => `  ${tag}`).join("\n");
+    html = html.replace("</head>", `${block}\n</head>`);
+  }
+  return html;
+}
+
+function renderDocument({
+  title,
+  description,
+  canonicalPath,
+  bodyContent,
+  extraHead = [],
+}) {
   const canonical = canonicalUrl(canonicalPath);
+  const safeDescription = escapeHtml(description);
   const headParts = [
-    "<meta charset=\"utf-8\">",
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-    `<title>${escapeHtml(title)}</title>`,
     `<link rel=\"canonical\" href=\"${canonical}\">`,
-    `<meta name=\"description\" content=\"${escapeHtml(description)}\">`,
+    `<meta name=\"description\" content=\"${safeDescription}\">`,
     "<meta name=\"robots\" content=\"index,follow\">",
-    "<link rel=\"stylesheet\" href=\"/assets/theme.css\">",
+    "<meta property=\"og:type\" content=\"website\">",
+    `<meta property=\"og:title\" content=\"${escapeHtml(title)}\">`,
+    `<meta property=\"og:description\" content=\"${safeDescription}\">`,
+    `<meta property=\"og:url\" content=\"${canonical}\">`,
+    `<meta property=\"og:site_name\" content=\"${escapeHtml(SITE_NAME)}\">`,
+    "<meta name=\"twitter:card\" content=\"summary_large_image\">",
+    `<meta name=\"twitter:title\" content=\"${escapeHtml(title)}\">`,
+    `<meta name=\"twitter:description\" content=\"${safeDescription}\">`,
+    `<meta name=\"twitter:url\" content=\"${canonical}\">`,
+    `<link rel=\"alternate\" type=\"application/rss+xml\" title=\"${escapeHtml(
+      SITE_NAME,
+    )} RSS\" href=\"/rss.xml\">`,
     ...extraHead,
   ];
-  return `${DOC_TYPE}\n<html lang=\"en\"><head>${headParts.join("\n")}</head><body>\n${HEADER_PARTIAL}<main><div class=\"wrap\">\n${bodyContent}\n</div></main>\n${FOOTER_PARTIAL}</body></html>`;
+  return renderWithBase({ content: bodyContent, pageTitle: title, headExtras: headParts });
 }
 
 function renderGuideCard(item) {
@@ -124,7 +169,7 @@ function renderGuidePage(title, slug, items) {
   };
   const extraHead = [`<script type=\"application/ld+json\">${JSON.stringify(ld)}</script>`];
   const description = `Top gift ideas for ${title}.`;
-  return pageShell({
+  return renderDocument({
     title: `${title} — ${SITE_NAME}`,
     description,
     canonicalPath: `/guides/${slug}/`,
@@ -153,7 +198,7 @@ function renderHomePage(guides) {
     });
     cards = `<ol class=\"grid\">${items.join("\n")}\n</ol>`;
   }
-  return pageShell({
+  return renderDocument({
     title: `${SITE_NAME} — Gift ideas & buying guides`,
     description: SITE_DESCRIPTION,
     canonicalPath: "/",
