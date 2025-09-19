@@ -4,16 +4,32 @@
       <img src="/assets/grabgifts.svg" alt="grabgifts" class="logo" />
       <span class="brand-text">grabgifts</span>
     </a>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/">Home</a>
-      <a href="/for-him/">For Him</a>
-      <a href="/for-her/">For Her</a>
-      <a href="/tech/">Tech</a>
-      <a href="/gamers/">Gamers</a>
-      <a href="/fandom/">Fandom</a>
-      <a href="/homebody/">Homebody</a>
-      <a href="/guides/">Guides</a>
-      <a href="/faq/">FAQ</a>
-    </nav>
+    <button
+      class="site-nav-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="site-nav"
+      data-nav-toggle
+    >
+      <span class="sr-only">Toggle navigation</span>
+      <span aria-hidden="true" class="site-nav-toggle-icon">
+        <span class="site-nav-toggle-bar"></span>
+        <span class="site-nav-toggle-bar"></span>
+        <span class="site-nav-toggle-bar"></span>
+      </span>
+    </button>
+    <div class="site-nav-panel" data-nav-panel>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/for-him/">For Him</a>
+        <a href="/for-her/">For Her</a>
+        <a href="/tech/">Tech</a>
+        <a href="/gamers/">Gamers</a>
+        <a href="/fandom/">Fandom</a>
+        <a href="/homebody/">Homebody</a>
+        <a href="/guides/">Guides</a>
+        <a href="/faq/">FAQ</a>
+      </nav>
+    </div>
   </div>
 </header>
