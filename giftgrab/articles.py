@@ -8,7 +8,7 @@ from typing import Iterable, List, Sequence
 from .utils import slugify, timestamp
 
 
-ARTICLE_KINDS = {"roundup", "seasonal", "weekly"}
+ARTICLE_KINDS = {"roundup", "seasonal", "weekly", "guide"}
 ARTICLE_STATUSES = {"draft", "published"}
 
 

@@ -12,6 +12,17 @@ from .utils import parse_price_string, slugify
 
 RECENCY_WINDOW_DAYS = 30
 
+GUIDE_HOLIDAY_CATEGORY_HINTS: dict[str, list[str]] = {
+    "valentine": ["gifts-for-her", "gifts-for-him"],
+    "mother": ["gifts-for-her", "home-and-kitchen"],
+    "father": ["gifts-for-him", "tech-and-gadgets"],
+    "prime": ["tech-and-gadgets", "home-and-kitchen"],
+    "school": ["office-and-productivity", "kids-and-family"],
+    "halloween": ["entertainment-and-games", "fandom-and-collectibles"],
+    "black friday": ["tech-and-gadgets", "home-and-kitchen"],
+    "holiday": ["gifts-for-her", "gifts-for-him", "home-and-kitchen"],
+}
+
 
 @dataclass
 class SelectionResult:
@@ -177,6 +188,71 @@ def select_seasonal(
                 price_cap=None,
                 preferred_categories=categories,
             ),
+        )
+        for product in recent
+    ]
+    scores.sort(key=lambda pair: pair[1], reverse=True)
+    ranked = _dedupe_products([pair[0] for pair in scores])
+    items, related = _select_with_related(ranked, limit=15, related_limit=18)
+    category_counts = Counter(product.category_slug for product in items if product.category_slug)
+    hub_slugs = [slug for slug, _ in category_counts.most_common(3)]
+    return SelectionResult(items=items, related=related, hub_slugs=hub_slugs)
+
+
+def _holiday_category_preferences(holiday: str | None) -> List[str]:
+    if not holiday:
+        return []
+    lowered = holiday.lower()
+    for key, categories in GUIDE_HOLIDAY_CATEGORY_HINTS.items():
+        if key in lowered:
+            return categories
+    return []
+
+
+def _holiday_bonus(product: Product, holiday: str | None) -> float:
+    if not holiday:
+        return 0.0
+    lowered = holiday.lower()
+    bonus = 0.0
+    title = (product.title or "").lower()
+    if lowered in title:
+        bonus += 65.0
+    keyword_blob = " ".join((product.keywords or []))
+    if lowered in keyword_blob.lower():
+        bonus += 55.0
+    return bonus
+
+
+def select_spouse_guide(
+    price_cap: float,
+    products: Sequence[Product],
+    *,
+    now: datetime | None = None,
+    preferred_categories: Sequence[str] | None = None,
+    holiday: str | None = None,
+) -> SelectionResult:
+    reference = now or datetime.now(timezone.utc)
+    recent = _filter_recent(products, now=reference)
+    recent = _ensure_images(recent)
+    category_preferences: List[str] = []
+    if preferred_categories:
+        for slug in preferred_categories:
+            normalized = slug.strip()
+            if normalized and normalized not in category_preferences:
+                category_preferences.append(normalized)
+    for slug in _holiday_category_preferences(holiday):
+        if slug not in category_preferences:
+            category_preferences.append(slug)
+    scores = [
+        (
+            product,
+            _score_product(
+                product,
+                now=reference,
+                price_cap=price_cap,
+                preferred_categories=category_preferences or None,
+            )
+            + _holiday_bonus(product, holiday),
         )
         for product in recent
     ]

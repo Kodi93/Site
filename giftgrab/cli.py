@@ -118,6 +118,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="ISO date (YYYY-MM-DD) to start scheduling roundups from.",
     )
     parser.add_argument(
+        "--guide-backfill-days",
+        type=int,
+        default=0,
+        help=(
+            "Number of days of partner guides to backfill (max 365)."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "INFO"),
         help="Set the log level (DEBUG, INFO, WARNING, ERROR).",
@@ -347,6 +355,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     if command == "generate" and not has_products:
         parser.error("No stored products available. Run 'update' first to fetch data.")
 
+    if args.guide_backfill_days < 0:
+        parser.error("--guide-backfill-days must be non-negative")
+
     if command == "update":
         amazon_credentials = load_credentials()
         ebay_credentials = load_ebay_credentials()
@@ -373,7 +384,10 @@ def main(argv: Optional[list[str]] = None) -> None:
             retailers=retailer_adapters,
             article_repository=article_repository,
         )
-        pipeline.run(item_count=args.item_count, regenerate_only=False)
+        run_kwargs = {"item_count": args.item_count, "regenerate_only": False}
+        if args.guide_backfill_days:
+            run_kwargs["guide_backfill_days"] = args.guide_backfill_days
+        pipeline.run(**run_kwargs)
     elif command == "roundups":
         roundup_limit = args.roundup_limit
         if roundup_limit <= 0:
@@ -406,7 +420,10 @@ def main(argv: Optional[list[str]] = None) -> None:
             retailers=retailer_adapters,
             article_repository=article_repository,
         )
-        pipeline.run(item_count=args.item_count, regenerate_only=True)
+        run_kwargs = {"item_count": args.item_count, "regenerate_only": True}
+        if args.guide_backfill_days:
+            run_kwargs["guide_backfill_days"] = args.guide_backfill_days
+        pipeline.run(**run_kwargs)
     else:
         retailer_adapters = load_static_retailers()
         pipeline = GiftPipeline(
@@ -417,7 +434,10 @@ def main(argv: Optional[list[str]] = None) -> None:
             retailers=retailer_adapters,
             article_repository=article_repository,
         )
-        pipeline.run(item_count=args.item_count, regenerate_only=True)
+        run_kwargs = {"item_count": args.item_count, "regenerate_only": True}
+        if args.guide_backfill_days:
+            run_kwargs["guide_backfill_days"] = args.guide_backfill_days
+        pipeline.run(**run_kwargs)
 
     LOGGER.info("Site build completed. Output directory: %s", args.output_dir)
 

@@ -25,7 +25,15 @@ class ArticleRepository:
         logger.debug("Creating article repository at %s", self.data_file)
         dump_json(
             self.data_file,
-            {"articles": [], "meta": {"roundup_index": 0}, "roundups": []},
+            {
+                "articles": [],
+                "meta": {
+                    "roundup_index": 0,
+                    "guide_index": 0,
+                    "guide_last_published": None,
+                },
+                "roundups": [],
+            },
         )
 
     def _load_payload(self) -> dict:
@@ -33,7 +41,14 @@ class ArticleRepository:
         if not isinstance(data, dict):
             data = {}
         data.setdefault("articles", [])
-        data.setdefault("meta", {"roundup_index": 0})
+        data.setdefault(
+            "meta",
+            {
+                "roundup_index": 0,
+                "guide_index": 0,
+                "guide_last_published": None,
+            },
+        )
         data.setdefault("roundups", [])
         return data
 
@@ -171,6 +186,37 @@ class ArticleRepository:
     def set_roundup_index(self, value: int) -> None:
         payload = self._load_payload()
         payload.setdefault("meta", {})["roundup_index"] = int(value)
+        dump_json(self.data_file, payload)
+
+    def get_guide_index(self) -> int:
+        payload = self._load_payload()
+        meta = payload.get("meta") or {}
+        value = meta.get("guide_index", 0)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    def set_guide_index(self, value: int) -> None:
+        payload = self._load_payload()
+        payload.setdefault("meta", {})["guide_index"] = int(value)
+        dump_json(self.data_file, payload)
+
+    def get_guide_last_published(self) -> str | None:
+        payload = self._load_payload()
+        meta = payload.get("meta") or {}
+        value = meta.get("guide_last_published")
+        if value:
+            return str(value)
+        return None
+
+    def set_guide_last_published(self, value: str | None) -> None:
+        payload = self._load_payload()
+        meta = payload.setdefault("meta", {})
+        if value:
+            meta["guide_last_published"] = value
+        else:
+            meta.pop("guide_last_published", None)
         dump_json(self.data_file, payload)
 
 

@@ -77,7 +77,13 @@ class GiftPipeline:
         self.minimum_daily_posts = max(0, minimum_daily_posts)
         self.bootstrap_target = max(self.minimum_daily_posts, bootstrap_target)
 
-    def run(self, *, item_count: int = 6, regenerate_only: bool = False) -> PipelineResult:
+    def run(
+        self,
+        *,
+        item_count: int = 6,
+        regenerate_only: bool = False,
+        guide_backfill_days: int = 0,
+    ) -> PipelineResult:
         logger.info("Starting pipeline regenerate_only=%s", regenerate_only)
         existing_products = self.repository.load_products()
         categories = [
@@ -268,6 +274,16 @@ class GiftPipeline:
         logger.info("Total products stored: %s", len(combined))
         articles = []
         if self.article_automation and self.article_repository:
+            clamped_backfill = min(365, max(0, guide_backfill_days))
+            if clamped_backfill:
+                try:
+                    self.article_automation.backfill_guides(
+                        combined,
+                        days=clamped_backfill,
+                        end_date=now.date(),
+                    )
+                except Exception as error:
+                    logger.warning("Guide backfill failed: %s", error)
             try:
                 self.article_automation.generate(combined, now=now)
             except Exception as error:
