@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ebaySearch } from "./ebay.mjs";
 import { amazonSearch } from "./amazon.mjs";
+import fetch from "node-fetch";
 import { normalizeItem } from "./normalize.mjs";
 import { hash } from "./util.mjs";
 
@@ -32,6 +33,8 @@ async function run(){
 
   let items = raw.map(normalizeItem);
 
+  items = items.filter((item) => item.image);
+
   // Deduplicate by id
   const byId = new Map();
   for(const i of items){ if(i.id && !byId.has(i.id)) byId.set(i.id, i); }
@@ -46,6 +49,8 @@ async function run(){
     process.exit(1);
   }
 
+  await verifyImages(items);
+
   // Update seen timestamps
   const now = new Date().toISOString();
   for(const i of items){ seen[i.id] = { lastSeenISO: now }; }
@@ -54,6 +59,21 @@ async function run(){
   fs.mkdirSync("data",{ recursive:true });
   fs.writeFileSync(OUT, JSON.stringify(items,null,2));
   console.info("Wrote", items.length, "items →", OUT);
+}
+
+async function verifyImages(items){
+  const sample = items.slice(0, 100);
+  for(const item of sample){
+    try{
+      const res = await fetch(item.image, { method: "HEAD" });
+      if(!res.ok){
+        throw new Error(`Image check failed (${res.status}) for ${item.id}`);
+      }
+    }catch(error){
+      console.error("Image validation failed for", item.image, error);
+      throw new Error("Image HEAD check failed");
+    }
+  }
 }
 
 run().catch(e=>{ console.error(e); process.exit(1); });
