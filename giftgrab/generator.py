@@ -1905,6 +1905,42 @@ main > section + section {
   margin-top: 2rem;
 }
 
+.search-sentinel {
+  margin: 2.5rem auto 0;
+  max-width: 320px;
+}
+
+.shortlist-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.shortlist-status {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 1.75rem;
+}
+
+.shortlist-grid {
+  display: grid;
+  gap: 1.75rem;
+  margin-top: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.shortlist-helper {
+  margin-top: 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.shortlist-remove {
+  margin-left: 0.75rem;
+}
+
 footer {
   border-top: 1px solid rgba(127, 86, 217, 0.16);
   margin-top: 3.5rem;
@@ -2231,6 +2267,7 @@ class SiteGenerator:
             roundups=self._roundups,
         )
         self._write_latest_page(products_sorted)
+        self._write_shortlist_page(products_sorted)
         self._write_search_page(categories, products_sorted)
         for category in categories:
             category_products = [
@@ -2352,7 +2389,10 @@ class SiteGenerator:
             f"<p class=\"nav-tagline\">{nav_tagline}</p>"
             "</div>"
         )
-        nav_action_links = ['<a href="/latest.html">Latest drops</a>']
+        nav_action_links = [
+            '<a href="/latest.html">Latest drops</a>',
+            '<a href="/shortlist.html">Shortlist</a>',
+        ]
         if self._has_deals_page:
             nav_action_links.append('<a href="/deals.html">Deals</a>')
         nav_action_links.append(
@@ -4185,16 +4225,90 @@ class SiteGenerator:
         }
 
     def _write_latest_page(self, products: List[Product]) -> None:
-        cards = self._product_cards_with_ads(products[:60])
+        cards = self._product_cards_with_ads(products)
         body = f"""
 <section class=\"latest-intro\">
   <div class=\"section-heading\">
     <h1>Latest gift drops</h1>
     <p>Keep tabs on the freshest Amazon discoveries and schedule them into campaigns before competitors notice.</p>
   </div>
-  <div class=\"grid\">{cards}</div>
+  <div class=\"grid\" id=\"latest-grid\" data-latest-grid aria-live=\"polite\">{cards}</div>
+  <div class=\"feed-sentinel\" data-latest-sentinel aria-live=\"polite\" hidden>
+    <button type=\"button\" class=\"feed-more\" data-latest-more aria-controls=\"latest-grid\" aria-expanded=\"false\">Show more gift drops</button>
+  </div>
 </section>
 {self._newsletter_banner()}
+<script>
+(function() {{
+  const grid = document.querySelector('[data-latest-grid]');
+  if (!grid) {{
+    return;
+  }}
+  const cards = Array.from(grid.querySelectorAll('.card'));
+  const sentinel = document.querySelector('[data-latest-sentinel]');
+  const moreButton = sentinel ? sentinel.querySelector('[data-latest-more]') : null;
+  const INITIAL_BATCH = 24;
+  const BATCH_SIZE = 12;
+  let visibleCount = Math.min(INITIAL_BATCH, cards.length);
+
+  function updateControls(hasMore) {{
+    if (!sentinel) {{
+      return;
+    }}
+    if (hasMore) {{
+      sentinel.removeAttribute('hidden');
+      sentinel.setAttribute('aria-hidden', 'false');
+    }} else {{
+      sentinel.setAttribute('hidden', 'hidden');
+      sentinel.setAttribute('aria-hidden', 'true');
+    }}
+    if (moreButton) {{
+      moreButton.disabled = cards.length === 0;
+      moreButton.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
+    }}
+  }}
+
+  function applyVisibility() {{
+    cards.forEach(function (card, index) {{
+      const isVisible = index < visibleCount;
+      card.classList.toggle('is-hidden', !isVisible);
+      if (isVisible) {{
+        card.removeAttribute('aria-hidden');
+      }} else {{
+        card.setAttribute('aria-hidden', 'true');
+      }}
+    }});
+    updateControls(cards.length > visibleCount);
+  }}
+
+  function revealMore() {{
+    if (visibleCount >= cards.length) {{
+      return;
+    }}
+    visibleCount = Math.min(cards.length, visibleCount + BATCH_SIZE);
+    applyVisibility();
+  }}
+
+  if (moreButton) {{
+    moreButton.addEventListener('click', function () {{
+      revealMore();
+    }});
+  }}
+
+  if ('IntersectionObserver' in window && sentinel) {{
+    const observer = new IntersectionObserver(function (entries) {{
+      entries.forEach(function (entry) {{
+        if (entry.isIntersecting) {{
+          revealMore();
+        }}
+      }});
+    }}, {{ rootMargin: '0px 0px 320px 0px' }});
+    observer.observe(sentinel);
+  }}
+
+  applyVisibility();
+}})();
+</script>
 """
         item_list_data = self._item_list_structured_data(
             "Latest gift ideas",
@@ -4232,6 +4346,189 @@ class SiteGenerator:
             updated_time=self._format_iso8601(latest_update),
         )
         self._write_page(self.output_dir / "latest.html", context)
+
+    def _write_shortlist_page(self, products: List[Product]) -> None:
+        entries: dict[str, dict[str, str]] = {}
+        for product in products:
+            entries[product.slug] = {
+                "html": self._product_card(product),
+                "title": product.title,
+            }
+        dataset = json.dumps(entries, ensure_ascii=False).replace("</", "<\\/")
+        intro_message = (
+            "Save any gift to revisit it here. Tap \"Save to shortlist\" on a product page to get started."
+        )
+        helper_message = (
+            "Shortlists live in your browser — remove saved gifts anytime using the buttons below."
+        )
+        status_html = html.escape(intro_message)
+        helper_html = html.escape(helper_message)
+        body = f"""
+<section class=\"shortlist-page\">
+  <div class=\"section-heading\">
+    <span class=\"badge\">Wishlist</span>
+    <h1>Your shortlist</h1>
+    <p>Collect favorite drops in one place so you can share them with teammates or revisit them later.</p>
+  </div>
+  <div class=\"shortlist-status\" data-shortlist-status role=\"status\" aria-live=\"polite\">{status_html}</div>
+  <div class=\"grid shortlist-grid\" data-shortlist-grid aria-live=\"polite\"></div>
+  <p class=\"shortlist-helper\">{helper_html}</p>
+  <noscript><p class=\"shortlist-helper\">Enable JavaScript to sync your saved gifts from this browser.</p></noscript>
+</section>
+<script>
+(function() {{
+  const STORAGE_KEY = 'grabgifts-wishlist';
+  const PRODUCT_LOOKUP = {dataset};
+  const grid = document.querySelector('[data-shortlist-grid]');
+  const status = document.querySelector('[data-shortlist-status]');
+  if (!grid || !status) {{
+    return;
+  }}
+
+  function readList() {{
+    try {{
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) {{
+        return [];
+      }}
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }} catch (error) {{
+      return [];
+    }}
+  }}
+
+  function writeList(list) {{
+    try {{
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }} catch (error) {{}}
+  }}
+
+  function removeSlug(slug) {{
+    const next = readList().filter((item) => item !== slug);
+    writeList(next);
+    render();
+  }}
+
+  function createCard(entry, slug) {{
+    const template = document.createElement('template');
+    template.innerHTML = entry.html;
+    const node = template.content.firstElementChild;
+    if (!node) {{
+      return null;
+    }}
+    const actions = node.querySelector('.card-actions');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pill-link shortlist-remove';
+    const label = entry.title ? 'Remove ' + entry.title + ' from shortlist' : 'Remove from shortlist';
+    button.setAttribute('aria-label', label);
+    button.textContent = 'Remove';
+    button.addEventListener('click', function () {{
+      removeSlug(slug);
+    }});
+    if (actions) {{
+      actions.appendChild(button);
+    }} else {{
+      const wrapper = document.createElement('div');
+      wrapper.className = 'card-actions';
+      wrapper.appendChild(button);
+      node.appendChild(wrapper);
+    }}
+    return node;
+  }}
+
+  function render() {{
+    const stored = readList();
+    const seen = new Set();
+    const valid = [];
+    const fragment = document.createDocumentFragment();
+    stored.forEach(function (slug) {{
+      if (typeof slug !== 'string') {{
+        return;
+      }}
+      const trimmed = slug.trim();
+      if (!trimmed || seen.has(trimmed)) {{
+        return;
+      }}
+      seen.add(trimmed);
+      const entry = PRODUCT_LOOKUP[trimmed];
+      if (!entry) {{
+        return;
+      }}
+      const card = createCard(entry, trimmed);
+      if (!card) {{
+        return;
+      }}
+      fragment.appendChild(card);
+      valid.push(trimmed);
+    }});
+    if (valid.length !== stored.length) {{
+      writeList(valid);
+    }}
+    grid.innerHTML = '';
+    grid.appendChild(fragment);
+    if (!valid.length) {{
+      status.textContent = 'Save any gift to revisit it here. Tap "Save to shortlist" on a product page to get started.';
+    }} else {{
+      const count = valid.length;
+      const plural = count === 1 ? '' : 's';
+      status.textContent = `Saved picks ready to share — ${{count}} item${{plural}}.`;
+    }}
+  }}
+
+  window.addEventListener('storage', function (event) {{
+    if (event.key === STORAGE_KEY) {{
+      render();
+    }}
+  }});
+
+  document.addEventListener('visibilitychange', function () {{
+    if (!document.hidden) {{
+      render();
+    }}
+  }});
+
+  render();
+}})();
+</script>
+"""
+        item_list_data = self._item_list_structured_data(
+            "Saved Grab Gifts picks",
+            [
+                (product.title, self._absolute_url(self._product_path(product)))
+                for product in products[:30]
+            ],
+        )
+        collection_page_data = self._collection_page_structured_data(
+            name="Saved gift shortlist",
+            description="Revisit and share favorite Grab Gifts picks saved from across the catalog.",
+            url=self._absolute_url("shortlist.html"),
+            item_list=item_list_data,
+        )
+        structured_data = [item_list_data, collection_page_data]
+        og_image = None
+        for product in products:
+            if product.image:
+                og_image = product.image
+                break
+        if og_image is None:
+            if self.settings.logo_url:
+                og_image = self.settings.logo_url
+            else:
+                og_image = DEFAULT_SOCIAL_IMAGE
+        latest_update = self._latest_updated_datetime(products)
+        context = PageContext(
+            title=f"Saved shortlist — {self.settings.site_name}",
+            description="Collect favorite gift drops to revisit later and clear them out whenever you're done sharing.",
+            canonical_url=f"{self.settings.base_url.rstrip('/')}/shortlist.html",
+            body=body,
+            og_image=og_image,
+            structured_data=structured_data,
+            og_image_alt="Saved shortlist",
+            updated_time=self._format_iso8601(latest_update),
+        )
+        self._write_page(self.output_dir / "shortlist.html", context)
 
     def _write_deals_page(self, products: List[Product]) -> None:
         if not products:
@@ -4336,165 +4633,195 @@ class SiteGenerator:
                     "retailerSlug": product.retailer_slug,
                 }
             )
-        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\\/")
-        body = f"""
-<section class="search-page">
+        dataset = json.dumps(index_entries, ensure_ascii=False).replace("</", "<\/")
+        fallback_items = ''.join(
+            self._search_result_markup(product, category_lookup)
+            for product in products[:12]
+        )
+        if not fallback_items:
+            fallback_items = ("<li class='search-result'><p>No gift drops are live yet — check back soon for fresh finds.</p></li>")
+        body_template = """
+<section class='search-page'>
   <h1>Search Grab Gifts</h1>
   <p>Zero in on conversion-ready gift drops by keyword, price point, rating, or marketplace partner.</p>
-  <form id="search-page-form" class="search-form" action="/search.html" method="get" role="search">
-    <label class="sr-only" for="search-query">Search Grab Gifts</label>
-    <input id="search-query" type="search" name="q" placeholder="Type a product, keyword, or vibe" aria-label="Search Grab Gifts" />
-    <button type="submit" aria-label="Submit search">
-      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.65" y2="16.65"></line></svg>
+  <form id='search-page-form' class='search-form' action='/search.html' method='get' role='search'>
+    <label class='sr-only' for='search-query'>Search Grab Gifts</label>
+    <input id='search-query' type='search' name='q' placeholder='Type a product, keyword, or vibe' aria-label='Search Grab Gifts' />
+    <button type='submit' aria-label='Submit search'>
+      <svg aria-hidden='true' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'></circle><line x1='20' y1='20' x2='16.65' y2='16.65'></line></svg>
     </button>
   </form>
-  <div class="search-filters" role="group" aria-label="Filter search results">
-    <label for="filter-price">Price</label>
-    <select id="filter-price" name="price">
-      <option value="all">Any price</option>
-      <option value="under-25">Under $25</option>
-      <option value="25-50">$25 – $50</option>
-      <option value="50-100">$50 – $100</option>
-      <option value="100-plus">$100+</option>
+  <div class='search-filters' role='group' aria-label='Filter search results'>
+    <label for='filter-price'>Price</label>
+    <select id='filter-price' name='price'>
+      <option value='all'>Any price</option>
+      <option value='under-25'>Under $25</option>
+      <option value='25-50'>$25 – $50</option>
+      <option value='50-100'>$50 – $100</option>
+      <option value='100-plus'>$100+</option>
     </select>
-    <label for="filter-rating">Rating</label>
-    <select id="filter-rating" name="rating">
-      <option value="all">Any rating</option>
-      <option value="4">4★ &amp; up</option>
-      <option value="4.5">4.5★ &amp; up</option>
+    <label for='filter-rating'>Rating</label>
+    <select id='filter-rating' name='rating'>
+      <option value='all'>Any rating</option>
+      <option value='4'>4★ &amp; up</option>
+      <option value='4.5'>4.5★ &amp; up</option>
     </select>
-    <label for="filter-deal">Deal status</label>
-    <select id="filter-deal" name="deal">
-      <option value="all">Any status</option>
-      <option value="on-sale">On sale</option>
-      <option value="drop-10">Price drop ≥ 10%</option>
-      <option value="drop-25">Price drop ≥ 25%</option>
+    <label for='filter-deal'>Deal status</label>
+    <select id='filter-deal' name='deal'>
+      <option value='all'>Any status</option>
+      <option value='on-sale'>On sale</option>
+      <option value='drop-10'>Price drop ≥ 10%</option>
+      <option value='drop-25'>Price drop ≥ 25%</option>
     </select>
-    <label for="filter-retailer">Retailer</label>
-    <select id="filter-retailer" name="retailer">
-      <option value="all">All partners</option>
+    <label for='filter-retailer'>Retailer</label>
+    <select id='filter-retailer' name='retailer'>
+      <option value='all'>All partners</option>
     </select>
   </div>
-  <div id="search-feedback" class="search-empty" role="status" aria-live="polite" aria-atomic="true">Start typing to reveal the latest gift ideas.</div>
-  <ol id="search-results" class="search-results" aria-live="polite"></ol>
+  <div id='search-feedback' class='search-empty' role='status' aria-live='polite' aria-atomic='true'>Previewing the latest gift ideas while you search.</div>
+  <ol id='search-results' class='search-results' aria-live='polite'>__FALLBACK_RESULTS__</ol>
+  <div class='feed-sentinel search-sentinel' data-search-sentinel aria-live='polite' hidden>
+    <button type='button' class='feed-more' data-search-more aria-controls='search-results' aria-expanded='false'>Show more results</button>
+  </div>
+  <noscript><p class='search-helper'>Enable JavaScript to filter results instantly.</p></noscript>
 </section>
 <script>
-const PRODUCT_INDEX = {dataset};
-const form = document.getElementById('search-page-form');
-const input = document.getElementById('search-query');
-const feedback = document.getElementById('search-feedback');
-const resultsList = document.getElementById('search-results');
-const priceSelect = document.getElementById('filter-price');
-const ratingSelect = document.getElementById('filter-rating');
-const dealSelect = document.getElementById('filter-deal');
-const retailerSelect = document.getElementById('filter-retailer');
-const retailerMap = new Map();
-for (const item of PRODUCT_INDEX) {{
-  if (item.retailerSlug && !retailerMap.has(item.retailerSlug)) {{
-    retailerMap.set(item.retailerSlug, item.retailerName || item.retailerSlug);
-  }}
-}}
-for (const [slug, name] of retailerMap.entries()) {{
-  const option = document.createElement('option');
-  option.value = slug;
-  option.textContent = name;
-  retailerSelect.appendChild(option);
-}}
-function getFilters() {{
-  return {{
-    price: priceSelect.value || 'all',
-    rating: ratingSelect.value || 'all',
-    deal: dealSelect.value || 'all',
-    retailer: retailerSelect.value || 'all',
-  }};
-}}
-function matchesFilters(item, filters) {{
-  if (filters.price !== 'all') {{
-    const value = typeof item.priceValue === 'number' ? item.priceValue : null;
-    if (value === null) {{
-      return false;
-    }}
-    if (filters.price === 'under-25' && value >= 25) {{
-      return false;
-    }}
-    if (filters.price === '25-50' && (value < 25 || value > 50)) {{
-      return false;
-    }}
-    if (filters.price === '50-100' && (value < 50 || value > 100)) {{
-      return false;
-    }}
-    if (filters.price === '100-plus' && value < 100) {{
-      return false;
-    }}
-  }}
-  if (filters.rating !== 'all') {{
-    const minRating = parseFloat(filters.rating);
-    if (!item.rating || item.rating < minRating) {{
-      return false;
-    }}
-  }}
-  if (filters.deal !== 'all') {{
-    const percent = typeof item.priceDropPercent === 'number' ? item.priceDropPercent : null;
-    const onSale = Boolean(item.onDeal) || (percent !== null && percent > 0);
-    if (filters.deal === 'on-sale') {{
-      if (!onSale) {{
+(function() {
+  const PRODUCT_INDEX = __PRODUCT_DATA__;
+  const form = document.getElementById('search-page-form');
+  const input = document.getElementById('search-query');
+  const feedback = document.getElementById('search-feedback');
+  const resultsList = document.getElementById('search-results');
+  const priceSelect = document.getElementById('filter-price');
+  const ratingSelect = document.getElementById('filter-rating');
+  const dealSelect = document.getElementById('filter-deal');
+  const retailerSelect = document.getElementById('filter-retailer');
+  const sentinel = document.querySelector('[data-search-sentinel]');
+  const moreButton = sentinel ? sentinel.querySelector('[data-search-more]') : null;
+  if (!form || !input || !feedback || !resultsList) {
+    return;
+  }
+  const retailerMap = new Map();
+  for (const item of PRODUCT_INDEX) {
+    if (item.retailerSlug && !retailerMap.has(item.retailerSlug)) {
+      retailerMap.set(item.retailerSlug, item.retailerName || item.retailerSlug);
+    }
+  }
+  for (const [slug, name] of retailerMap.entries()) {
+    const option = document.createElement('option');
+    option.value = slug;
+    option.textContent = name;
+    retailerSelect.appendChild(option);
+  }
+
+  const INITIAL_BATCH = 20;
+  const BATCH_SIZE = 20;
+  const fallbackMarkup = resultsList.innerHTML;
+  let currentMatches = [];
+  let visibleCount = INITIAL_BATCH;
+
+  function getFilters() {
+    return {
+      price: priceSelect.value || 'all',
+      rating: ratingSelect.value || 'all',
+      deal: dealSelect.value || 'all',
+      retailer: retailerSelect.value || 'all',
+    };
+  }
+
+  function matchesFilters(item, filters) {
+    if (filters.price !== 'all') {
+      const value = typeof item.priceValue === "number" ? item.priceValue : null;
+      if (value === null) {
         return false;
-      }}
-    }} else if (filters.deal === 'drop-10') {{
-      if (!(percent !== null && percent >= 10)) {{
+      }
+      if (filters.price === 'under-25' && value >= 25) {
         return false;
-      }}
-    }} else if (filters.deal === 'drop-25') {{
-      if (!(percent !== null && percent >= 25)) {{
+      }
+      if (filters.price === '25-50' && (value < 25 || value > 50)) {
         return false;
-      }}
-    }}
-  }}
-  if (filters.retailer !== 'all' && item.retailerSlug !== filters.retailer) {{
+      }
+      if (filters.price === '50-100' && (value < 50 || value > 100)) {
+        return false;
+      }
+      if (filters.price === '100-plus' && value < 100) {
+        return false;
+      }
+    }
+    if (filters.rating !== 'all') {
+      const minRating = parseFloat(filters.rating);
+      if (!item.rating || item.rating < minRating) {
+        return false;
+      }
+    }
+    if (filters.deal !== 'all') {
+      const percent = typeof item.priceDropPercent === "number" ? item.priceDropPercent : null;
+      const onSale = Boolean(item.onDeal) || (percent !== null && percent > 0);
+      if (filters.deal === 'on-sale') {
+        if (!onSale) {
+          return false;
+        }
+      } else if (filters.deal === 'drop-10') {
+        if (!(percent !== null && percent >= 10)) {
+          return false;
+        }
+      } else if (filters.deal === 'drop-25') {
+        if (!(percent !== null && percent >= 25)) {
+          return false;
+        }
+      }
+    }
+    if (filters.retailer !== 'all' && item.retailerSlug !== filters.retailer) {
+      return false;
+    }
+    return true;
+  }
+
+  function matchesQuery(item, normalized, hasQuery) {
+    if (!hasQuery) {
+      return true;
+    }
+    if (item.title.toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if ((item.summary || '').toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if (item.category && item.category.toLowerCase().includes(normalized)) {
+      return true;
+    }
+    if (item.keywordBlob && item.keywordBlob.includes(normalized)) {
+      return true;
+    }
+    if (Array.isArray(item.keywords)) {
+      return item.keywords.some((keyword) => (keyword || '').toLowerCase().includes(normalized));
+    }
     return false;
-  }}
-  return true;
-}}
-function matchesQuery(item, normalized, hasQuery) {{
-  if (!hasQuery) {{
-    return true;
-  }}
-  if (item.title.toLowerCase().includes(normalized)) {{
-    return true;
-  }}
-  if ((item.summary || '').toLowerCase().includes(normalized)) {{
-    return true;
-  }}
-  if (item.category && item.category.toLowerCase().includes(normalized)) {{
-    return true;
-  }}
-  if (item.keywordBlob && item.keywordBlob.includes(normalized)) {{
-    return true;
-  }}
-  if (Array.isArray(item.keywords)) {{
-    return item.keywords.some((keyword) => (keyword || '').toLowerCase().includes(normalized));
-  }}
-  return false;
-}}
-function renderResults(query, filters) {{
-  resultsList.innerHTML = '';
-  const hasQuery = Boolean(query);
-  const hasFilters = filters.price !== 'all' || filters.rating !== 'all' || filters.deal !== 'all' || filters.retailer !== 'all';
-  if (!hasQuery && !hasFilters) {{
-    feedback.textContent = 'Start typing to reveal the latest gift ideas.';
-    return;
-  }}
-  const normalized = query.toLowerCase();
-  const matches = PRODUCT_INDEX.filter((item) => {{
-    return matchesQuery(item, normalized, hasQuery) && matchesFilters(item, filters);
-  }}).slice(0, 60);
-  if (!matches.length) {{
-    feedback.textContent = 'No matching gifts yet — try a different keyword or adjust the filters.';
-    return;
-  }}
-  feedback.textContent = `Showing ${{matches.length}} conversion-ready picks.`;
-  const frag = document.createDocumentFragment();
-  for (const match of matches) {{
+  }
+
+  function updateControls(hasMore) {
+    if (!sentinel) {
+      return;
+    }
+    if (hasMore) {
+      sentinel.removeAttribute('hidden');
+      sentinel.setAttribute('aria-hidden', 'false');
+    } else {
+      sentinel.setAttribute('hidden', 'hidden');
+      sentinel.setAttribute('aria-hidden', 'true');
+    }
+    if (moreButton) {
+      moreButton.disabled = !hasMore;
+      moreButton.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
+    }
+  }
+
+  function restoreFallback() {
+    resultsList.innerHTML = fallbackMarkup;
+    updateControls(false);
+  }
+
+  function createResultItem(match) {
     const li = document.createElement('li');
     li.className = 'search-result';
     const heading = document.createElement('h3');
@@ -4507,106 +4834,190 @@ function renderResults(query, filters) {{
     summary.textContent = match.summary || 'Tap through to read the full hype breakdown.';
     li.appendChild(summary);
     const metaParts = [];
-    if (match.priceDisplay) {{
+    if (match.priceDisplay) {
       metaParts.push(match.priceDisplay);
-    }}
-    if (typeof match.rating === 'number') {{
-      metaParts.push(`${{match.rating.toFixed(1)}}★`);
-    }}
-    if (match.retailerName) {{
+    }
+    if (typeof match.rating === "number") {
+      metaParts.push(`${match.rating.toFixed(1)}★`);
+    }
+    if (match.retailerName) {
       metaParts.push(match.retailerName);
-    }}
-    if (match.priceDropLabel) {{
+    }
+    if (match.priceDropLabel) {
       metaParts.push(match.priceDropLabel);
-    }}
-    if (metaParts.length) {{
+    }
+    if (metaParts.length) {
       const meta = document.createElement('p');
       meta.className = 'search-meta';
       meta.textContent = metaParts.join(' • ');
       li.appendChild(meta);
-    }}
-    if (match.category) {{
+    }
+    if (match.category) {
       const badge = document.createElement('p');
       badge.className = 'badge';
       badge.textContent = match.category;
       li.appendChild(badge);
-    }}
-    frag.appendChild(li);
-  }}
-  resultsList.appendChild(frag);
-}}
-function updateUrl(query, filters) {{
-  const url = new URL(window.location.href);
-  if (query) {{
-    url.searchParams.set('q', query);
-  }} else {{
-    url.searchParams.delete('q');
-  }}
-  for (const [key, value] of Object.entries(filters)) {{
-    if (value && value !== 'all') {{
-      url.searchParams.set(key, value);
-    }} else {{
-      url.searchParams.delete(key);
-    }}
-  }}
-  window.history.replaceState(null, '', url.toString());
-}}
-function applyState() {{
-  const filters = getFilters();
-  const query = input.value.trim();
-  updateUrl(query, filters);
-  renderResults(query, filters);
-}}
-const params = new URLSearchParams(window.location.search);
-const initial = (params.get('q') || '').trim();
-const initialFilters = {{
-  price: params.get('price') || 'all',
-  rating: params.get('rating') || 'all',
-  deal: params.get('deal') || 'all',
-  retailer: params.get('retailer') || 'all',
-}};
-const priceOptions = new Set(['all', 'under-25', '25-50', '50-100', '100-plus']);
-const ratingOptions = new Set(['all', '4', '4.5']);
-const dealOptions = new Set(['all', 'on-sale', 'drop-10', 'drop-25']);
-if (!priceOptions.has(initialFilters.price)) {{
-  initialFilters.price = 'all';
-}}
-if (!ratingOptions.has(initialFilters.rating)) {{
-  initialFilters.rating = 'all';
-}}
-if (!dealOptions.has(initialFilters.deal)) {{
-  initialFilters.deal = 'all';
-}}
-if (initialFilters.retailer && !retailerMap.has(initialFilters.retailer)) {{
-  initialFilters.retailer = 'all';
-}}
-input.value = initial;
-priceSelect.value = initialFilters.price;
-ratingSelect.value = initialFilters.rating;
-dealSelect.value = initialFilters.deal;
-retailerSelect.value = initialFilters.retailer;
-applyState();
-form.addEventListener('submit', (event) => {{
-  event.preventDefault();
+    }
+    return li;
+  }
+
+  function renderMatches(resetCount) {
+    if (resetCount) {
+      visibleCount = Math.min(INITIAL_BATCH, currentMatches.length);
+    } else {
+      visibleCount = Math.min(visibleCount, currentMatches.length);
+    }
+    if (!currentMatches.length) {
+      resultsList.innerHTML = '';
+      updateControls(false);
+      feedback.textContent = 'No matching gifts yet — try a different keyword or adjust the filters.';
+      return;
+    }
+    const total = currentMatches.length;
+    const limit = Math.min(visibleCount, total);
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < limit; index += 1) {
+      fragment.appendChild(createResultItem(currentMatches[index]));
+    }
+    resultsList.innerHTML = '';
+    resultsList.appendChild(fragment);
+    const hasMore = total > limit;
+    updateControls(hasMore);
+    if (hasMore) {
+      feedback.textContent = `Showing ${limit} of ${total} conversion-ready picks.`;
+    } else {
+      feedback.textContent = `Showing ${total} conversion-ready picks.`;
+    }
+  }
+
+  function updateUrl(query, filters) {
+    const url = new URL(window.location.href);
+    if (query) {
+      url.searchParams.set('q', query);
+    } else {
+      url.searchParams.delete('q');
+    }
+    for (const [key, value] of Object.entries(filters)) {
+      if (value && value !== "all") {
+        url.searchParams.set(key, value);
+      } else {
+        url.searchParams.delete(key);
+      }
+    }
+    window.history.replaceState(null, '', url.toString());
+  }
+
+
+  function revealMore() {
+    if (currentMatches.length <= visibleCount) {
+      return;
+    }
+    visibleCount = Math.min(currentMatches.length, visibleCount + BATCH_SIZE);
+    renderMatches(false);
+  }
+
+  function applyState(options) {
+    const settings = options || {};
+    const resetBatch = settings.resetBatch !== false;
+    const filters = getFilters();
+    const query = input.value.trim();
+    updateUrl(query, filters);
+    const hasQuery = Boolean(query);
+    const hasFilters = filters.price !== 'all' || filters.rating !== 'all' || filters.deal !== 'all' || filters.retailer !== 'all';
+    if (!hasQuery && !hasFilters) {
+      currentMatches = [];
+      visibleCount = INITIAL_BATCH;
+      restoreFallback();
+      feedback.textContent = 'Previewing the latest gift ideas while you search.';
+      return;
+    }
+    const normalized = query.toLowerCase();
+    currentMatches = PRODUCT_INDEX.filter((item) => {
+      return matchesQuery(item, normalized, hasQuery) && matchesFilters(item, filters);
+    });
+    renderMatches(resetBatch);
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const initial = (params.get('q') || '').trim();
+  const initialFilters = {
+    price: params.get('price') || 'all',
+    rating: params.get('rating') || 'all',
+    deal: params.get('deal') || 'all',
+    retailer: params.get('retailer') || 'all',
+  };
+  const priceOptions = new Set(['all', 'under-25', '25-50', '50-100', '100-plus']);
+  const ratingOptions = new Set(['all', '4', '4.5']);
+  const dealOptions = new Set(['all', 'on-sale', 'drop-10', 'drop-25']);
+  if (!priceOptions.has(initialFilters.price)) {
+    initialFilters.price = 'all';
+  }
+  if (!ratingOptions.has(initialFilters.rating)) {
+    initialFilters.rating = 'all';
+  }
+  if (!dealOptions.has(initialFilters.deal)) {
+    initialFilters.deal = 'all';
+  }
+  if (initialFilters.retailer && !retailerMap.has(initialFilters.retailer)) {
+    initialFilters.retailer = 'all';
+  }
+  input.value = initial;
+  priceSelect.value = initialFilters.price;
+  ratingSelect.value = initialFilters.rating;
+  dealSelect.value = initialFilters.deal;
+  retailerSelect.value = initialFilters.retailer;
+  let typingTimer = null;
+  const INPUT_DEBOUNCE_MS = 200;
+  const filterControls = [priceSelect, ratingSelect, dealSelect, retailerSelect];
+
+  function queueApplyState() {
+    window.clearTimeout(typingTimer);
+    typingTimer = window.setTimeout(() => applyState(), INPUT_DEBOUNCE_MS);
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    applyState();
+  });
+
+  input.addEventListener('input', queueApplyState);
+  input.addEventListener('search', () => {
+    window.clearTimeout(typingTimer);
+    applyState();
+  });
+
+  for (const control of filterControls) {
+    control.addEventListener('change', () => applyState());
+  }
+
+  if (moreButton) {
+    moreButton.addEventListener('click', () => {
+      revealMore();
+    });
+  }
+
+  if ('IntersectionObserver' in window && sentinel) {
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          revealMore();
+        }
+      }
+    }, { rootMargin: '0px 0px 160px 0px' });
+    observer.observe(sentinel);
+  }
+
   applyState();
-}});
-input.addEventListener('input', () => {{
-  applyState();
-}});
-priceSelect.addEventListener('change', () => {{
-  applyState();
-}});
-ratingSelect.addEventListener('change', () => {{
-  applyState();
-}});
-dealSelect.addEventListener('change', () => {{
-  applyState();
-}});
-retailerSelect.addEventListener('change', () => {{
-  applyState();
-}});
+
+})();
 </script>
 """
+        body = (
+            body_template
+            .replace("__FALLBACK_RESULTS__", fallback_items)
+            .replace("__PRODUCT_DATA__", dataset)
+        )
+
         structured_data = [
             {
                 "@context": "https://schema.org",
@@ -4625,6 +5036,47 @@ retailerSelect.addEventListener('change', () => {{
             noindex=True,
         )
         self._write_page(self.output_dir / "search.html", context)
+
+    def _search_result_markup(self, product: Product, category_lookup: dict[str, str]) -> str:
+        latest_point = product.latest_price_point
+        price_display = product.price or (latest_point.display if latest_point else None)
+        meta_parts: list[str] = []
+        if price_display:
+            meta_parts.append(html.escape(price_display))
+        if product.rating is not None:
+            meta_parts.append(html.escape(f"{product.rating:.1f}★"))
+        if product.retailer_name:
+            meta_parts.append(html.escape(product.retailer_name))
+        drop_amount = product.price_drop_amount()
+        drop_percent = product.price_drop_percent()
+        if drop_amount is not None:
+            currency = latest_point.currency if latest_point else None
+            formatted_amount = self._format_currency(drop_amount, currency)
+            if drop_percent is not None:
+                label = f"↓ {drop_percent:.0f}% ({formatted_amount} off)"
+            else:
+                label = f"↓ {formatted_amount} off"
+            meta_parts.append(html.escape(label))
+        meta_html = ""
+        if meta_parts:
+            meta_html = f"<p class='search-meta'>{' • '.join(meta_parts)}</p>"
+        category_name = category_lookup.get(product.category_slug or "", "")
+        badge_html = (
+            f"<p class='badge'>{html.escape(category_name)}</p>"
+            if category_name
+            else ""
+        )
+        summary = html.escape(product.summary or "Tap through to read the full hype breakdown.")
+        title = html.escape(product.title)
+        link = html.escape(f"/{self._product_path(product)}")
+        return (
+            "<li class='search-result'>"
+            f"<h3><a href='{link}'>{title}</a></h3>"
+            f"<p>{summary}</p>"
+            f"{meta_html}"
+            f"{badge_html}"
+            "</li>"
+        )
 
     def _write_feed(
         self,

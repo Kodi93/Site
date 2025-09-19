@@ -1,6 +1,16 @@
 const crypto = require('crypto');
 const { URL, URLSearchParams } = require('url');
 
+const accountStoreModule = process.env.ACCOUNT_STORE_MODULE
+  ? require(process.env.ACCOUNT_STORE_MODULE)
+  : require('../lib/accountStore');
+
+const { deleteUserById } = accountStoreModule;
+
+if (typeof deleteUserById !== 'function') {
+  throw new Error('Account store module must export a deleteUserById function.');
+}
+
 const REQUIRED_METHOD = 'POST';
 const EXPECTED_TOKEN = 'gdel1f4f2f7c9b0a4f2e86b0bb7fb6c0f1a5';
 const HEALTH_CHECK_METHODS = new Set(['GET', 'HEAD']);
@@ -93,6 +103,45 @@ function resolveEndpoint(event) {
 
   const protocol = headers['x-forwarded-proto'] || headers['x-forwarded_proto'] || 'https';
   return `${protocol}://${host}${path}`;
+}
+
+function jsonResponse(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+function resolveUserIdFromPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    payload.userId,
+    payload.user_id,
+    payload.accountId,
+    payload.account_id,
+    payload.id,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  if (payload.user && typeof payload.user === 'object') {
+    return resolveUserIdFromPayload(payload.user);
+  }
+
+  return null;
 }
 
 exports.handler = async (event) => {
@@ -194,8 +243,22 @@ exports.handler = async (event) => {
 
   console.info('Marketplace account deletion payload received.', payload);
 
-  // TODO: Wire up your persistence layer deletion logic here.
-  // Example: await deleteUserById(payload.userId);
+  const userId = resolveUserIdFromPayload(payload);
+  if (!userId) {
+    return jsonResponse(400, { message: 'Missing user identifier in payload' });
+  }
+
+  try {
+    const deleted = await deleteUserById(userId);
+    if (!deleted) {
+      return jsonResponse(404, { message: 'Account not found' });
+    }
+  } catch (error) {
+    console.error('Failed to delete marketplace account.', error);
+    return jsonResponse(500, { message: 'Failed to delete account' });
+  }
+
+  console.info('Marketplace account deleted for', userId);
 
   return {
     statusCode: 204,
