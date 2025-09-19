@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="socialGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7f56d9" />
+      <stop offset="50%" stop-color="#12b76a" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+    <radialGradient id="socialHalo" cx="80%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#f6f4ff" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#0f0a1e" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" rx="42" fill="#0f0a1e" />
+  <rect width="1140" height="570" x="30" y="30" rx="38" fill="url(#socialGradient)" opacity="0.85" />
+  <rect width="900" height="420" x="150" y="120" rx="30" fill="url(#socialHalo)" />
+  <g fill="#f6f4ff" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text font-size="68" font-weight="800" x="180" y="300">Grab Gifts — Curated drops, zero guesswork</text>
+    <text font-size="34" font-weight="600" x="180" y="360" opacity="0.82">Fallback social share artwork for polished previews</text>
+  </g>
+  <circle cx="1020" cy="170" r="78" fill="#ffffff" opacity="0.12" />
+  <circle cx="260" cy="470" r="96" fill="#12b76a" opacity="0.18" />
+</svg>

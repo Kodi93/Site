@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <radialGradient id="heroGlow" cx="50%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#7f56d9" stop-opacity="0.85" />
+      <stop offset="55%" stop-color="#53389e" stop-opacity="0.65" />
+      <stop offset="100%" stop-color="#0f0a1e" stop-opacity="1" />
+    </radialGradient>
+    <linearGradient id="heroSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.55" />
+      <stop offset="60%" stop-color="#12b76a" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#7f56d9" stop-opacity="0.2" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="64" fill="#0f0a1e" />
+  <rect width="1480" height="780" x="60" y="60" rx="58" fill="url(#heroGlow)" />
+  <rect width="1120" height="520" x="240" y="190" rx="42" fill="url(#heroSheen)" opacity="0.55" />
+  <g fill="#f6f4ff" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text font-size="78" font-weight="800" x="280" y="360">Bring campaigns to life in minutes</text>
+    <text font-size="40" font-weight="600" x="280" y="430" opacity="0.82">Use this polished fallback art whenever a product image is missing.</text>
+  </g>
+  <circle cx="1310" cy="660" r="120" fill="#12b76a" opacity="0.18" />
+  <circle cx="1360" cy="620" r="64" fill="#f97316" opacity="0.22" />
+  <circle cx="380" cy="700" r="92" fill="#7f56d9" opacity="0.28" />
+</svg>

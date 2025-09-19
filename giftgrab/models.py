@@ -268,6 +268,9 @@ class Category:
     name: str
     blurb: str
     keywords: List[str]
+    image: str | None = None
+    card_image: str | None = None
+    hero_image: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -275,6 +278,9 @@ class Category:
             "name": self.name,
             "blurb": self.blurb,
             "keywords": self.keywords,
+            "image": self.image,
+            "card_image": self.card_image,
+            "hero_image": self.hero_image,
         }
 
 

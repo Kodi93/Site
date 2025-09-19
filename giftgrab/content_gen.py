@@ -10,6 +10,10 @@ from .models import Product
 from .utils import slugify
 
 
+BRAND_GUIDE_HERO = "/assets/brand/hero-fallback.svg"
+BRAND_GUIDE_CARD = "/assets/brand/card-fallback.svg"
+
+
 DEFAULT_RELATED_FALLBACK = [
     "gifts-for-him",
     "tech-and-gadgets",
@@ -89,7 +93,7 @@ def _hero_image(products: Sequence[Product]) -> str:
     for product in products:
         if product.image:
             return product.image
-    return "https://source.unsplash.com/1200x630/?gift-guide"
+    return BRAND_GUIDE_HERO
 
 
 def _article_tags(topic: str, products: Sequence[Product]) -> List[str]:
@@ -196,7 +200,7 @@ def _build_items(products: Sequence[Product], *, context: str) -> List[ArticleIt
                 anchor=anchor,
                 title=product.title,
                 product_slug=product.slug,
-                image=product.image or "https://source.unsplash.com/800x600/?gifts",
+                image=product.image or BRAND_GUIDE_CARD,
                 blurb=blurb,
                 specs=specs,
                 tags=_extract_keywords(product, limit=4),

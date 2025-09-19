@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="himGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="55%" stop-color="#312e81" />
+      <stop offset="100%" stop-color="#7f56d9" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#0b1024" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#himGradient)" opacity="0.9" />
+  <circle cx="940" cy="210" r="110" fill="#38bdf8" opacity="0.2" />
+  <circle cx="300" cy="620" r="140" fill="#f97316" opacity="0.16" />
+  <g fill="#f6f4ff" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="170" y="320" font-size="70" font-weight="800">Statement gear for him</text>
+    <text x="170" y="390" font-size="34" font-weight="600" opacity="0.82">Bold tech, barware, and street-ready drops.</text>
+  </g>
+</svg>

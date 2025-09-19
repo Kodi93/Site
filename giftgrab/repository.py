@@ -136,7 +136,10 @@ class ProductRepository:
                 slug=definition.slug,
                 name=definition.name,
                 blurb=definition.blurb,
-                keywords=definition.keywords,
+                keywords=list(definition.keywords),
+                image=definition.image,
+                card_image=definition.card_image,
+                hero_image=definition.hero_image,
             )
             for definition in DEFAULT_CATEGORIES
         ]
