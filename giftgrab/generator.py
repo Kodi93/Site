@@ -847,6 +847,55 @@ main > section + section {
   padding: 2.5rem 3rem;
 }
 
+.guides-index {
+  padding: 3.5rem 0 4rem;
+}
+
+.guides-grid {
+  margin-top: 2.5rem;
+  display: grid;
+  gap: 2.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.guide-card {
+  background: var(--card);
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guide-card:hover,
+.guide-card:focus-within {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.guide-card-media img {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+}
+
+.guide-card-body {
+  padding: 1.8rem 2rem 2.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.guide-card-meta {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 .guide-intro p {
   font-size: 1.05rem;
 }
@@ -2253,10 +2302,12 @@ class SiteGenerator:
         if not og_type_value:
             og_type_value = "website"
         og_type = html.escape(og_type_value)
-        nav_links = "".join(
+        nav_link_parts = [
             f"<a href=\"/{self._category_path(slug)}\">{html.escape(name)}</a>"
             for slug, name in self._navigation_links()
-        )
+        ]
+        nav_link_parts.append('<a href="/guides/index.html">Guides</a>')
+        nav_links = "".join(nav_link_parts)
         raw_site_name = (self.settings.site_name or "Grab Gifts").strip() or "Grab Gifts"
         site_words = [word for word in raw_site_name.split() if word]
         highlight_word = site_words[-1] if site_words else raw_site_name
@@ -3802,6 +3853,111 @@ class SiteGenerator:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             context = self._article_page_context(article, category_lookup, product_lookup)
             self._write_page(output_path, context)
+        self._write_guides_page(articles)
+
+    def _write_guides_page(self, articles: Sequence[Article]) -> None:
+        published = [
+            article
+            for article in articles
+            if article.status == "published" and article.body_length >= 800
+        ]
+        published.sort(
+            key=lambda article: (
+                self._parse_iso_datetime(article.published_at)
+                or self._parse_iso_datetime(article.updated_at)
+                or datetime.min.replace(tzinfo=timezone.utc)
+            ),
+            reverse=True,
+        )
+        cards: List[str] = []
+        latest_update: datetime | None = None
+        for article in published:
+            published_dt = self._parse_iso_datetime(article.published_at)
+            if not published_dt:
+                published_dt = self._parse_iso_datetime(article.updated_at)
+            if published_dt and (latest_update is None or published_dt > latest_update):
+                latest_update = published_dt
+            date_label = self._format_display_date(published_dt)
+            teaser_source = article.intro[0] if article.intro else article.description
+            teaser = teaser_source.strip()
+            if len(teaser) > 220:
+                cutoff = teaser[:220].rsplit(" ", 1)[0]
+                teaser = cutoff + "…"
+            hero = html.escape(article.hero_image or DEFAULT_SOCIAL_IMAGE)
+            title = html.escape(article.title)
+            path = html.escape(article.path)
+            teaser_html = html.escape(teaser)
+            kind = html.escape(article.kind.title())
+            cards.append(
+                f"""
+<article class=\"guide-card\">
+  <a class=\"guide-card-media\" href=\"/{path}\">
+    <img src=\"{hero}\" alt=\"{title}\" loading=\"lazy\" decoding=\"async\" />
+  </a>
+  <div class=\"guide-card-body\">
+    <p class=\"guide-card-meta\">{kind} · {html.escape(date_label)}</p>
+    <h2><a href=\"/{path}\">{title}</a></h2>
+    <p>{teaser_html}</p>
+    <a class=\"button-link\" href=\"/{path}\">Read the guide</a>
+  </div>
+</article>
+"""
+            )
+        cards_html = "".join(cards)
+        if not cards_html:
+            body = f"""
+<section class=\"guides-index\">
+  <div class=\"section-heading\">\n    <h1>Guides &amp; gift playbooks</h1>\n    <p>Come back soon—we're assembling conversion-ready gift guides and seasonal playbooks for every audience.</p>\n  </div>
+</section>
+{self._newsletter_banner()}
+"""
+        else:
+            body = f"""
+<section class=\"guides-index\">
+  <div class=\"section-heading\">\n    <h1>Guides &amp; gift playbooks</h1>\n    <p>Plug-and-play editorial picks, price caps, and seasonal nudges built to help you surprise the people you love without endless scrolling.</p>\n  </div>
+  <div class=\"grid guides-grid\">{cards_html}</div>
+</section>
+{self._newsletter_banner()}
+"""
+        item_list = self._item_list_structured_data(
+            "Latest gift guides",
+            [
+                (
+                    article.title,
+                    self._absolute_url(article.path),
+                )
+                for article in published[:20]
+            ],
+        )
+        collection_data = self._collection_page_structured_data(
+            name="Guides & gift playbooks",
+            description="Browse conversion-tested gift guides with rotating price caps, seasonal hooks, and curated product picks.",
+            url=self._absolute_url("guides/index.html"),
+            item_list=item_list,
+        )
+        structured_data = [item_list, collection_data]
+        organization = self._organization_structured_data()
+        if organization:
+            structured_data.append(organization)
+        og_image = None
+        for article in published:
+            if article.hero_image:
+                og_image = article.hero_image
+                break
+        if og_image is None:
+            og_image = self.settings.logo_url or DEFAULT_SOCIAL_IMAGE
+        updated_time = self._format_iso8601(latest_update)
+        context = PageContext(
+            title=f"Guides & gift playbooks — {self.settings.site_name}",
+            description="Explore curated guides packed with under-the-radar gifts, price caps, and seasonal prompts for every relationship.",
+            canonical_url=self._absolute_url("guides/index.html"),
+            body=body,
+            og_image=og_image,
+            structured_data=structured_data,
+            og_image_alt="Featured gift guides",
+            updated_time=updated_time,
+        )
+        self._write_page(self.output_dir / "guides/index.html", context)
 
     def _article_page_context(
         self,
@@ -4632,6 +4788,12 @@ retailerSelect.addEventListener('change', () => {{
                 "lastmod": self._format_iso8601(latest_site_update),
                 "changefreq": "daily",
                 "priority": "0.8",
+            },
+            {
+                "loc": self._absolute_url("guides/index.html"),
+                "lastmod": self._format_iso8601(latest_site_update),
+                "changefreq": "daily",
+                "priority": "0.72",
             },
         ]
         if self._has_deals_page and self._deals_products:

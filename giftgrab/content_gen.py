@@ -1,7 +1,7 @@
 """Generate long-form editorial content for roundups and weekly picks."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Sequence
 from uuid import uuid4
 
@@ -174,6 +174,76 @@ def _intro_weekly(week_number: int, year: int, *, items: Sequence[Product]) -> L
     return [first, second, third]
 
 
+def _intro_partner(
+    audience: str,
+    price_cap: float,
+    *,
+    items: Sequence[Product],
+    holiday: str | None,
+    holiday_date: date | None,
+) -> List[str]:
+    sample_titles = [product.title for product in items[:3]]
+    highlight = ", ".join(sample_titles) or "fresh drops we can't stop recommending"
+    count = len(items)
+    price_text = f"${price_cap:,.0f}"
+    if holiday:
+        event_phrase = holiday
+        if holiday_date:
+            event_phrase = f"{holiday} on {holiday_date.strftime('%B %d')}"
+        first = (
+            f"{event_phrase} has a way of sneaking up, so we stitched together {count} under-{price_text} wins tailored for your {audience}. "
+            f"Our editors blended conversion data, reader wish lists, and shipping cutoff intel to surface showstoppers like {highlight}."
+        )
+    else:
+        first = (
+            f"Readers keep asking for under-{price_text} ideas that make a {audience} feel wildly appreciated, so we pulled {count} standouts including {highlight}. "
+            "Each one earned rave scores for sentiment, packaging, and long-haul delight."
+        )
+    second = (
+        f"Every pick stays at or below {price_text} yet still feels premium thanks to luxe textures, personalization moments, or clever utility touches. "
+        "Use the blurbs to understand the love-it details in plain language and skim the specs for price, rating, and retailer perks so checkout decisions happen fast."
+    )
+    third = (
+        "Treat the guide like a plug-and-play planning doc—stack two items into a themed surprise, tap the related hubs for backup plans, and note any customization lead times so nothing slips through the cracks. "
+        "We also flag delivery windows and return policies so last-minute pivots never derail the celebration."
+    )
+    return [first, second, third]
+
+
+def _guide_who_for(audience: str) -> str:
+    return (
+        f"Ideal for celebrating your {audience} during anniversaries, milestone wins, or just-because Tuesdays. Pair any pick with a handwritten note, a playlist, or a mini experience to keep the momentum going."
+    )
+
+
+def _guide_consider(price_cap: float, holiday: str | None) -> str:
+    budget_callout = (
+        f"Everything lands at or below ${price_cap:,.0f}, though flash restocks can nudge prices slightly."
+    )
+    timing_callout = (
+        f"Build in buffer time for engraving or shipping—{holiday} gifting rushes sell out fast." if holiday else "Double-check personalization windows and delivery cutoffs so surprise plans stay on track."
+    )
+    return (
+        f"{budget_callout} {timing_callout} Keep receipts handy for easy swaps and peek at retailer loyalty perks if you want to stretch the budget further."
+    )
+
+
+def _guide_meta_description(
+    audience: str,
+    price_cap: float,
+    *,
+    holiday: str | None,
+) -> str:
+    price_text = f"${price_cap:,.0f}"
+    celebration = holiday or "surprise night"
+    description = (
+        f"Curated gifts under {price_text} for your {audience} with blurbs, price callouts, and shipping tips so planning a {celebration.lower()} feels effortless."
+    )
+    if len(description) < 140:
+        description += " Expect editor-tested picks, personalization intel, and related hubs for backup plans."
+    return description[:160]
+
+
 def _who_for(topic: str, *, audience: str) -> str:
     return (
         f"Great for {audience} who light up when a gift feels tailored to their routine. Use it for birthdays, office swaps, or to surprise a friend who already owns the basics—these ideas layer personality without asking for a splurge."
@@ -237,6 +307,56 @@ def _meta_weekly(week_number: int, year: int, *, items: Sequence[Product]) -> st
 
 def _article_id() -> str:
     return uuid4().hex
+
+
+def make_spouse_guide(
+    *,
+    audience_slug: str,
+    audience_label: str,
+    tone: str,
+    price_cap: float,
+    products: Sequence[Product],
+    now: datetime | None = None,
+    holiday: str | None = None,
+    holiday_date: date | None = None,
+    related_products: Sequence[Product] | None = None,
+    hub_slugs: Sequence[str] | None = None,
+) -> Article:
+    now = now or datetime.now(timezone.utc)
+    limited = list(products[:12]) if len(products) >= 12 else list(products)
+    items = _build_items(limited, context=tone)
+    intro = _intro_partner(
+        audience_label,
+        price_cap,
+        items=limited,
+        holiday=holiday,
+        holiday_date=holiday_date,
+    )
+    who_for = _guide_who_for(audience_label)
+    consider = _guide_consider(price_cap, holiday)
+    related = related_products or []
+    slug = slugify(
+        f"{audience_slug}-gifts-under-{int(price_cap)}-{now.date().isoformat()}"
+    )
+    path = f"guides/{slug}/index.html"
+    article = Article(
+        id=_article_id(),
+        slug=slug,
+        path=path,
+        kind="guide",
+        title=f"Top {len(items)} gifts under ${int(price_cap)} for your {audience_label}",
+        description=_guide_meta_description(audience_label, price_cap, holiday=holiday),
+        hero_image=_hero_image(limited),
+        intro=intro,
+        who_for=who_for,
+        consider=consider,
+        items=items,
+        hub_slugs=list(hub_slugs or []),
+        related_product_slugs=_related_slugs(related),
+        tags=_article_tags(f"{audience_label} gifts", limited),
+    )
+    article.ensure_quality(min_items=10)
+    return article
 
 
 def make_roundup(
