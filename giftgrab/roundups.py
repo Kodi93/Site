@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import random
 import re
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
 from .affiliates import amazon_search_link
-from .article_repository import ArticleRepository
+from .article_repository import ArticleRepository, RoundupHistoryEntry
 from .config import DATA_DIR
 from .models import GeneratedProduct, RoundupArticle, RoundupItem
 from .repository import ProductRepository
@@ -18,9 +20,11 @@ from .text import clamp, clean_text, desc_roundup, intro_roundup, title_roundup
 from .utils import slugify, timestamp
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-ROUNDUP_CONFIG_FILE = BASE_DIR / "config" / "roundups.json"
+ROUNDUP_CONFIG_FILE = BASE_DIR / "config" / "step1.roundups.json"
 ROUNDUPS_PER_DAY_DEFAULT = 15
 ROUNDUP_PRODUCT_COUNT = 10
+
+logger = logging.getLogger(__name__)
 
 HIGHLIGHT_TONES = [
     "playful",
@@ -112,6 +116,96 @@ def _to_iso(when: datetime | None) -> str | None:
     return when.astimezone(timezone.utc).isoformat()
 
 
+@dataclass
+class RoundupPlan:
+    topic: str
+    cap: int
+    slug: str
+
+
+class RoundupHistoryManager:
+    """Coordinate cooldown and slug reservations for roundup generation."""
+
+    def __init__(
+        self,
+        *,
+        entries: Sequence[RoundupHistoryEntry] | None = None,
+        used_slugs: Sequence[str] | None = None,
+        cooldown_days: int = 90,
+    ) -> None:
+        self.cooldown_days = cooldown_days
+        self._entries: dict[tuple[str, int], RoundupHistoryEntry] = {}
+        self._slug_index: set[str] = set()
+        if used_slugs:
+            for slug in used_slugs:
+                if slug:
+                    self._slug_index.add(slug.strip().lower())
+        if entries:
+            for entry in entries:
+                key = self._make_key(entry.topic, entry.cap)
+                self._entries[key] = entry
+                if entry.slug:
+                    self._slug_index.add(entry.slug.strip().lower())
+
+    @staticmethod
+    def _make_key(topic: str, cap: int) -> tuple[str, int]:
+        return (topic.strip().lower(), int(cap))
+
+    def _ensure_timezone(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def is_on_cooldown(
+        self, topic: str, cap: int, reference_time: datetime
+    ) -> bool:
+        entry = self._entries.get(self._make_key(topic, cap))
+        if not entry:
+            return False
+        reference = self._ensure_timezone(reference_time)
+        last_published = entry.published_at_datetime()
+        return reference - last_published < timedelta(days=self.cooldown_days)
+
+    def cooldown_until(self, topic: str, cap: int) -> datetime | None:
+        entry = self._entries.get(self._make_key(topic, cap))
+        if not entry:
+            return None
+        return entry.published_at_datetime() + timedelta(days=self.cooldown_days)
+
+    def last_slug(self, topic: str, cap: int) -> str | None:
+        entry = self._entries.get(self._make_key(topic, cap))
+        return entry.slug if entry else None
+
+    def is_slug_available(self, slug: str) -> bool:
+        return slug.strip().lower() not in self._slug_index
+
+    def reserve_slug(self, slug: str) -> None:
+        if slug:
+            self._slug_index.add(slug.strip().lower())
+
+    def record_usage(
+        self, topic: str, cap: int, slug: str, when: datetime | str | None
+    ) -> None:
+        timestamp_value: str
+        if isinstance(when, datetime):
+            timestamp_value = _to_iso(when) or timestamp()
+        elif isinstance(when, str) and when.strip():
+            timestamp_value = when
+        else:
+            timestamp_value = timestamp()
+        entry = RoundupHistoryEntry(
+            topic=str(topic),
+            cap=int(cap),
+            slug=str(slug),
+            last_published=timestamp_value,
+        )
+        self._entries[self._make_key(topic, cap)] = entry
+        self.reserve_slug(slug)
+
+    def entries(self) -> List[RoundupHistoryEntry]:
+        return list(self._entries.values())
+
+
 def load_roundup_config(path: Path) -> Sequence[dict]:
     if not path.exists():
         raise FileNotFoundError(f"Roundup configuration not found: {path}")
@@ -125,8 +219,10 @@ def load_roundup_config(path: Path) -> Sequence[dict]:
 def pick_combinations(
     config: Sequence[dict],
     *,
-    limit: int = ROUNDUPS_PER_DAY_DEFAULT,
+    limit: int | None = ROUNDUPS_PER_DAY_DEFAULT,
     seed: str | None = None,
+    history: RoundupHistoryManager | None = None,
+    reference_time: datetime | None = None,
 ) -> List[tuple[str, int]]:
     options: List[tuple[str, int]] = []
     for entry in config:
@@ -145,7 +241,27 @@ def pick_combinations(
     seed_value = seed or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rng = random.Random(seed_value)
     rng.shuffle(options)
-    return options[:limit]
+    if history is None:
+        if limit is None:
+            return options
+        return options[:limit]
+    reference = reference_time or datetime.now(timezone.utc)
+    available: List[tuple[str, int]] = []
+    for topic, cap in options:
+        if history.is_on_cooldown(topic, cap, reference):
+            cooldown_end = history.cooldown_until(topic, cap)
+            logger.info(
+                "Cooldown skip for '%s' under $%s until %s (last slug: %s)",
+                topic,
+                cap,
+                cooldown_end.isoformat() if cooldown_end else "unknown",
+                history.last_slug(topic, cap) or "",
+            )
+            continue
+        available.append((topic, cap))
+    if limit is None:
+        return available
+    return available[:limit]
 
 
 def synthesize_item_names(
@@ -396,8 +512,9 @@ def build_roundup(
     edition_label: str | None,
     slug_suffix: str | None,
     published_at: datetime | None,
+    slug_override: str | None = None,
 ) -> RoundupArticle:
-    slug = _compose_slug("top-10", topic, f"under-{cap}", slug_suffix)
+    slug = slug_override or _compose_slug("top-10", topic, f"under-{cap}", slug_suffix)
     publish_iso = _to_iso(published_at)
     items = [
         RoundupItem(
@@ -442,12 +559,83 @@ def generate_roundups(
     edition_label: str | None = None,
     slug_suffix: str | None = None,
     publish_at: datetime | None = None,
+    history: RoundupHistoryManager | None = None,
+    week_number: int | None = None,
 ) -> tuple[List[RoundupArticle], List[GeneratedProduct]]:
     config = load_roundup_config(config_path)
-    combinations = pick_combinations(config, limit=limit, seed=seed)
+    reference_time = publish_at or datetime.now(timezone.utc)
+    if history is not None:
+        combinations = pick_combinations(
+            config,
+            limit=None,
+            seed=seed,
+            history=history,
+            reference_time=reference_time,
+        )
+    else:
+        combinations = pick_combinations(config, limit=limit, seed=seed)
+    if not combinations:
+        return [], []
+    limit_value = max(1, int(limit))
+    plans: List[RoundupPlan] = []
+    version_candidates: List[tuple[str, int]] = []
+    if history is None:
+        for topic, cap in combinations[:limit_value]:
+            plans.append(
+                RoundupPlan(
+                    topic=topic,
+                    cap=cap,
+                    slug=_compose_slug("top-10", topic, f"under-{cap}", slug_suffix),
+                )
+            )
+    else:
+        for topic, cap in combinations:
+            if len(plans) >= limit_value:
+                break
+            candidate_slug = _compose_slug("top-10", topic, f"under-{cap}")
+            if history.is_slug_available(candidate_slug):
+                plans.append(
+                    RoundupPlan(topic=topic, cap=cap, slug=candidate_slug)
+                )
+                history.reserve_slug(candidate_slug)
+            else:
+                version_candidates.append((topic, cap))
+        if len(plans) < limit_value and version_candidates:
+            week_value = week_number or reference_time.isocalendar()[1]
+            for topic, cap in version_candidates:
+                if len(plans) >= limit_value:
+                    break
+                base_slug = _compose_slug("top-10", topic, f"under-{cap}")
+                label_prefix = f"w{int(week_value):02d}" if week_value else "w"
+                attempt = 0
+                while attempt < 10:
+                    suffix = (
+                        label_prefix
+                        if attempt == 0
+                        else f"{label_prefix}-{attempt + 1}"
+                    )
+                    candidate = f"{base_slug}-{suffix}"
+                    if history.is_slug_available(candidate):
+                        plans.append(
+                            RoundupPlan(topic=topic, cap=cap, slug=candidate)
+                        )
+                        history.reserve_slug(candidate)
+                        logger.info(
+                            "Versioned slug for '%s' under $%s -> %s",
+                            topic,
+                            cap,
+                            candidate,
+                        )
+                        break
+                    attempt += 1
+    if not plans:
+        return [], []
+    plans = plans[:limit_value]
     roundups: List[RoundupArticle] = []
     generated_products: List[GeneratedProduct] = []
-    for combo_index, (topic, cap) in enumerate(combinations, start=1):
+    for combo_index, plan in enumerate(plans, start=1):
+        topic = plan.topic
+        cap = plan.cap
         combo_seed = f"{seed or 'auto'}-{slug_suffix or ''}-{topic}-{cap}-{combo_index}"
         names = synthesize_item_names(
             topic, seed=combo_seed, edition_label=edition_label
@@ -489,8 +677,16 @@ def generate_roundups(
                 edition_label=edition_label,
                 slug_suffix=slug_suffix,
                 published_at=roundup_publish_dt,
+                slug_override=plan.slug,
             )
         )
+        if history is not None:
+            history.record_usage(
+                topic,
+                cap,
+                roundups[-1].slug,
+                roundup_publish_dt or base_publish_dt or reference_time,
+            )
     return roundups, generated_products
 
 
@@ -501,6 +697,7 @@ def generate_roundups_for_span(
     days: int = 1,
     limit: int = ROUNDUPS_PER_DAY_DEFAULT,
     seed: str | None = None,
+    history: RoundupHistoryManager | None = None,
 ) -> tuple[List[RoundupArticle], List[GeneratedProduct]]:
     effective_days = max(1, int(days))
     start = start_date or datetime.now(timezone.utc).date()
@@ -520,6 +717,8 @@ def generate_roundups_for_span(
             edition_label=edition_label,
             slug_suffix=slug_suffix,
             publish_at=base_publish,
+            history=history,
+            week_number=edition_date.isocalendar()[1],
         )
         roundups.extend(day_roundups)
         products.extend(day_products)
@@ -538,15 +737,23 @@ def run_daily_roundups(
 ) -> tuple[List[RoundupArticle], List[GeneratedProduct]]:
     repo = repository or ProductRepository()
     article_repo = article_repository or ArticleRepository(DATA_DIR / "articles.json")
+    existing_roundups = article_repo.load_roundups()
+    history_entries = article_repo.load_roundup_history()
+    history_manager = RoundupHistoryManager(
+        entries=history_entries,
+        used_slugs=[roundup.slug for roundup in existing_roundups],
+    )
     roundups, generated_products = generate_roundups_for_span(
         config_path=config_path,
         start_date=start_date,
         days=days,
         limit=limit,
         seed=seed,
+        history=history_manager,
     )
     for roundup in roundups:
         article_repo.upsert_roundup(roundup)
+    article_repo.save_roundup_history(history_manager.entries())
     repo.upsert_generated_products(generated_products)
     return roundups, generated_products
 

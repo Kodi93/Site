@@ -2,14 +2,55 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Sequence
+from typing import Iterable, List, Sequence
 
 from .articles import Article
 from .models import RoundupArticle
 from .utils import dump_json, load_json, timestamp
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RoundupHistoryEntry:
+    """Tracks when a topic/cap pairing was last published."""
+
+    topic: str
+    cap: int
+    slug: str
+    last_published: str
+
+    def to_dict(self) -> dict:
+        return {
+            "topic": self.topic,
+            "cap": self.cap,
+            "slug": self.slug,
+            "last_published": self.last_published,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RoundupHistoryEntry":
+        return cls(
+            topic=str(data.get("topic", "")),
+            cap=int(data.get("cap", 0)),
+            slug=str(data.get("slug", "")),
+            last_published=str(data.get("last_published") or timestamp()),
+        )
+
+    def published_at_datetime(self) -> datetime:
+        """Return the published timestamp as a timezone-aware datetime."""
+
+        raw = self.last_published
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            parsed = datetime.now(timezone.utc)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
 
 class ArticleRepository:
@@ -33,6 +74,7 @@ class ArticleRepository:
                     "guide_last_published": None,
                 },
                 "roundups": [],
+                "roundup_history": [],
             },
         )
 
@@ -50,6 +92,7 @@ class ArticleRepository:
             },
         )
         data.setdefault("roundups", [])
+        data.setdefault("roundup_history", [])
         return data
 
     def load_articles(self) -> List[Article]:
@@ -141,6 +184,43 @@ class ArticleRepository:
         payload["roundups"] = [roundup.to_dict() for roundup in roundups]
         payload["last_saved"] = timestamp()
         dump_json(self.data_file, payload)
+
+    # ------------------------------------------------------------------
+    # Roundup history helpers
+    def load_roundup_history(self) -> List[RoundupHistoryEntry]:
+        payload = self._load_payload()
+        entries: List[RoundupHistoryEntry] = []
+        for raw in payload.get("roundup_history", []):
+            if isinstance(raw, dict):
+                try:
+                    entries.append(RoundupHistoryEntry.from_dict(raw))
+                except Exception as error:  # pragma: no cover - logged for visibility
+                    logger.debug("Skipping invalid roundup history payload: %s", error)
+        return entries
+
+    def save_roundup_history(
+        self, history: Iterable[RoundupHistoryEntry]
+    ) -> None:
+        payload = self._load_payload()
+        payload["roundup_history"] = [entry.to_dict() for entry in history]
+        payload["last_saved"] = timestamp()
+        dump_json(self.data_file, payload)
+
+    def upsert_roundup_history(self, entry: RoundupHistoryEntry) -> None:
+        entries = self.load_roundup_history()
+        key = (entry.topic.lower().strip(), int(entry.cap))
+        updated: List[RoundupHistoryEntry] = []
+        replaced = False
+        for existing in entries:
+            existing_key = (existing.topic.lower().strip(), int(existing.cap))
+            if existing_key == key:
+                updated.append(entry)
+                replaced = True
+            else:
+                updated.append(existing)
+        if not replaced:
+            updated.append(entry)
+        self.save_roundup_history(updated)
 
     def upsert_roundup(self, roundup: RoundupArticle) -> RoundupArticle:
         roundups = self.load_roundups()
