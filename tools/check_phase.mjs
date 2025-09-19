@@ -4,8 +4,24 @@ import fetch from "node-fetch";
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, "public");
+const THEME_PATH = path.join(PUBLIC_DIR, "assets", "theme.css");
 const BANNED_PHRASES = ["fresh drops", "active vibes"];
 const PRODUCT_IMAGE_LIMIT = 100;
+const NAV_LINKS = [
+  "Home",
+  "For Him",
+  "For Her",
+  "Tech",
+  "Gamers",
+  "Fandom",
+  "Homebody",
+  "Guides",
+  "FAQ",
+];
+
+function escapeRegExp(input) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function readHtml(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -45,16 +61,20 @@ function ensureHeaderFooter(html, filePath) {
   if (!/<header[^>]*class=["']site-header["']/i.test(html)) {
     throw new Error(`Missing site header in ${filePath}`);
   }
-  if (!html.includes('<img src="/assets/logo.svg"')) {
+  if (!html.includes('<img src="/assets/grabgifts.svg"')) {
     throw new Error(`Header logo not found in ${filePath}`);
   }
   const navMatch = html.match(/<nav class=["']site-nav["'][^>]*>([\s\S]*?)<\/nav>/i);
   if (!navMatch) {
     throw new Error(`Primary navigation missing in ${filePath}`);
   }
-  const linkCount = (navMatch[1].match(/<a\b/gi) || []).length;
-  if (linkCount < 6) {
-    throw new Error(`Primary navigation should include at least 6 links in ${filePath}`);
+  const linkMatches = Array.from(navMatch[1].matchAll(/<a[^>]*>([^<]+)<\/a>/gi)).map((match) =>
+    match[1].trim(),
+  );
+  for (const expected of NAV_LINKS) {
+    if (!linkMatches.includes(expected)) {
+      throw new Error(`Navigation link "${expected}" missing in ${filePath}`);
+    }
   }
   const footerMatch = html.match(/<footer[^>]*class=["']site-footer["'][^>]*>([\s\S]*?)<\/footer>/i);
   if (!footerMatch) {
@@ -62,6 +82,52 @@ function ensureHeaderFooter(html, filePath) {
   }
   if (!/href=["']\/faq\//i.test(footerMatch[1])) {
     throw new Error(`Footer must include a /faq/ link in ${filePath}`);
+  }
+}
+
+function ensureHero(homeHtml, filePath) {
+  if (!/<section[^>]+class=["']hero["']/i.test(homeHtml)) {
+    throw new Error(`Hero section missing in ${filePath}`);
+  }
+  if (!/grabgifts<\/h1>/i.test(homeHtml)) {
+    throw new Error(`Hero title must be lowercase grabgifts in ${filePath}`);
+  }
+  if (!homeHtml.includes("Grab Gifts surfaces viral-ready Amazon finds")) {
+    throw new Error(`Hero tagline sentence one missing in ${filePath}`);
+  }
+  if (!homeHtml.includes("Launch scroll-stopping gift funnels")) {
+    throw new Error(`Hero tagline sentence two missing in ${filePath}`);
+  }
+  const actions = homeHtml.match(/<div[^>]*class=["']hero-actions["'][^>]*>([\s\S]*?)<\/div>/i);
+  if (!actions) {
+    throw new Error(`Hero actions missing in ${filePath}`);
+  }
+  const actionMarkup = actions[1];
+  const buttons = [
+    { href: "/guides/", label: "Explore today's drops" },
+    { href: "/surprise/", label: "Spin up a surprise" },
+    { href: "/changelog/", label: "See the live changelog" },
+  ];
+  for (const { href, label } of buttons) {
+    const pattern = new RegExp(
+      `<a[^>]+href=["']${escapeRegExp(href)}["'][^>]*>${escapeRegExp(label)}</a>`,
+      "i",
+    );
+    if (!pattern.test(actionMarkup)) {
+      throw new Error(`Hero button "${label}" linking to ${href} missing in ${filePath}`);
+    }
+  }
+}
+
+function ensureGradientTheme() {
+  if (!fs.existsSync(THEME_PATH)) {
+    throw new Error("theme.css missing from assets");
+  }
+  const css = fs.readFileSync(THEME_PATH, "utf8").toLowerCase();
+  for (const color of ["#2a0c6a", "#9b0f62", "#0a0810"]) {
+    if (!css.includes(color)) {
+      throw new Error(`Gradient color ${color} missing from theme.css`);
+    }
   }
 }
 
@@ -136,6 +202,7 @@ async function main() {
     ensureStylesheetLink(html, filePath);
     ensureNoStyleTags(html, filePath);
     ensureNoBannedContent(html, filePath);
+    ensureHeaderFooter(html, filePath);
     const sources = extractProductImageSources(html, filePath);
     for (const src of sources) {
       productImages.add(src);
@@ -143,9 +210,20 @@ async function main() {
   }
 
   const homeHtml = readHtml(homePath);
-  ensureHeaderFooter(homeHtml, homePath);
-  const guideHtml = readHtml(guidePath);
-  ensureHeaderFooter(guideHtml, guidePath);
+  ensureHero(homeHtml, homePath);
+
+  const guidesIndexPath = path.join(PUBLIC_DIR, "guides", "index.html");
+  if (!fs.existsSync(guidesIndexPath)) {
+    throw new Error("/guides/index.html is missing");
+  }
+  const surprisePath = path.join(PUBLIC_DIR, "surprise", "index.html");
+  if (!fs.existsSync(surprisePath)) {
+    throw new Error("/surprise/index.html is missing");
+  }
+  const changelogPath = path.join(PUBLIC_DIR, "changelog", "index.html");
+  if (!fs.existsSync(changelogPath)) {
+    throw new Error("/changelog/index.html is missing");
+  }
 
   const faqPath = path.join(PUBLIC_DIR, "faq", "index.html");
   if (!fs.existsSync(faqPath)) {
@@ -165,6 +243,8 @@ async function main() {
   for (const src of imagesToCheck) {
     await headRequest(src);
   }
+
+  ensureGradientTheme();
 
   console.log("Phase-1 checks passed.");
 }
