@@ -13,6 +13,9 @@ const BASE_TEMPLATE_PATH = path.join("templates", "base.html");
 const HEADER_PATH = path.join("templates", "partials", "header.html");
 const FOOTER_PATH = path.join("templates", "partials", "footer.html");
 const THEME_PATH = path.join(PUB, "assets", "theme.css");
+const FEED_DIR = path.join(PUB, "assets", "feed");
+const FEED_MANIFEST = path.join(FEED_DIR, "manifest.json");
+const FEED_PAGE_SIZE = 18;
 const PROTECTED_FILES = new Set(
   [BASE_TEMPLATE_PATH, HEADER_PATH, FOOTER_PATH, THEME_PATH].map((p) =>
     path.resolve(p),
@@ -59,6 +62,43 @@ function escapeHtml(input) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function parseTimestamp(value) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function compactObject(payload) {
+  const output = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    output[key] = value;
+  }
+  return output;
+}
+
+function formatCategory(item) {
+  if (item.category) return item.category;
+  if (item.category_slug) {
+    return titleCase(String(item.category_slug).replace(/[-_]+/g, " "));
+  }
+  return "";
+}
+
+function toFeedEntry(item) {
+  return compactObject({
+    id: item.id,
+    title: item.title,
+    url: item.url,
+    image: item.image,
+    price: item.price,
+    brand: item.brand,
+    category: formatCategory(item),
+    updatedAt: item.updated_at || item.updatedAt,
+  });
 }
 
 function ensureNotProtected(targetPath) {
@@ -159,6 +199,48 @@ function renderGuideCard(item) {
   return parts.join("");
 }
 
+function renderFeedItem(item) {
+  if (!item || !item.title || !item.url || !item.image) return "";
+  const metaParts = [];
+  if (item.category) metaParts.push(escapeHtml(item.category));
+  if (item.brand) metaParts.push(escapeHtml(item.brand));
+  const meta = metaParts.length
+    ? `<p class=\"feed-card-meta\">${metaParts.join(" • ")}</p>`
+    : "";
+  const price = item.price ? `<p class=\"feed-card-price\">${escapeHtml(item.price)}</p>` : "";
+  const media = `<div class=\"feed-card-media\"><img src=\"${escapeHtml(item.image)}\" alt=\"${escapeHtml(item.title)}\" loading=\"lazy\"></div>`;
+  const idAttr = item.id ? ` data-feed-id=\"${escapeHtml(item.id)}\"` : "";
+  return [
+    `<article class=\"feed-card\"${idAttr}>`,
+    `<a class=\"feed-card-link\" href=\"${escapeHtml(item.url)}\" rel=\"sponsored nofollow noopener\" target=\"_blank\">`,
+    media,
+    '<div class="feed-card-body">',
+    meta,
+    `<h3 class=\"feed-card-title\">${escapeHtml(item.title)}</h3>`,
+    price,
+    "</div>",
+    "</a>",
+    "</article>",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function renderGuidePreview(guide) {
+  const summary = guide.summary
+    ? escapeHtml(stripBannedPhrases(guide.summary))
+    : "Explore thoughtful ideas for every list.";
+  const title = polishGuideTitle(guide.title);
+  return [
+    '<li class="card">',
+    `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
+    `<h3>${escapeHtml(title)}</h3>`,
+    `<p>${summary}</p>`,
+    "</a>",
+    "</li>",
+  ].join("\n");
+}
+
 function renderGuidePage(title, slug, items) {
   const polishedTitle = polishGuideTitle(title);
   const cards = items
@@ -174,30 +256,152 @@ function renderGuidePage(title, slug, items) {
   return renderWithBase(sections.join("\n"));
 }
 
-function renderHomePage(guides) {
-  const intro = [
+function writeFeedData(items) {
+  fs.rmSync(FEED_DIR, { recursive: true, force: true });
+  const feedItems = items
+    .filter((item) => item && item.image && item.url && item.title)
+    .map((item) => toFeedEntry(item))
+    .sort((a, b) => {
+      const diff = parseTimestamp(b.updatedAt) - parseTimestamp(a.updatedAt);
+      if (diff !== 0) return diff;
+      return (a.title || "").localeCompare(b.title || "");
+    });
+
+  const totalPages = Math.ceil(feedItems.length / FEED_PAGE_SIZE);
+  const manifest = {
+    pageSize: FEED_PAGE_SIZE,
+    totalItems: feedItems.length,
+    totalPages,
+    generatedAt: new Date().toISOString(),
+    pages: [],
+  };
+
+  for (let index = 0; index < feedItems.length; index += FEED_PAGE_SIZE) {
+    const page = Math.floor(index / FEED_PAGE_SIZE) + 1;
+    const slice = feedItems.slice(index, index + FEED_PAGE_SIZE);
+    const href = `/assets/feed/page-${page}.json`;
+    manifest.pages.push({ page, href });
+    writeFile(
+      path.join(FEED_DIR, `page-${page}.json`),
+      `${JSON.stringify(
+        {
+          page,
+          pageSize: FEED_PAGE_SIZE,
+          totalPages,
+          totalItems: feedItems.length,
+          items: slice,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
+
+  writeFile(FEED_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  return {
+    initialItems: feedItems.slice(0, FEED_PAGE_SIZE),
+    initialPage: feedItems.length ? 1 : 0,
+    nextPage: totalPages > 1 ? `/assets/feed/page-2.json` : "",
+    pageSize: FEED_PAGE_SIZE,
+    totalPages,
+    totalItems: feedItems.length,
+    manifestHref: "/assets/feed/manifest.json",
+  };
+}
+
+function renderHomePage(guides, feed) {
+  const hero = [
+    '<section class="hero">',
     `<h1>${escapeHtml(SITE_NAME)}</h1>`,
     `<p>${escapeHtml(stripBannedPhrases(SITE_DESCRIPTION))}</p>`,
   ];
-  let cards = "";
-  if (guides.length) {
-    const items = guides.slice(0, 8).map((guide) => {
-      const summary = guide.summary
-        ? escapeHtml(stripBannedPhrases(guide.summary))
-        : "Explore thoughtful ideas for every list.";
-      const displayTitle = polishGuideTitle(guide.title);
-      return [
-        "<li class=\"card\">",
-        `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
-        `<h3>${escapeHtml(displayTitle)}</h3>`,
-        `<p>${summary}</p>`,
-        "</a>",
-        "</li>",
-      ].join("");
-    });
-    cards = `<ol class=\"grid\">${items.join("\n")}\n</ol>`;
+  if (feed.totalItems) {
+    hero.push(
+      '<div class="hero-actions">',
+      '<a class="button" href="#latest">Shop the live feed</a>',
+      '<a class="button button-ghost" href="/guides/">Browse guides</a>',
+      "</div>",
+    );
+  } else if (guides.length) {
+    hero.push(
+      '<div class="hero-actions">',
+      '<a class="button" href="/guides/">Browse guides</a>',
+      "</div>",
+    );
   }
-  const content = cards ? [...intro, cards].join("\n") : intro.join("\n");
+  hero.push("</section>");
+
+  const feedItemsMarkup = feed.initialItems
+    .map((item) => renderFeedItem(item))
+    .filter(Boolean)
+    .join("\n");
+  const feedListMarkup =
+    feedItemsMarkup ||
+    '<p class="feed-empty">More gifts are loading soon—check back for fresh picks.</p>';
+  const feedAttributes = [
+    'class="item-feed"',
+    "data-feed",
+    `data-feed-page=\"${feed.initialPage}\"`,
+    `data-feed-page-size=\"${feed.pageSize}\"`,
+    `data-feed-total=\"${feed.totalPages}\"`,
+    `data-feed-total-items=\"${feed.totalItems}\"`,
+    `data-feed-manifest=\"${escapeHtml(feed.manifestHref)}\"`,
+  ];
+  if (feed.nextPage) {
+    feedAttributes.push(`data-feed-next=\"${escapeHtml(feed.nextPage)}\"`);
+  } else {
+    feedAttributes.push("data-feed-complete");
+  }
+
+  const feedSection = [
+    '<section class="feed-section" id="latest">',
+    '<div class="feed-header">',
+    "<h2>Trending gifts now</h2>",
+    "<p>Scroll through new arrivals as they hit our catalog. We keep the feed fresh so you're never short on ideas.</p>",
+    "</div>",
+    `<div ${feedAttributes.join(" ")}>`,
+    `<div class=\"feed-list\" data-feed-list>${feedListMarkup}</div>`,
+  ];
+  if (feed.totalPages > 1) {
+    feedSection.push(
+      '<button class="button feed-load-more" type="button" data-feed-more>Load more gifts</button>',
+      '<p class="feed-status" data-feed-status aria-live="polite" hidden>Loading new picks…</p>',
+    );
+  } else {
+    feedSection.push(
+      '<p class="feed-status" data-feed-status aria-live="polite">You\'re all caught up.</p>',
+    );
+  }
+  feedSection.push(
+    '<div class="feed-sentinel" data-feed-sentinel></div>',
+    "</div>",
+    '<noscript><p class="feed-status">Enable JavaScript to load more gifts from the feed.</p></noscript>',
+    "</section>",
+  );
+
+  let guidesSection = "";
+  if (guides.length) {
+    const guideCards = guides
+      .slice(0, 6)
+      .map((guide) => renderGuidePreview(guide))
+      .filter(Boolean)
+      .join("\n");
+    if (guideCards) {
+      guidesSection = [
+        '<section class="feed-section">',
+        '<div class="feed-header">',
+        "<h2>Featured guides</h2>",
+        "<p>Dive into curated collections powered by the same inventory as our live feed.</p>",
+        "</div>",
+        `<ol class=\"grid\">${guideCards}</ol>`,
+        '<div class="hero-actions"><a class="button button-ghost" href="/guides/">View all guides</a></div>',
+        "</section>",
+      ].join("\n");
+    }
+  }
+
+  const content = [...hero, ...feedSection, guidesSection].filter(Boolean).join("\n");
   return renderWithBase(content);
 }
 
@@ -248,7 +452,8 @@ function main() {
     made++;
   }
 
-  const homeHtml = renderHomePage(guidesForHome);
+  const feedState = writeFeedData(items);
+  const homeHtml = renderHomePage(guidesForHome, feedState);
   writeFile(path.join(PUB, "index.html"), homeHtml);
   const faqHtml = renderFaqPage();
   writeFile(path.join(PUB, "faq", "index.html"), faqHtml);
