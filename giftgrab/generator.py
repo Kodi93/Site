@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,142 +15,34 @@ from .blog import blurb
 from .models import Guide, Product
 from .utils import slugify
 
-LOGGER = logging.getLogger(__name__)
+ROOT_DIR = Path(__file__).resolve().parent.parent
+HEADER_PATH = ROOT_DIR / "templates" / "partials" / "header.html"
+FOOTER_PATH = ROOT_DIR / "templates" / "partials" / "footer.html"
+THEME_PATH = ROOT_DIR / "public" / "assets" / "theme.css"
+PROTECTED_FILES = {
+    HEADER_PATH.resolve(),
+    FOOTER_PATH.resolve(),
+    THEME_PATH.resolve(),
+}
 
-BASE_STYLES = """
-:root {
-  color-scheme: light dark;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --bg: #070b11;
-  --bg-alt: #0f1622;
-  --text: #f5f7fa;
-  --text-muted: #a7b4c7;
-  --card: rgba(18, 26, 40, 0.92);
-  --accent: #6d5dfc;
-  --accent-soft: rgba(109, 93, 252, 0.18);
-  --border: rgba(255, 255, 255, 0.08);
-  --pill: rgba(255, 255, 255, 0.12);
-}
-body {
-  margin: 0;
-  background: radial-gradient(circle at top, rgba(109,93,252,0.35), transparent 55%), var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-}
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
-}
-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-  background: rgba(7, 11, 17, 0.82);
-  backdrop-filter: blur(14px);
-}
-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  max-width: 960px;
-  margin: 0 auto;
-}
-nav a {
-  color: var(--text);
-  text-decoration: none;
-  font-weight: 600;
-}
-.hero {
-  text-align: center;
-  margin: 3rem auto 2.5rem;
-  max-width: 720px;
-}
-.hero h1 {
-  margin-bottom: 1rem;
-  font-size: clamp(2.3rem, 4vw, 3rem);
-}
-.hero p {
-  color: var(--text-muted);
-  font-size: 1.05rem;
-}
-.grid {
-  display: grid;
-  gap: 1.6rem;
-}
-@media (min-width: 720px) {
-  .grid.cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 1.5rem;
-  box-shadow: 0 30px 70px rgba(0,0,0,0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.card img {
-  border-radius: 14px;
-  width: 100%;
-  height: auto;
-}
-.card h2 {
-  margin: 0;
-  font-size: 1.3rem;
-}
-.card p {
-  margin: 0;
-  color: var(--text-muted);
-}
-.price-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: var(--pill);
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.95rem;
-}
-.badge {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.product-meta {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-.button {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0.85rem 1.4rem;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 999px;
-  text-decoration: none;
-  font-weight: 600;
-}
-.footer {
-  border-top: 1px solid var(--border);
-  padding: 2.5rem 1.5rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-.section-title {
-  margin: 3rem 0 1.5rem;
-  font-size: 1.6rem;
-}
-"""
+
+def _load_partials() -> tuple[str, str, str]:
+    header_raw = HEADER_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
+    match = re.match(r"^\s*<!doctype html>\s*", header_raw, flags=re.IGNORECASE)
+    if match:
+        doctype = match.group(0).strip()
+        header_markup = header_raw[match.end():]
+    else:
+        doctype = "<!doctype html>"
+        header_markup = header_raw
+    header_markup = header_markup.strip()
+    footer_markup = FOOTER_PATH.read_text(encoding="utf-8").strip()
+    return doctype, f"{header_markup}\n", f"{footer_markup}\n"
+
+
+HEADER_DOCTYPE, HEADER_PARTIAL, FOOTER_PARTIAL = _load_partials()
+
+LOGGER = logging.getLogger(__name__)
 
 GUIDE_ITEM_TARGET = 20
 
@@ -265,12 +158,18 @@ class SiteGenerator:
             "<script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>"
         )
 
+    def _safe_write(self, target: Path, content: str) -> None:
+        resolved = target.resolve()
+        if resolved in PROTECTED_FILES:
+            raise RuntimeError("Protected layout files may not be modified by content builds.")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
     def _write_file(self, path: str, content: str) -> None:
         file_path = self.output_dir / path.lstrip("/")
         if file_path.name != "index.html":
             file_path = file_path / "index.html"
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(content, encoding="utf-8")
+        self._safe_write(file_path, content)
 
     def _page_head(
         self,
@@ -297,7 +196,7 @@ class SiteGenerator:
             f"<meta name=\"twitter:description\" content=\"{description}\">",
             f"<meta name=\"twitter:url\" content=\"{canonical_url}\">",
             f"<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{self.settings.name} RSS\" href=\"{self._abs_url('/rss.xml')}\">",
-            f"<style>{BASE_STYLES}</style>",
+            "<link rel=\"stylesheet\" href=\"/assets/theme.css\">",
             f"<script type=\"application/ld+json\">{self._website_json_ld}</script>",
         ]
         if self.settings.logo_url:
@@ -335,7 +234,14 @@ class SiteGenerator:
         return "\n".join(pieces)
 
     def _page_shell(self, *, head: str, body: str) -> str:
-        return f"<!doctype html><html lang=\"en\"><head>{head}</head><body>{body}</body></html>"
+        body_html = body if body.endswith("\n") else f"{body}\n"
+        return (
+            f"{HEADER_DOCTYPE}\n"
+            f"<html lang=\"en\"><head>{head}</head><body>\n"
+            f"{HEADER_PARTIAL}"
+            f"<main><div class=\"wrap\">{body_html}</div></main>\n"
+            f"{FOOTER_PARTIAL}</body></html>"
+        )
 
     def _guide_json_ld(self, guide: Guide, canonical_path: str) -> dict:
         return {
@@ -400,12 +306,14 @@ class SiteGenerator:
             meta_parts.append(f"{product.rating:.1f}★")
         body = ["<article class=\"card\">"]
         if product.image:
-            body.append(f"<img src=\"{product.image}\" alt=\"{product.title}\">")
+            body.append(
+                f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
+            )
         body.append(f"<h2>{product.title}</h2>")
         if price_display:
-            body.append(f"<div class=\"price-tag\">{price_display}</div>")
+            body.append(f"<p class=\"price\">{price_display}</p>")
         if meta_parts:
-            body.append(f"<div class=\"product-meta\">{' • '.join(meta_parts)}</div>")
+            body.append(f"<p>{' • '.join(meta_parts)}</p>")
         body.append(f"<p>{description}</p>")
         body.append(
             f"<a class=\"button\" rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{link}\">See details</a>"
@@ -422,19 +330,14 @@ class SiteGenerator:
             json_ld.append(payload)
         cards = "".join(cards_html)
         ad_block = self._adsense_unit(self.settings.adsense_slot)
-        body = (
-            "<header><nav><a href=\"/\">"
-            f"{self.settings.name}</a><a href=\"/rss.xml\">RSS</a></nav></header>"
-            "<main>"
-            f"<div class=\"hero\"><p class=\"badge\">Guide</p><h1>{guide.title}</h1>"
-            f"<p>{guide.description}</p></div>"
-            f"{ad_block}"
-            f"<section class=\"grid cards\">{cards}</section>"
-            "<div class=\"footer\">Affiliate links may earn commissions."
-            " Prices and availability can change.</div>"
-            "</main>"
+        parts = [f"<h1>{guide.title}</h1>", f"<p>{guide.description}</p>"]
+        if ad_block:
+            parts.append(ad_block)
+        parts.append(f"<section class=\"grid\">{cards}</section>")
+        parts.append(
+            "<p class=\"disclosure\">Affiliate links may earn commissions. Prices and availability can change.</p>"
         )
-        return body, json_ld
+        return "\n".join(parts), json_ld
 
     def _write_homepage(self, guides: Sequence[Guide]) -> None:
         if guides:
@@ -458,16 +361,22 @@ class SiteGenerator:
             )
         cards_html = "".join(cards)
         ad_block = self._adsense_unit(self.settings.adsense_slot)
-        body = (
-            "<header><nav><a href=\"/\">"
-            f"{self.settings.name}</a><a href=\"/rss.xml\">RSS</a></nav></header>"
-            "<main>"
-            f"<div class=\"hero\"><h1>{self.settings.name}</h1><p>{self.settings.description}</p></div>"
-            f"{ad_block}"
-            f"<section class=\"grid cards\">{cards_html}</section>"
-            "<div class=\"footer\">As an Amazon Associate and eBay Partner Network member we earn from qualifying purchases.</div>"
-            "</main>"
+        parts = [
+            f"<h1>{self.settings.name}</h1>",
+            f"<p>{self.settings.description}</p>",
+        ]
+        if ad_block:
+            parts.append(ad_block)
+        if cards_html:
+            parts.append(f"<section class=\"grid\">{cards_html}</section>")
+        else:
+            parts.append(
+                "<p class=\"disclosure\">Guides are being prepared. Check back soon.</p>"
+            )
+        parts.append(
+            "<p class=\"disclosure\">As an Amazon Associate and eBay Partner Network member we earn from qualifying purchases.</p>"
         )
+        body = "\n".join(parts)
         head = self._page_head(
             title=self.settings.name,
             description=self.settings.description,
@@ -511,16 +420,13 @@ class SiteGenerator:
                 cards.append(card_html)
                 product_json.append(payload)
             description = f"Trending picks from the {name} category updated daily."
-            body = (
-                "<header><nav><a href=\"/\">"
-                f"{self.settings.name}</a><a href=\"/rss.xml\">RSS</a></nav></header>"
-                "<main>"
-                f"<div class=\"hero\"><p class=\"badge\">Category</p><h1>{name}</h1>"
-                f"<p>{description}</p></div>"
-                f"<section class=\"grid cards\">{''.join(cards)}</section>"
-                "<div class=\"footer\">Prices and availability are subject to change.</div>"
-                "</main>"
-            )
+            parts = [
+                f"<h1>{name}</h1>",
+                f"<p>{description}</p>",
+                f"<section class=\"grid\">{''.join(cards)}</section>",
+                "<p class=\"disclosure\">Prices and availability are subject to change.</p>",
+            ]
+            body = "\n".join(parts)
             head = self._page_head(
                 title=f"{name} Gifts – {self.settings.name}",
                 description=description,
@@ -559,30 +465,32 @@ class SiteGenerator:
                     price_display = f"${product.price:,.2f}"
                 else:
                     price_display = f"{product.price:,.2f} {currency.upper()}"
-            body_parts = [
-                "<header><nav><a href=\"/\">"
-                f"{self.settings.name}</a><a href=\"/rss.xml\">RSS</a></nav></header>",
-                "<main>",
-                f"<div class=\"hero\"><p class=\"badge\">Product</p><h1>{product.title}</h1>"
-                f"<p>{description}</p></div>",
-            ]
+            details: list[str] = []
+            if product.brand:
+                details.append(product.brand)
+            if product.category:
+                details.append(product.category)
+            if product.rating:
+                details.append(f"{product.rating:.1f}★")
+            body_parts = [f"<h1>{product.title}</h1>", f"<p>{description}</p>"]
             if product.image:
-                body_parts.append(f"<section class=\"grid\"><img src=\"{product.image}\" alt=\"{product.title}\"></section>")
-            body_parts.append("<section class=\"grid\">")
-            body_parts.append(f"<article class=\"card\"><h2>Why we like it</h2><p>{description}</p>")
+                body_parts.append(
+                    f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
+                )
+            if details:
+                body_parts.append(f"<p>{' • '.join(details)}</p>")
             if price_display:
-                body_parts.append(f"<div class=\"price-tag\">{price_display}</div>")
+                body_parts.append(f"<p class=\"price\">{price_display}</p>")
             body_parts.append(
-                f"<a class=\"button\" rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{link}\">Shop now</a>"
+                f"<p><a class=\"button\" rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{link}\">Shop now</a></p>"
             )
             rail = self._adsense_unit(self.settings.adsense_rail_slot)
-            body_parts.append(f"</article>{rail}</section>")
+            if rail:
+                body_parts.append(rail)
             body_parts.append(
-                "<div class=\"footer\">Affiliate links may earn commissions."
-                " Always verify current pricing and availability.</div>"
+                "<p class=\"disclosure\">Affiliate links may earn commissions. Always verify current pricing and availability.</p>"
             )
-            body_parts.append("</main>")
-            body = "".join(body_parts)
+            body = "\n".join(body_parts)
             head = self._page_head(
                 title=f"{product.title} – {self.settings.name}",
                 description=description,
@@ -607,14 +515,14 @@ class SiteGenerator:
             entries.append(f"<lastmod>{lastmod}</lastmod>")
             entries.append("</url>")
         entries.append("</urlset>")
-        (self.output_dir / "sitemap.xml").write_text("\n".join(entries), encoding="utf-8")
+        self._safe_write(self.output_dir / "sitemap.xml", "\n".join(entries))
 
     def _write_robots(self) -> None:
         content = (
             "User-agent: *\nAllow: /\n"
             f"Sitemap: {self._abs_url('/sitemap.xml')}\n"
         )
-        (self.output_dir / "robots.txt").write_text(content, encoding="utf-8")
+        self._safe_write(self.output_dir / "robots.txt", content)
 
     def _write_rss(self, guides: Sequence[Guide]) -> None:
         base = self._abs_url("/")
@@ -640,7 +548,7 @@ class SiteGenerator:
             f"{''.join(items)}"
             "</channel></rss>"
         )
-        (self.output_dir / "rss.xml").write_text(rss, encoding="utf-8")
+        self._safe_write(self.output_dir / "rss.xml", rss)
 
 
 def _format_rfc2822(iso_date: str) -> str:

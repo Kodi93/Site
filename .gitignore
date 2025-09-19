@@ -3,6 +3,8 @@ __pycache__/
 .env
 public/*
 !public/
+!public/assets/
+!public/assets/theme.css
 !public/robots.txt
 !public/sitemap.xml
 data/products.json
