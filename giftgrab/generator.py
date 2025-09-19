@@ -28,6 +28,8 @@ PROTECTED_FILES = {
     THEME_PATH.resolve(),
 }
 
+_MIN_TIMESTAMP = datetime.min.replace(tzinfo=timezone.utc)
+
 
 _BANNED_PHRASES = ("fresh drops", "active vibes")
 
@@ -88,6 +90,15 @@ def _parse_iso_datetime(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _format_updated_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = _parse_iso_datetime(value)
+    if parsed <= _MIN_TIMESTAMP:
+        return None
+    return parsed.strftime("%b %d, %Y")
 
 
 def _read_markup(path: Path) -> str:
@@ -847,29 +858,77 @@ class SiteGenerator:
                     price_display = f"${product.price:,.2f}"
                 else:
                     price_display = f"{product.price:,.2f} {currency.upper()}"
-            details: list[str] = []
+            tags: list[str] = []
             if product.brand:
-                details.append(product.brand)
+                tags.append(html_escape(product.brand))
             if product.category:
-                details.append(product.category)
-            body_parts = [
-                "<section class=\"page-header\">",
-                f"<h1>{product.title}</h1>",
-                f"<p>{description}</p>",
-                "</section>",
-            ]
-            if product.image:
-                body_parts.append(
-                    f"<img src=\"{product.image}\" alt=\"{product.title}\" loading=\"lazy\">"
-                )
-            if details:
-                body_parts.append(f"<p>{' • '.join(details)}</p>")
-            if price_display:
-                body_parts.append(f"<p class=\"price\">{price_display}</p>")
-            body_parts.append(
-                f"<p><a class=\"button\" rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{link}\">Shop now</a></p>"
+                tags.append(html_escape(product.category))
+            tags_html = (
+                "<ul class=\"product-card__tags\">"
+                + "".join(f"<li>{tag}</li>" for tag in tags)
+                + "</ul>"
+            ) if tags else ""
+
+            price_html = (
+                f"<p class=\"product-card__price\">{html_escape(price_display)}</p>"
+                if price_display
+                else ""
             )
-            body = "\n".join(body_parts)
+
+            rating_html = ""
+            if product.rating is not None:
+                rating_value = f"{product.rating:.1f}".rstrip("0").rstrip(".")
+                reviews_html = ""
+                if product.rating_count and product.rating_count > 0:
+                    review_word = "review" if product.rating_count == 1 else "reviews"
+                    reviews_html = (
+                        f"<span class=\"product-card__rating-count\">({product.rating_count:,} {review_word})</span>"
+                    )
+                rating_html = (
+                    "<div class=\"product-card__rating\" "
+                    f"aria-label=\"Rated {rating_value} out of 5\">"
+                    "<span class=\"product-card__rating-icon\" aria-hidden=\"true\">★</span>"
+                    f"<span class=\"product-card__rating-score\">{rating_value}</span>"
+                    + reviews_html
+                    + "</div>"
+                )
+
+            updated_label = _format_updated_label(product.updated_at)
+            updated_html = (
+                f"<p class=\"product-card__updated\">Updated {html_escape(updated_label)}</p>"
+                if updated_label
+                else ""
+            )
+
+            card_parts = ['<article class="product-card product-card--page">']
+            if product.image:
+                card_parts.append(
+                    "<div class=\"product-card__media\">"
+                    + f"<img src=\"{html_escape(product.image)}\" alt=\"{html_escape(product.title)}\" loading=\"lazy\">"
+                    + "</div>"
+                )
+            card_parts.append("<div class=\"product-card__body\">")
+            if tags_html:
+                card_parts.append(tags_html)
+            card_parts.append(
+                f"<h1 class=\"product-card__title\">{html_escape(product.title)}</h1>"
+            )
+            if price_html:
+                card_parts.append(price_html)
+            if rating_html:
+                card_parts.append(rating_html)
+            card_parts.append(
+                f"<p class=\"product-card__description\">{html_escape(description)}</p>"
+            )
+            card_parts.append(
+                "<a class=\"button product-card__cta\" "
+                f"rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{html_escape(link)}\">Shop now</a>"
+            )
+            if updated_html:
+                card_parts.append(updated_html)
+            card_parts.append("</div>")
+            card_parts.append("</article>")
+            body = "\n".join(card_parts)
             html = self._render_document(
                 page_title=f"{product.title} – {self.settings.name}",
                 description=description,

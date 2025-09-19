@@ -9,6 +9,7 @@ export interface ProductCardData {
   image?: string | null;
   description?: string | null;
   brand?: string | null;
+  category?: string | null;
   rating?: number | null;
   reviews?: number | null;
   updatedAt: string;
@@ -21,7 +22,6 @@ export interface ProductCardProps {
 }
 
 const DEFAULT_BASE_URL = "https://www.grabgifts.net";
-const ISO_DATE_LENGTH = 10;
 
 const sanitizeBaseUrl = (value: string): string => {
   return value.endsWith("/") ? value.slice(0, -1) : value;
@@ -61,11 +61,41 @@ const detectCurrency = (price: string | null | undefined): string => {
   return "USD";
 };
 
+const UPDATED_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
 const formatUpdatedAt = (updatedAt: string): string => {
   if (!updatedAt) {
     return "Unknown";
   }
-  return updatedAt.slice(0, ISO_DATE_LENGTH);
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return updatedAt.slice(0, 10);
+  }
+  return UPDATED_DATE_FORMAT.format(parsed);
+};
+
+const formatAvailabilityLabel = (availability?: string | null): string | undefined => {
+  if (!availability) {
+    return undefined;
+  }
+  let label = availability.trim();
+  const schemaMatch = label.match(/schema\.org\/(.+)$/i);
+  if (schemaMatch) {
+    label = schemaMatch[1];
+  }
+  label = label.replace(/^https?:\/\//i, "");
+  label = label.replace(/[_-]+/g, " ");
+  label = label.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return label
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 const normalizeAvailability = (availability?: string | null): string => {
@@ -115,32 +145,71 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return JSON.stringify(payload, (_, value) => (value === undefined ? undefined : value));
   }, [product.amazonUrl, product.availability, product.brand, product.description, product.image, product.price, product.rating, product.reviews, product.title]);
 
+  const availabilityLabel = formatAvailabilityLabel(product.availability);
+  const metaTags = [] as string[];
+  if (product.brand) {
+    metaTags.push(product.brand);
+  }
+  if (product.category) {
+    metaTags.push(product.category);
+  }
+  if (availabilityLabel) {
+    metaTags.push(availabilityLabel);
+  }
+
+  const ratingLabel = product.rating != null ? product.rating.toFixed(1).replace(/\.0$/, "") : undefined;
+  const reviewLabel =
+    product.reviews != null && product.reviews > 0
+      ? `${product.reviews.toLocaleString()} ${product.reviews === 1 ? "review" : "reviews"}`
+      : undefined;
+
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
       <article className="product-card">
         {product.image ? (
-          <img
-            src={product.image}
-            alt={product.title}
-            loading="lazy"
-            width={640}
-            height={640}
-          />
+          <div className="product-card__media">
+            <img
+              src={product.image}
+              alt={product.title}
+              loading="lazy"
+              width={640}
+              height={640}
+            />
+          </div>
         ) : null}
-        <h3 className="product-card__title">{product.title}</h3>
-        {product.description ? (
-          <p className="product-card__description">{product.description}</p>
-        ) : null}
-        <a
-          className="product-card__cta"
-          href={aff(product.amazonUrl)}
-          target="_blank"
-          rel="sponsored nofollow noopener"
-        >
-          View on Amazon
-        </a>
-        <p className="text-xs text-slate-500">Updated {formatUpdatedAt(product.updatedAt)}</p>
+        <div className="product-card__body">
+          {metaTags.length ? (
+            <ul className="product-card__tags">
+              {metaTags.map((tag, index) => (
+                <li key={`${tag}-${index}`}>{tag}</li>
+              ))}
+            </ul>
+          ) : null}
+          <h2 className="product-card__title">{product.title}</h2>
+          {product.price ? <p className="product-card__price">{product.price}</p> : null}
+          {ratingLabel ? (
+            <div className="product-card__rating" aria-label={`Rated ${ratingLabel} out of 5`}>
+              <span className="product-card__rating-icon" aria-hidden="true">
+                ★
+              </span>
+              <span className="product-card__rating-score">{ratingLabel}</span>
+              {reviewLabel ? <span className="product-card__rating-count">({reviewLabel})</span> : null}
+            </div>
+          ) : null}
+          {product.description ? (
+            <p className="product-card__description">{product.description}</p>
+          ) : null}
+          <a
+            className="button product-card__cta"
+            href={aff(product.amazonUrl)}
+            target="_blank"
+            rel="sponsored nofollow noopener"
+          >
+            View on Amazon
+          </a>
+          <p className="product-card__updated">Updated {formatUpdatedAt(product.updatedAt)}</p>
+        </div>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schemaPayload }} />
       </article>
     </>

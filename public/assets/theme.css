@@ -433,6 +433,136 @@ p {
   color: var(--fg);
 }
 
+.product-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 2.75rem);
+  padding: clamp(1.75rem, 5vw, 3rem);
+  border-radius: 32px;
+  border: 1px solid rgba(160, 122, 210, 0.25);
+  background: linear-gradient(150deg, rgba(33, 14, 58, 0.92), rgba(18, 7, 40, 0.88));
+  box-shadow: var(--shadow);
+}
+
+.product-card--page {
+  max-width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.product-card__media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 7, 32, 0.7);
+  min-height: clamp(240px, 36vw, 420px);
+}
+
+.product-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.product-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  grid-column: 1 / -1;
+}
+
+.product-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.product-card__tags li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(22, 10, 40, 0.7);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.product-card__title {
+  margin: 0;
+  font-size: clamp(1.85rem, 4vw, 2.75rem);
+  line-height: 1.15;
+}
+
+.product-card__price {
+  margin: 0;
+  font-size: clamp(1.35rem, 3.25vw, 1.85rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.product-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.product-card__rating-icon {
+  color: var(--accent);
+  font-size: 1.15rem;
+  filter: drop-shadow(0 8px 22px rgba(255, 61, 158, 0.35));
+}
+
+.product-card__rating-score {
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.product-card__rating-count {
+  font-weight: 500;
+}
+
+.product-card__description {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.product-card__cta {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
+.product-card__updated {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (min-width: 768px) {
+  .product-card {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    align-items: center;
+  }
+
+  .product-card__media + .product-card__body {
+    grid-column: auto;
+  }
+}
+
 .feed-section {
   display: flex;
   flex-direction: column;
