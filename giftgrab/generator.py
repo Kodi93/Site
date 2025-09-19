@@ -2290,6 +2290,8 @@ class SiteGenerator:
         articles_list = [article for article in (articles or []) if article.status == "published"]
         if articles_list:
             self._write_articles(articles_list, categories, products_sorted)
+        else:
+            self._write_guides_page([])
         self._write_feed(products_sorted, generated_list, self._roundups)
         self._write_sitemap(
             categories,
