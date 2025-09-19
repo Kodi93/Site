@@ -6,7 +6,8 @@ import { priceNumber } from "./util.mjs";
 const IN = path.join("data", "items.json");
 const PUB = "public";
 const SITE_NAME = "GrabGifts";
-const SITE_DESCRIPTION = "Gift ideas for every fan, friend, and family member.";
+const SITE_DESCRIPTION =
+  "GrabGifts curates trending products daily. Smart picks, clean layouts, zero clutter.";
 
 const BASE_TEMPLATE_PATH = path.join("templates", "base.html");
 const HEADER_PATH = path.join("templates", "partials", "header.html");
@@ -81,6 +82,10 @@ function renderWithBase(content) {
 }
 
 const BANNED_PHRASES = ["fresh drops", "active vibes"];
+const STOPWORDS = new Set(["for", "a", "the", "and", "of"]);
+const RIGHT_NOW_SUFFIX = /\s+right now\.?$/i;
+const BEST_FOR_PATTERN = /^best\s+for\s+a\s+(.+?)\s+gifts(.*)$/i;
+const TITLE_REPLACEMENTS = new Map([["Techy", "Tech"]]);
 
 function stripBannedPhrases(text) {
   let output = text;
@@ -89,6 +94,52 @@ function stripBannedPhrases(text) {
     output = output.replace(pattern, "");
   }
   return output.trim();
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function titleCase(value) {
+  return String(value).replace(/[A-Za-z]+/g, (word) => {
+    if (/[A-Z]/.test(word.slice(1))) return word;
+    if (word.length > 1 && word === word.toUpperCase()) return word;
+    return word[0].toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
+function applyStopwords(text) {
+  let firstWordSeen = false;
+  return text.replace(/[A-Za-z]+/g, (segment) => {
+    const lower = segment.toLowerCase();
+    if (!firstWordSeen) {
+      firstWordSeen = true;
+      return segment;
+    }
+    if (STOPWORDS.has(lower)) {
+      return lower;
+    }
+    return segment;
+  });
+}
+
+function polishGuideTitle(title) {
+  let text = (title || "").trim();
+  if (!text) return "";
+  text = text.replace(RIGHT_NOW_SUFFIX, "").trim();
+  const match = text.match(BEST_FOR_PATTERN);
+  if (match) {
+    const subject = match[1].trim();
+    const tail = match[2] || "";
+    text = `Best ${subject} Gifts${tail}`;
+  }
+  text = text.replace(/\s+/g, " ").trim();
+  text = applyStopwords(titleCase(text));
+  for (const [source, target] of TITLE_REPLACEMENTS) {
+    const pattern = new RegExp(`\\b${escapeRegExp(source)}\\b`, "g");
+    text = text.replace(pattern, target);
+  }
+  return text.trim();
 }
 
 function renderGuideCard(item) {
@@ -109,11 +160,12 @@ function renderGuideCard(item) {
 }
 
 function renderGuidePage(title, slug, items) {
+  const polishedTitle = polishGuideTitle(title);
   const cards = items
     .map((item) => renderGuideCard(item))
     .filter(Boolean)
     .join("\n");
-  const sections = [`<h1>${escapeHtml(title)}</h1>`];
+  const sections = [`<h1>${escapeHtml(polishedTitle)}</h1>`];
   if (cards) {
     sections.push(`<ol class=\"grid\">${cards}</ol>`);
   } else {
@@ -133,10 +185,11 @@ function renderHomePage(guides) {
       const summary = guide.summary
         ? escapeHtml(stripBannedPhrases(guide.summary))
         : "Explore thoughtful ideas for every list.";
+      const displayTitle = polishGuideTitle(guide.title);
       return [
         "<li class=\"card\">",
         `<a href=\"/guides/${escapeHtml(guide.slug)}/\">`,
-        `<h3>${escapeHtml(guide.title)}</h3>`,
+        `<h3>${escapeHtml(displayTitle)}</h3>`,
         `<p>${summary}</p>`,
         "</a>",
         "</li>",
@@ -184,12 +237,13 @@ function main() {
     const picks = filterByTopic(title, items);
     const picksWithImages = picks.filter((item) => item.image);
     if (picksWithImages.length < 10) continue;
-    const html = renderGuidePage(title, slug, picksWithImages);
+    const polishedTitle = polishGuideTitle(title);
+    const html = renderGuidePage(polishedTitle, slug, picksWithImages);
     writeFile(path.join(PUB, "guides", slug, "index.html"), html);
     guidesForHome.push({
-      title,
+      title: polishedTitle,
       slug,
-      summary: picksWithImages[0]?.title || `Top picks for ${title}`,
+      summary: picksWithImages[0]?.title || `Top picks for ${polishedTitle}`,
     });
     made++;
   }

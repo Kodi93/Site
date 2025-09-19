@@ -1,4 +1,4 @@
-from giftgrab.generator import SiteGenerator
+from giftgrab.generator import SiteGenerator, polish_guide_title
 from giftgrab.models import Product
 from giftgrab.repository import ProductRepository
 from giftgrab.roundups import generate_guides
@@ -63,3 +63,8 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     product_html = (output_dir / "products" / amazon_product.slug / "index.html").read_text(encoding="utf-8")
     assert 'rel="sponsored nofollow noopener"' in product_html
     assert "tag=testtag-20" in product_html
+
+
+def test_polish_guide_title_removes_for_a_and_right_now():
+    cleaned = polish_guide_title("Best For A Techy Gifts Right Now")
+    assert cleaned == "Best Tech Gifts"
