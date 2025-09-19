@@ -1,10 +1,10 @@
 [build]
-command = "python -m giftgrab.cli update && python -m giftgrab.cli roundups --roundup-days 1 --roundup-limit 15"
+command = "npm run update && npm run build && npm run check"
 publish = "public"
 
 [functions]
-node_bundler = "esbuild"
 directory = "netlify/functions"
+node_bundler = "esbuild"
 
 [[headers]]
 for = "/*"
