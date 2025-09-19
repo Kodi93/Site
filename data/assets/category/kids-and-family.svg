@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="kidsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#facc15" />
+      <stop offset="40%" stop-color="#f97316" />
+      <stop offset="80%" stop-color="#fb7185" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#210b1f" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#kidsGradient)" opacity="0.92" />
+  <circle cx="260" cy="220" r="140" fill="#fde68a" opacity="0.24" />
+  <circle cx="900" cy="560" r="150" fill="#bae6fd" opacity="0.25" />
+  <g fill="#fff7ed" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="160" y="320" font-size="70" font-weight="800">Playful family time</text>
+    <text x="160" y="390" font-size="34" font-weight="600" opacity="0.86">STEM kits, imaginative play, and cozy moments.</text>
+  </g>
+</svg>

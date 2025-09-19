@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="fitnessGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="50%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#18030f" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#fitnessGradient)" opacity="0.88" />
+  <circle cx="920" cy="220" r="130" fill="#facc15" opacity="0.22" />
+  <circle cx="320" cy="600" r="140" fill="#fb7185" opacity="0.2" />
+  <g fill="#fff0f3" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="160" y="320" font-size="70" font-weight="800">High-energy wellness</text>
+    <text x="160" y="390" font-size="34" font-weight="600" opacity="0.85">Recovery tools, training tech, and studio vibes.</text>
+  </g>
+</svg>

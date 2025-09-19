@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="herGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f472b6" />
+      <stop offset="50%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#211024" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#herGradient)" opacity="0.85" />
+  <circle cx="240" cy="200" r="120" fill="#fbcfe8" opacity="0.22" />
+  <circle cx="940" cy="620" r="130" fill="#fde68a" opacity="0.18" />
+  <g fill="#fff7fb" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="160" y="320" font-size="68" font-weight="800">Elevated delights for her</text>
+    <text x="160" y="390" font-size="34" font-weight="600" opacity="0.84">Spa-worthy luxuries and creative essentials.</text>
+  </g>
+</svg>

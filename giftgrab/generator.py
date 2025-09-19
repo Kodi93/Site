@@ -189,6 +189,29 @@ nav {
   gap: 0.75rem;
 }
 
+.logo--has-image {
+  font-size: 1.35rem;
+}
+
+.logo-image {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.6rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 16px 30px rgba(8, 6, 15, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.logo-image img {
+  max-height: 42px;
+  width: auto;
+  display: block;
+  border-radius: 12px;
+  filter: drop-shadow(0 10px 22px rgba(15, 10, 30, 0.45));
+}
+
 .logo-mark {
   width: 44px;
   height: 44px;
@@ -618,6 +641,106 @@ main > section + section {
 
 .hero-actions.align-left {
   justify-content: flex-start;
+}
+
+.social-proof {
+  margin: 0 auto 4rem;
+  max-width: 1020px;
+  padding: 1.75rem 2rem;
+  border-radius: 28px;
+  border: 1px solid rgba(127, 86, 217, 0.22);
+  background: linear-gradient(135deg, rgba(127, 86, 217, 0.12), rgba(249, 115, 22, 0.08)), var(--card);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  backdrop-filter: blur(12px);
+}
+
+.social-proof-eyebrow {
+  font-size: 0.85rem;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.social-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.35rem;
+}
+
+.press-card {
+  position: relative;
+  padding: 1.1rem 1.3rem;
+  border-radius: 22px;
+  border: 1px solid rgba(127, 86, 217, 0.18);
+  background: rgba(24, 18, 45, 0.76);
+  box-shadow: 0 22px 40px rgba(8, 6, 15, 0.48);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+.press-card:hover,
+.press-card:focus-within {
+  transform: translateY(-4px);
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow: 0 30px 58px rgba(5, 3, 12, 0.58);
+}
+
+.press-card__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.press-card__link:focus-visible {
+  outline: none;
+}
+
+.press-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.press-logo img {
+  max-height: 38px;
+  width: auto;
+  border-radius: 12px;
+  filter: drop-shadow(0 12px 24px rgba(15, 10, 30, 0.5));
+}
+
+.press-initial {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  color: var(--muted-strong);
+  background: rgba(127, 86, 217, 0.32);
+  box-shadow: 0 16px 28px rgba(8, 6, 15, 0.48);
+}
+
+.press-quote {
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.55;
+  font-size: 0.98rem;
+}
+
+.press-outlet {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  color: rgba(199, 194, 232, 0.9);
 }
 
 .button-link,
@@ -1926,7 +2049,9 @@ footer {
 }
 """
 
-DEFAULT_SOCIAL_IMAGE = "https://source.unsplash.com/1200x630/?gifts"
+DEFAULT_SOCIAL_IMAGE = "/assets/brand/social-share.svg"
+DEFAULT_CARD_IMAGE = "/assets/brand/card-fallback.svg"
+DEFAULT_HERO_IMAGE = "/assets/brand/hero-fallback.svg"
 
 
 @dataclass
@@ -1977,6 +2102,31 @@ class SiteGenerator:
         self._has_deals_page = False
         self._deals_products: List[Product] = []
         self._seo_failures: set[str] = set()
+
+    def _lookup_category(self, reference: str | None) -> Category | None:
+        if not reference:
+            return None
+        key = reference.strip()
+        if not key:
+            return None
+        category = self._category_lookup.get(key)
+        if category:
+            return category
+        slug = slugify(key)
+        return self._category_lookup.get(slug)
+
+    def _category_image(self, category: Category | None, *, variant: str = "card") -> str:
+        if category:
+            if variant == "hero":
+                return category.hero_image or category.image or DEFAULT_HERO_IMAGE
+            return category.card_image or category.image or DEFAULT_CARD_IMAGE
+        return DEFAULT_HERO_IMAGE if variant == "hero" else DEFAULT_CARD_IMAGE
+
+    def _brand_card_fallback(self) -> str:
+        return DEFAULT_CARD_IMAGE
+
+    def _brand_hero_fallback(self) -> str:
+        return DEFAULT_HERO_IMAGE
 
     def build(
         self,
@@ -2126,10 +2276,26 @@ class SiteGenerator:
         tagline_default = "Gift commerce intelligence that sells itself"
         tagline_text = str(tagline_value).strip() if tagline_value else tagline_default
         nav_tagline = html.escape(tagline_text)
+        logo_classes = ["logo"]
+        if self.settings.logo_url:
+            logo_classes.append("logo--has-image")
+            logo_src = html.escape(self.settings.logo_url)
+            logo_media = (
+                "<span class=\"logo-image\" aria-hidden=\"true\">"
+                f"<img src=\"{logo_src}\" alt=\"\" loading=\"lazy\" decoding=\"async\" />"
+                "</span>"
+            )
+        else:
+            logo_media = (
+                "<span class=\"logo-mark\" aria-hidden=\"true\">"
+                "<span class=\"logo-spark\"></span>"
+                "</span>"
+            )
+        logo_class_attr = " ".join(logo_classes)
         nav_brand = (
             "<div class=\"nav-brand\">"
-            f"<a href=\"/index.html\" class=\"logo\" aria-label=\"{logo_aria}\">"
-            "<span class=\"logo-mark\" aria-hidden=\"true\"><span class=\"logo-spark\"></span></span>"
+            f"<a href=\"/index.html\" class=\"{logo_class_attr}\" aria-label=\"{logo_aria}\">"
+            f"{logo_media}"
             f"<span class=\"logo-text\">{logo_text_markup}</span>"
             "</a>"
             f"<p class=\"nav-tagline\">{nav_tagline}</p>"
@@ -2519,21 +2685,11 @@ class SiteGenerator:
         self._copy_retailer_assets()
 
     def _copy_retailer_assets(self) -> None:
-        retailers_dir = DATA_DIR / "retailers"
-        if not retailers_dir.exists():
-            return
-
-        for retailer_dir in sorted(retailers_dir.iterdir()):
-            if not retailer_dir.is_dir():
-                continue
-            source = retailer_dir / "images"
+        def mirror_directory(source: Path, destination: Path) -> None:
             if not source.exists() or not source.is_dir():
-                continue
-
-            destination = self.assets_dir / retailer_dir.name
+                return
             destination.mkdir(parents=True, exist_ok=True)
-
-            copied: set[str] = set()
+            copied: set[Path] = set()
             for path in sorted(source.glob("**/*")):
                 if path.is_dir():
                     continue
@@ -2542,14 +2698,29 @@ class SiteGenerator:
                 target_dir.mkdir(parents=True, exist_ok=True)
                 target_path = target_dir / path.name
                 shutil.copy2(path, target_path)
-                copied.add(str(target_path.relative_to(destination)))
-
+                copied.add(target_path.relative_to(destination))
             for path in destination.glob("**/*"):
                 if path.is_dir():
                     continue
-                relative = str(path.relative_to(destination))
+                relative = path.relative_to(destination)
                 if relative not in copied:
                     path.unlink()
+
+        retailers_dir = DATA_DIR / "retailers"
+        if retailers_dir.exists():
+            for retailer_dir in sorted(retailers_dir.iterdir()):
+                if not retailer_dir.is_dir():
+                    continue
+                source = retailer_dir / "images"
+                destination = self.assets_dir / retailer_dir.name
+                mirror_directory(source, destination)
+
+        static_dir = DATA_DIR / "assets"
+        if static_dir.exists():
+            for entry in sorted(static_dir.iterdir()):
+                if not entry.is_dir():
+                    continue
+                mirror_directory(entry, self.assets_dir / entry.name)
 
     def _write_index(
         self,
@@ -2620,6 +2791,7 @@ class SiteGenerator:
         )
         feed_section = self._news_feed_section(all_products)
         best_gift_section = self._best_gift_section(best_generated)
+        social_proof = self._social_proof_belt()
         roundup_section = self._roundup_listing(roundups or [])
         category_section = f"""
 <section>
@@ -2657,7 +2829,7 @@ class SiteGenerator:
 """
         newsletter_banner = self._newsletter_banner()
         body = (
-            f"{hero}{best_gift_section}{feed_section}{roundup_section}{category_section}{newsletter_banner}{value_props}"
+            f"{hero}{social_proof}{best_gift_section}{feed_section}{roundup_section}{category_section}{newsletter_banner}{value_props}"
         )
         organization_data = self._organization_structured_data()
         website_schema = {
@@ -2712,8 +2884,8 @@ class SiteGenerator:
     def _best_gift_section(self, product: GeneratedProduct | None) -> str:
         if product is None:
             return ""
-        image_seed = slugify(product.category or product.name or "gift")
-        fallback_image = f"https://source.unsplash.com/600x400/?{html.escape(image_seed)}"
+        category = self._lookup_category(getattr(product, "category", None))
+        fallback_image = self._category_image(category)
         image_url = html.escape(product.image or fallback_image)
         detail_url = f"/{self._generated_product_path(product)}"
         intro_text = product.intro or intro_breakdown(product.name, product.price_cap)
@@ -2760,14 +2932,60 @@ class SiteGenerator:
 </section>
 """
 
+    def _social_proof_belt(self) -> str:
+        mentions = list(getattr(self.settings, "press_mentions", ()) or ())
+        cards: List[str] = []
+        for mention in mentions:
+            outlet = str(getattr(mention, "outlet", "") or getattr(mention, "name", "")).strip()
+            quote = str(getattr(mention, "quote", "")).strip()
+            logo = getattr(mention, "logo", None) or getattr(mention, "logo_url", None)
+            url = getattr(mention, "url", None)
+            if not any([outlet, quote, logo]):
+                continue
+            if logo:
+                logo_markup = (
+                    f"<img src=\"{html.escape(logo)}\" alt=\"{html.escape(outlet or 'Press mention')} logo\" "
+                    "loading=\"lazy\" decoding=\"async\" />"
+                )
+            else:
+                initial = (outlet[:1].upper() if outlet else "•") or "•"
+                logo_markup = f"<span class=\"press-initial\">{html.escape(initial)}</span>"
+            quote_markup = (
+                f"<p class=\"press-quote\">&ldquo;{html.escape(quote)}&rdquo;</p>"
+                if quote
+                else ""
+            )
+            outlet_markup = (
+                f"<span class=\"press-outlet\">{html.escape(outlet)}</span>"
+                if outlet
+                else ""
+            )
+            inner = (
+                f"<div class=\"press-logo\">{logo_markup}</div>{quote_markup}{outlet_markup}"
+            )
+            if url:
+                safe_url = html.escape(url, quote=True)
+                inner = (
+                    f"<a class=\"press-card__link\" href=\"{safe_url}\" target=\"_blank\" rel=\"noopener\">{inner}</a>"
+                )
+            cards.append(f"<article class=\"press-card\">{inner}</article>")
+        if not cards:
+            return ""
+        cards_html = "".join(cards)
+        return f"""
+<section class=\"social-proof\" aria-label=\"Press highlights\">
+  <p class=\"social-proof-eyebrow\">Featured in</p>
+  <div class=\"social-proof-grid\">{cards_html}</div>
+</section>
+"""
+
     def _roundup_listing(self, roundups: Sequence[RoundupArticle]) -> str:
         if not roundups:
             return ""
         cards: List[str] = []
         for roundup in list(roundups)[:6]:
-            image_seed = slugify(roundup.topic or "gifts")
-            fallback_image = f"https://source.unsplash.com/600x400/?{html.escape(image_seed)}"
-            image_url = html.escape(getattr(roundup, "hero_image", None) or fallback_image)
+            fallback_image = getattr(roundup, "hero_image", None) or self._brand_card_fallback()
+            image_url = html.escape(fallback_image)
             url = f"/{self._roundup_path(roundup)}"
             intro = html.escape(roundup.intro)
             preview_items = "".join(
@@ -3085,7 +3303,7 @@ class SiteGenerator:
                 og_image = product.image
                 break
         if og_image is None:
-            og_image = f"https://source.unsplash.com/1200x630/?{category.slug}"
+            og_image = self._category_image(category, variant="hero")
         breadcrumb_data = self._breadcrumb_structured_data(
             [
                 ("Home", self._absolute_url("index.html")),
@@ -3181,7 +3399,7 @@ class SiteGenerator:
         breadcrumbs_html = (
             f'<div class="breadcrumbs"><a href="/index.html">Home</a> &rsaquo; <a href="/{self._category_path(category.slug)}">{html.escape(category.name)}</a></div>'
         )
-        image_url = product.image or f"https://source.unsplash.com/1200x630/?{category.slug}"
+        image_url = product.image or self._category_image(category, variant="hero")
         updated_dt = self._parse_iso_datetime(product.updated_at)
         published_dt = self._parse_iso_datetime(product.created_at)
         price_value, price_currency = self._extract_price_components(product.price)
@@ -3440,8 +3658,8 @@ class SiteGenerator:
         self._write_page(path, context)
 
     def _write_generated_product_page(self, product: GeneratedProduct) -> None:
-        category_seed = slugify(product.category or "gifts")
-        fallback_image = f"https://source.unsplash.com/1200x630/?{html.escape(category_seed)}"
+        category = self._lookup_category(getattr(product, "category", None))
+        fallback_image = self._category_image(category, variant="hero")
         image_url = html.escape(product.image or fallback_image)
         bullet_items = "".join(
             f"<li>{html.escape(line)}</li>" for line in product.bullets
@@ -3555,7 +3773,7 @@ class SiteGenerator:
         ]
         updated_time = self._format_iso8601(self._parse_iso_datetime(roundup.updated_at))
         published_time = self._format_iso8601(self._parse_iso_datetime(roundup.published_at))
-        og_image = f"https://source.unsplash.com/1200x630/?{html.escape(slugify(roundup.topic or 'gifts'))}"
+        og_image = getattr(roundup, "hero_image", None) or self._brand_hero_fallback()
         context = PageContext(
             title=roundup.title,
             description=roundup.description,
@@ -4670,7 +4888,7 @@ retailerSelect.addEventListener('change', () => {{
         if product.image:
             image_url = product.image
         else:
-            image_url = f"https://source.unsplash.com/1200x630/?{category.slug}"
+            image_url = self._category_image(category, variant="hero")
         data["image"] = [image_url]
         price_value, currency = self._extract_price_components(product.price)
         if price_value:
@@ -4819,10 +5037,8 @@ retailerSelect.addEventListener('change', () => {{
         extra_classes: str = "",
     ) -> str:
         description = html.escape(product.summary or "Discover why we love this find.")
-        category = self._category_lookup.get(product.category_slug)
-        fallback_seed = (category.slug if category else product.category_slug) or "gifts"
-        fallback_image = f"https://source.unsplash.com/600x400/?{fallback_seed}"
-        image_url = product.image or fallback_image
+        category = self._lookup_category(product.category_slug)
+        image_url = product.image or self._category_image(category)
         image = html.escape(image_url)
         category_badge = ""
         if category:
@@ -4925,10 +5141,11 @@ retailerSelect.addEventListener('change', () => {{
 </article>
 """
     def _category_card(self, category: Category) -> str:
+        image = html.escape(self._category_image(category))
         return f"""
 <article class=\"card\">
   <a class=\"card-media\" href=\"/{self._category_path(category.slug)}\">
-    <img src=\"https://source.unsplash.com/600x400/?{html.escape(category.slug)}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" />
+    <img src=\"{image}\" alt=\"{html.escape(category.name)}\" loading=\"lazy\" decoding=\"async\" />
   </a>
   <div class=\"card-content\">
     <h3><a href=\"/{self._category_path(category.slug)}\">{html.escape(category.name)}</a></h3>

@@ -12,7 +12,14 @@ from urllib.parse import parse_qsl
 from .amazon import AmazonCredentials
 from .ebay import EbayCredentials
 from .article_repository import ArticleRepository
-from .config import DEFAULT_CATEGORIES, DATA_DIR, OUTPUT_DIR, SiteSettings, ensure_directories
+from .config import (
+    DEFAULT_CATEGORIES,
+    DATA_DIR,
+    OUTPUT_DIR,
+    SiteSettings,
+    default_settings,
+    ensure_directories,
+)
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
@@ -156,7 +163,7 @@ def load_site_settings() -> SiteSettings:
 
     email_field = optional_env("SITE_NEWSLETTER_EMAIL_FIELD") or "email"
 
-    defaults = SiteSettings()
+    defaults = default_settings()
     adsense_client_id = optional_env("ADSENSE_CLIENT_ID")
     adsense_slot = optional_env("ADSENSE_SLOT")
     adsense_rail_slot = optional_env("ADSENSE_RAIL_SLOT")
@@ -192,6 +199,7 @@ def load_site_settings() -> SiteSettings:
         newsletter_form_email_field=email_field,
         newsletter_form_hidden_inputs=hidden_inputs,
         newsletter_cta_copy=optional_env("SITE_NEWSLETTER_CTA_COPY"),
+        press_mentions=defaults.press_mentions,
     )
 
 

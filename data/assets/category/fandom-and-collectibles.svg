@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="fandomGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="45%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#120a28" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#fandomGradient)" opacity="0.9" />
+  <circle cx="940" cy="220" r="140" fill="#ec4899" opacity="0.2" />
+  <circle cx="320" cy="600" r="130" fill="#7dd3fc" opacity="0.2" />
+  <g fill="#f8f7ff" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="160" y="320" font-size="70" font-weight="800">Collectible culture finds</text>
+    <text x="160" y="390" font-size="34" font-weight="600" opacity="0.86">Limited runs, cosplay gear, and fandom art.</text>
+  </g>
+</svg>

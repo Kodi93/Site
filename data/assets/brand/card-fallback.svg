@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f56d9" stop-opacity="0.95" />
+      <stop offset="50%" stop-color="#53389e" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0.85" />
+    </linearGradient>
+    <linearGradient id="cardSheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#120a28" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#cardGradient)" opacity="0.92" />
+  <rect width="900" height="560" x="150" y="120" rx="32" fill="url(#cardSheen)" />
+  <g fill="#f6f4ff" font-family="'Manrope','Inter',sans-serif" font-weight="700" text-anchor="start">
+    <text font-size="64" x="180" y="320">Gift commerce ready</text>
+    <text font-size="36" x="180" y="394" opacity="0.85">Plug-and-play hero art for standout drops</text>
+  </g>
+  <circle cx="960" cy="620" r="96" fill="#12b76a" opacity="0.2" />
+  <circle cx="960" cy="620" r="58" fill="#f6f4ff" opacity="0.08" />
+</svg>

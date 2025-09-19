@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from giftgrab.config import SiteSettings
-from giftgrab.generator import SiteGenerator
+from giftgrab.generator import DEFAULT_CARD_IMAGE, SiteGenerator
 from giftgrab.models import Category, Product
 
 
@@ -31,13 +31,19 @@ def make_product(*, category_slug: str, image: str | None = None) -> Product:
 
 def test_product_card_uses_category_fallback_when_image_missing(tmp_path: Path) -> None:
     generator = build_generator(tmp_path)
-    category = Category(slug="gadgets", name="Gadgets", blurb="Gadget gifts", keywords=["gadgets"])
+    category = Category(
+        slug="gadgets",
+        name="Gadgets",
+        blurb="Gadget gifts",
+        keywords=["gadgets"],
+        card_image="/assets/category/gadgets.svg",
+    )
     generator._category_lookup = {category.slug: category}
     product = make_product(category_slug=category.slug, image=None)
 
     card_html = generator._product_card(product)
 
-    assert 'src="https://source.unsplash.com/600x400/?gadgets"' in card_html
+    assert 'src="/assets/category/gadgets.svg"' in card_html
 
 
 def test_product_card_fallback_defaults_to_category_slug(tmp_path: Path) -> None:
@@ -46,4 +52,4 @@ def test_product_card_fallback_defaults_to_category_slug(tmp_path: Path) -> None
 
     card_html = generator._product_card(product)
 
-    assert 'src="https://source.unsplash.com/600x400/?toys"' in card_html
+    assert f'src="{DEFAULT_CARD_IMAGE}"' in card_html

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="officeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#7f56d9" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="48" fill="#0c1024" />
+  <rect width="1100" height="700" x="50" y="50" rx="42" fill="url(#officeGradient)" opacity="0.88" />
+  <circle cx="250" cy="220" r="130" fill="#bfdbfe" opacity="0.24" />
+  <circle cx="900" cy="580" r="140" fill="#c4b5fd" opacity="0.2" />
+  <g fill="#f8fafc" font-family="'Manrope','Inter',sans-serif" text-anchor="start">
+    <text x="160" y="320" font-size="70" font-weight="800">Productivity power-ups</text>
+    <text x="160" y="390" font-size="34" font-weight="600" opacity="0.86">Desk tech, planning tools, and remote work kits.</text>
+  </g>
+</svg>
