@@ -352,7 +352,8 @@ class SiteGenerator:
     def _product_card(self, product: Product) -> tuple[str, dict] | None:
         if not product.image:
             return None
-        description = blurb(product)
+        description_source = product.description or blurb(product)
+        description = _strip_banned_phrases(description_source)
         link = prepare_affiliate_url(product.url, product.source)
         price_display = product.price_text
         if not price_display and product.price is not None:
@@ -832,7 +833,8 @@ class SiteGenerator:
 
     def _write_products(self, products: Sequence[Product]) -> None:
         for product in products:
-            description = _strip_banned_phrases(blurb(product))
+            description_source = product.description or blurb(product)
+            description = _strip_banned_phrases(description_source)
             link = prepare_affiliate_url(product.url, product.source)
             price_display = product.price_text
             if not price_display and product.price is not None:

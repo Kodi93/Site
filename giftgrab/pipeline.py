@@ -1,20 +1,153 @@
 """Product ingestion pipeline for the static catalog."""
 from __future__ import annotations
 
-import json
 import logging
+import re
 from pathlib import Path
 from typing import Iterable, List, Sequence
+from urllib.parse import urlparse
 
 from . import amazon, ebay
 from .models import Product
 from .repository import ProductRepository
+from .retailers import StaticRetailerAdapter
+from .text import clean_text
 from .utils import load_json, parse_price_string
 
 LOGGER = logging.getLogger(__name__)
 
 CONFIG_ROUNDUPS = Path("config/roundups.json")
 CURATED_DIR = Path("data/retailers")
+
+_PLACEHOLDER_IMAGE_PREFIXES = ("/assets/amazon-sitestripe/",)
+_PLACEHOLDER_IMAGE_HOSTS = {
+    "images.unsplash.com",
+    "source.unsplash.com",
+    "picsum.photos",
+    "placekitten.com",
+}
+
+
+def _looks_like_placeholder_image(value: object) -> bool:
+    if not value:
+        return True
+    text = str(value).strip()
+    if not text:
+        return True
+    lowered = text.lower()
+    if lowered.startswith("data:image/svg"):
+        return True
+    for prefix in _PLACEHOLDER_IMAGE_PREFIXES:
+        if lowered.startswith(prefix):
+            return True
+    if lowered.endswith(".svg") and "amazon" in lowered:
+        return True
+    if "placeholder" in lowered:
+        return True
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        try:
+            host = urlparse(lowered).netloc
+        except ValueError:
+            return False
+        if host in _PLACEHOLDER_IMAGE_HOSTS:
+            return True
+    return False
+
+
+def _normalize_sentence(text: object) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    cleaned = clean_text(raw)
+    if not cleaned:
+        return ""
+    if cleaned[-1] not in ".!?":
+        cleaned = f"{cleaned}."
+    first = cleaned[0]
+    if first.islower():
+        cleaned = f"{first.upper()}{cleaned[1:]}"
+    return cleaned
+
+
+def _clean_feature_text(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    # Remove leading bullet characters and decorative brackets from Amazon exports.
+    text = re.sub(r"^[\s\u2022•\-–—]+", "", text)
+    if "】" in text:
+        text = text.split("】", 1)[1].strip()
+    text = text.strip("\"'“”[](){} ")
+    normalized = _normalize_sentence(text)
+    return normalized
+
+
+def _feature_sentences(payload: dict) -> List[str]:
+    features = payload.get("features")
+    sentences: List[str] = []
+    if isinstance(features, list):
+        seen: set[str] = set()
+        for entry in features:
+            normalized = _clean_feature_text(entry)
+            if not normalized or normalized in seen:
+                continue
+            sentences.append(normalized)
+            seen.add(normalized)
+            if len(sentences) >= 3:
+                break
+    return sentences
+
+
+def _meta_sentences(*, price_text: str | None, rating: float | None, rating_count: int | None) -> List[str]:
+    sentences: List[str] = []
+    if rating is not None and rating_count:
+        sentences.append(
+            _normalize_sentence(
+                f"Rated {rating:.1f}/5 by {rating_count:,} verified shoppers"
+            )
+        )
+    elif rating is not None:
+        sentences.append(_normalize_sentence(f"Rated {rating:.1f}/5 overall"))
+    elif rating_count:
+        sentences.append(
+            _normalize_sentence(f"Backed by {rating_count:,} shopper reviews")
+        )
+    if price_text:
+        sentences.append(
+            _normalize_sentence(
+                f"Check the listing for today's price (about {price_text})"
+            )
+        )
+    return [sentence for sentence in sentences if sentence]
+
+
+def _build_description(data: dict, *, title: str, price_text: str | None, rating: float | None, rating_count: int | None) -> str | None:
+    sentences: List[str] = []
+    raw_description = data.get("description")
+    normalized_description = _normalize_sentence(raw_description)
+    if normalized_description:
+        sentences.append(normalized_description)
+    for sentence in _feature_sentences(data):
+        if sentence not in sentences:
+            sentences.append(sentence)
+        if len(sentences) >= 3:
+            break
+    if len(sentences) < 3:
+        for sentence in _meta_sentences(
+            price_text=price_text, rating=rating, rating_count=rating_count
+        ):
+            if sentence not in sentences:
+                sentences.append(sentence)
+            if len(sentences) >= 4:
+                break
+    if not sentences:
+        fallback = _normalize_sentence(
+            f"{title} is a ready-to-gift pick with practical details"
+        )
+        if fallback:
+            sentences.append(fallback)
+    description = clean_text(" ".join(sentences))
+    return description or None
 
 
 class GiftPipeline:
@@ -40,15 +173,15 @@ class GiftPipeline:
         products: list[Product] = []
         if not CURATED_DIR.exists():
             return products
-        for path in CURATED_DIR.rglob("*.json"):
-            try:
-                data = load_json(path, default=None)
-            except json.JSONDecodeError:  # pragma: no cover - invalid files
-                LOGGER.warning("Skipping malformed curated feed: %s", path)
+        adapter = StaticRetailerAdapter(
+            slug="curated",
+            name="Curated Picks",
+            dataset=CURATED_DIR,
+        )
+        for entry in adapter.search_items(keywords=[], item_count=0):
+            if not isinstance(entry, dict):
                 continue
-            if not isinstance(data, dict) or "id" not in data:
-                continue
-            product = self._build_product(data, source="curated")
+            product = self._build_product(entry, source="curated")
             if product:
                 products.append(product)
         return products
@@ -113,37 +246,51 @@ class GiftPipeline:
         category = data.get("category") or data.get("category_slug")
         if isinstance(category, str):
             category = category.replace("-", " ").title()
-        rating = data.get("rating")
-        if isinstance(rating, str):
+        rating_value = data.get("rating")
+        if isinstance(rating_value, str):
             try:
-                rating = float(rating)
+                rating_value = float(rating_value)
             except ValueError:
-                rating = None
-        rating_count = data.get("rating_count") or data.get("total_reviews")
-        if isinstance(rating_count, str):
+                rating_value = None
+        elif not isinstance(rating_value, (int, float)):
+            rating_value = None
+        rating_numeric = (
+            float(rating_value) if isinstance(rating_value, (int, float)) else None
+        )
+        review_count = data.get("rating_count") or data.get("total_reviews")
+        if isinstance(review_count, str):
             try:
-                rating_count = int(rating_count.replace(",", ""))
+                review_count = int(review_count.replace(",", ""))
             except ValueError:
-                rating_count = None
-        description = data.get("description")
-        if not description:
-            features = data.get("features")
-            if isinstance(features, list):
-                description = " ".join(str(item) for item in features[:2] if item)
+                review_count = None
+        elif isinstance(review_count, float):
+            review_count = int(review_count)
+        elif not isinstance(review_count, int):
+            review_count = None
+        image = data.get("image")
+        if _looks_like_placeholder_image(image):
+            image = None
+        description_text = _build_description(
+            data,
+            title=str(title),
+            price_text=str(price_text) if price_text else None,
+            rating=rating_numeric,
+            rating_count=review_count,
+        )
         return Product(
             id=str(raw_id),
             title=str(title),
             url=str(url),
-            image=data.get("image"),
+            image=image,
             price=numeric_price,
             price_text=str(price_text) if price_text else None,
             currency=str(currency) if currency else None,
             brand=str(brand) if brand else None,
             category=str(category) if category else None,
-            rating=rating if isinstance(rating, (int, float)) else None,
-            rating_count=int(rating_count) if isinstance(rating_count, int) else None,
+            rating=rating_numeric,
+            rating_count=review_count,
             source=source,
-            description=str(description) if description else None,
+            description=description_text,
         )
 
     def _dedupe(self, products: Iterable[Product]) -> List[Product]:
