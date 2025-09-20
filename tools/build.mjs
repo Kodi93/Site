@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import slugify from "slugify";
 import { pickTopics } from "./topics.mjs";
-import { priceNumber } from "./util.mjs";
+import { hash, priceNumber } from "./util.mjs";
 
 const IN = path.join("data", "items.json");
 const PUB = "public";
@@ -153,6 +154,67 @@ function toFeedEntry(item) {
   });
 }
 
+function formatUpdatedLabel(value) {
+  const timestamp = parseTimestamp(value);
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function prepareProduct(raw) {
+  if (!raw) return null;
+  const title = String(raw.title || "").trim();
+  const url = String(raw.url || "").trim();
+  const image = String(raw.image || "").trim();
+  if (!title || !url || !image) return null;
+
+  let id = String(raw.id || "").trim();
+  if (!id) {
+    id = hash(url || title);
+  }
+
+  const slugSeed = [title, id].filter(Boolean).join("-");
+  let slug = slugify(slugSeed, { lower: true, strict: true });
+  if (!slug) {
+    slug = slugify(`${title}-${hash(slugSeed || url || title)}`, {
+      lower: true,
+      strict: true,
+    });
+  }
+  if (!slug) {
+    slug = `item-${hash(slugSeed || url || title)}`;
+  }
+
+  const priceTextRaw = raw.price_text || raw.price;
+  const priceText = typeof priceTextRaw === "number" ? `$${priceTextRaw.toFixed(2)}` : String(priceTextRaw || "").trim();
+  const brand = raw.brand ? String(raw.brand).trim() : "";
+  const category = raw.category ? String(raw.category).trim() : raw.category;
+  const updatedAt = raw.updated_at || raw.updatedAt || new Date().toISOString();
+  const ratingValue = Number(raw.rating);
+  const rating = Number.isFinite(ratingValue) && ratingValue > 0 ? Number(ratingValue.toFixed(1)) : null;
+  const descriptionSource = raw.description || raw.blurb || "";
+  const description = stripBannedPhrases(descriptionSource);
+
+  return {
+    ...raw,
+    id,
+    title,
+    url,
+    image,
+    slug,
+    pageUrl: `/products/${slug}/`,
+    priceText,
+    brand,
+    category,
+    updatedAt,
+    rating,
+    description,
+  };
+}
+
 function ensureNotProtected(targetPath) {
   const resolved = path.resolve(targetPath);
   if (PROTECTED_FILES.has(resolved)) {
@@ -166,8 +228,11 @@ function writeFile(target, html) {
   fs.writeFileSync(target, html);
 }
 
-function renderWithBase(content) {
+function renderWithBase(content, { head = "" } = {}) {
   let html = BASE_TEMPLATE;
+  const headMarkup = head || "";
+  html = html.replace(/\{\{\s*head\|safe\s*\}\}/g, headMarkup);
+  html = html.replace(/\{\{\s*head\s*\}\}/g, escapeHtml(headMarkup));
   html = html.replace(/\{\{\s*content\|safe\s*\}\}/g, content);
   html = html.replace(/\{\{\s*content\s*\}\}/g, escapeHtml(content));
   return html;
@@ -290,22 +355,30 @@ function renderFeedItem(item) {
 }
 
 function renderProductPreviewCard(item) {
-  if (!item || !item.title || !item.url || !item.image) return "";
+  if (!item || !item.title || !item.image) return "";
   const metaParts = [];
   const category = formatCategory(item);
   if (category) metaParts.push(escapeHtml(category));
   if (item.brand) metaParts.push(escapeHtml(item.brand));
   const meta = metaParts.length
-    ? `<p class=\"feed-card-meta\">${metaParts.join(" • ")}</p>`
+    ? `<p class="feed-card-meta">${metaParts.join(" • ")}</p>`
     : "";
-  const price = item.price ? `<p class=\"feed-card-price\">${escapeHtml(item.price)}</p>` : "";
+  const priceDisplay = item.priceText || item.price;
+  const price = priceDisplay ? `<p class="feed-card-price">${escapeHtml(priceDisplay)}</p>` : "";
+  const href = item.pageUrl || item.url || "#";
+  const isInternal = href.startsWith("/");
+  const linkAttrs = isInternal
+    ? `class="feed-card-link" href="${escapeHtml(href)}"`
+    : `class="feed-card-link" href="${escapeHtml(href)}" rel="sponsored nofollow noopener" target="_blank"`;
+  const idAttr = item.id ? ` data-product-id="${escapeHtml(String(item.id))}"` : "";
+  const media = `<div class="feed-card-media"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy"></div>`;
   return [
-    '<article class="feed-card" data-home-product-card="true">',
-    `<a class=\"feed-card-link\" href=\"${escapeHtml(item.url)}\" rel=\"sponsored nofollow noopener\" target=\"_blank\">`,
-    `<div class=\"feed-card-media\"><img src=\"${escapeHtml(item.image)}\" alt=\"${escapeHtml(item.title)}\" loading=\"lazy\"></div>`,
+    `<article class="feed-card" data-home-product-card="true"${idAttr}>`,
+    `<a ${linkAttrs}>`,
+    media,
     '<div class="feed-card-body">',
     meta,
-    `<h3 class=\"feed-card-title\">${escapeHtml(item.title)}</h3>`,
+    `<h3 class="feed-card-title">${escapeHtml(item.title)}</h3>`,
     price,
     '</div>',
     '</a>',
@@ -315,6 +388,107 @@ function renderProductPreviewCard(item) {
     .join("\n");
 }
 
+function renderProductPage(product) {
+  if (!product || !product.title || !product.slug) return "";
+  const tags = [];
+  const category = formatCategory(product);
+  if (category) tags.push(escapeHtml(category));
+  if (product.brand) tags.push(escapeHtml(product.brand));
+  const tagsMarkup = tags.length
+    ? `<ul class="product-card__tags">${tags.map((tag) => `<li>${tag}</li>`).join("")}</ul>`
+    : "";
+  const priceDisplay = product.priceText || product.price;
+  const priceMarkup = priceDisplay ? `<p class="product-card__price">${escapeHtml(priceDisplay)}</p>` : "";
+  const ratingValue = Number(product.rating);
+  const ratingLabel = Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue.toFixed(1).replace(/\.0$/, "") : "";
+  const ratingMarkup = ratingLabel
+    ? `<div class="product-card__rating" aria-label="Rated ${escapeHtml(ratingLabel)} out of 5"><span class="product-card__rating-icon" aria-hidden="true">★</span><span class="product-card__rating-score">${escapeHtml(ratingLabel)}</span></div>`
+    : "";
+  const descriptionText = product.description && String(product.description).trim()
+    ? String(product.description).trim()
+    : "Check the listing for the latest details.";
+  const descriptionMarkup = escapeHtml(descriptionText);
+  const updatedLabel = formatUpdatedLabel(product.updatedAt);
+  const updatedMarkup = updatedLabel
+    ? `<p class="product-card__updated">Updated ${escapeHtml(updatedLabel)}</p>`
+    : "";
+  const imageMarkup = product.image
+    ? `<div class="product-card__media"><img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" loading="lazy"></div>`
+    : "";
+  const body = [
+    '<article class="product-card product-card--page">',
+    imageMarkup,
+    '<div class="product-card__body">',
+    tagsMarkup,
+    `<h1 class="product-card__title">${escapeHtml(product.title)}</h1>`,
+    priceMarkup,
+    ratingMarkup,
+    `<p class="product-card__description">${descriptionMarkup}</p>`,
+    `<a class="button product-card__cta" rel="sponsored nofollow noopener" target="_blank" href="${escapeHtml(product.url)}">Shop now</a>`,
+    updatedMarkup,
+    '</div>',
+    '</article>',
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const head = [
+    `<title>${escapeHtml(product.title)} – ${escapeHtml(SITE_NAME)}</title>`,
+    `<meta name="description" content="${escapeHtml(descriptionText)}">`,
+    `<link rel="canonical" href="/products/${escapeHtml(product.slug)}/">`,
+  ].join("\n");
+
+  return renderWithBase(body, { head });
+}
+
+function renderProductsIndexPage(products) {
+  const cards = products
+    .map((item) => renderProductPreviewCard(item))
+    .filter(Boolean)
+    .join("\n");
+  const sections = [
+    '<section class="page-header">',
+    '<h1>All products</h1>',
+    '<p>Every grabgifts find in one catalog.</p>',
+    '</section>',
+  ];
+  if (cards) {
+    sections.push('<section class="feed-section">');
+    sections.push('<div class="feed-list" data-product-grid>');
+    sections.push(cards);
+    sections.push('</div>');
+    sections.push('</section>');
+  } else {
+    sections.push('<p class="empty-state">No products are available right now.</p>');
+  }
+
+  const head = [
+    `<title>Products – ${escapeHtml(SITE_NAME)}</title>`,
+    '<meta name="description" content="Browse every product in the grabgifts catalog.">',
+    '<link rel="canonical" href="/products/">',
+  ].join("\n");
+
+  return renderWithBase(sections.join("\n"), { head });
+}
+
+function writeProductPages(products) {
+  if (!Array.isArray(products) || !products.length) {
+    return;
+  }
+  const sorted = products.slice().sort((a, b) => {
+    const diff = parseTimestamp(b.updatedAt || b.updated_at) - parseTimestamp(a.updatedAt || a.updated_at);
+    if (diff !== 0) return diff;
+    return (a.title || "").localeCompare(b.title || "");
+  });
+  const indexHtml = renderProductsIndexPage(sorted);
+  writeFile(path.join(PUB, "products", "index.html"), indexHtml);
+  for (const product of sorted) {
+    if (!product || !product.slug) continue;
+    const html = renderProductPage(product);
+    if (!html) continue;
+    writeFile(path.join(PUB, "products", product.slug, "index.html"), html);
+  }
+}
 function renderGuidePage(title, slug, items, summary) {
   const polishedTitle = polishGuideTitle(title);
   const description = stripBannedPhrases(summary || `Explore curated picks for ${polishedTitle}.`);
@@ -862,8 +1036,13 @@ function filterByTopic(title, items) {
 }
 
 function main() {
-  const items = JSON.parse(fs.readFileSync(IN, "utf8"));
-  const plan = pickTopics(items, 15);
+  const rawItems = JSON.parse(fs.readFileSync(IN, "utf8"));
+  const products = Array.isArray(rawItems)
+    ? rawItems
+        .map((item) => prepareProduct(item))
+        .filter((item) => item && item.title && item.url)
+    : [];
+  const plan = pickTopics(products, 15);
 
   const ledgerEntries = loadGuideLedger();
   const ledgerMap = new Map(
@@ -873,7 +1052,7 @@ function main() {
   );
   let made = 0;
   for (const { title, slug } of plan.topics) {
-    const picks = filterByTopic(title, items);
+    const picks = filterByTopic(title, products);
     const picksWithImages = picks.filter((item) => item.image);
     if (picksWithImages.length < 10) continue;
     const polishedTitle = polishGuideTitle(title);
@@ -908,8 +1087,8 @@ function main() {
   const guidesFallback = guidesForHome.length ? guidesForHome : trimmedLedger.slice(0, 6);
   const guidesForDisplay = guidesFallback.slice(0, 12);
 
-  const feedState = writeFeedData(items);
-  const homeHtml = renderHomePage(guidesForDisplay, feedState, items, trimmedLedger.length);
+  const feedState = writeFeedData(products);
+  const homeHtml = renderHomePage(guidesForDisplay, feedState, products, trimmedLedger.length);
   writeFile(path.join(PUB, "index.html"), homeHtml);
   const guidesIndexHtml = renderGuidesIndexPage(trimmedLedger);
   writeFile(path.join(PUB, "guides", "index.html"), guidesIndexHtml);
@@ -919,6 +1098,7 @@ function main() {
   writeFile(path.join(PUB, "changelog", "index.html"), changelogHtml);
   const faqHtml = renderFaqPage();
   writeFile(path.join(PUB, "faq", "index.html"), faqHtml);
+  writeProductPages(products);
 
   if (made < 15) {
     console.error("Generated guides:", made);
