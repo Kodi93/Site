@@ -1,12 +1,16 @@
 """Generate roundup guides based on topics and the current catalog."""
 from __future__ import annotations
 
+import argparse
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import List, Sequence
 
+from .generator import SiteGenerator
 from .models import Guide, Product
+from .pipeline import GiftPipeline
 from .repository import ProductRepository
 from .topics import Topic, generate_topics
 
@@ -121,7 +125,11 @@ def _select_products_for_topic(
 
 
 def _guide_description(topic: Topic) -> str:
-    return f"Fresh picks for {topic.title.lower()} curated from this week's trending inventory."
+    focus = topic.title.lower()
+    return (
+        f"Automated daily refresh spotlighting {focus} gift ideas, with each pick QA'd "
+        "for price accuracy, availability, and brand fit."
+    )
 
 
 def generate_guides(
@@ -151,3 +159,50 @@ def generate_guides(
     for topic in topics[:limit]:
         repository.append_topic_history(topic.slug, topic.title)
     return guides
+
+
+def cli_entry(argv: Sequence[str] | None = None) -> None:
+    """Command-line entry point for daily roundup automation."""
+
+    parser = argparse.ArgumentParser(
+        description="Refresh the catalog and publish daily roundup guides.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=15,
+        help="Number of guides to generate (minimum 15).",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("public"),
+        help="Directory where the rendered site will be written.",
+    )
+    parser.add_argument(
+        "--skip-update",
+        action="store_true",
+        help="Skip refreshing the product catalog before generating guides.",
+    )
+    args = parser.parse_args(list(argv) if argv is not None else None)
+
+    if args.limit < 15:
+        parser.error("--limit must be at least 15")
+
+    repository = ProductRepository()
+
+    if not args.skip_update:
+        pipeline = GiftPipeline(repository=repository)
+        LOGGER.info("Refreshing catalog before generating guides")
+        pipeline.run()
+
+    guides = generate_guides(repository, limit=args.limit)
+
+    generator = SiteGenerator(output_dir=args.output)
+    products = repository.load_products()
+    generator.build(products=products, guides=guides)
+    LOGGER.info("Generated %s guides in %s", len(guides), args.output)
+
+
+if __name__ == "__main__":
+    cli_entry()
