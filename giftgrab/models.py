@@ -1,12 +1,11 @@
 """Data models used by the GiftGrab pipeline."""
 from __future__ import annotations
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional
 
+from .normalization import canonicalize_product_identity, looks_like_placeholder_image
 from .utils import parse_price_string, slugify, timestamp
 
 
@@ -55,6 +54,13 @@ class Product:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "Product":
+        raw_id = payload["id"]
+        raw_url = payload["url"]
+        source_value = payload.get("source", "curated")
+        canonical_id, canonical_url = canonicalize_product_identity(
+            raw_id, raw_url, source_value
+        )
+
         price_text = payload.get("price_text") or payload.get("price_display")
         if isinstance(price_text, (int, float)):
             price_text = f"${float(price_text):,.2f}"
@@ -100,11 +106,16 @@ class Product:
         elif isinstance(rating_count, float):
             rating_count = int(rating_count)
 
+        raw_image = payload.get("image")
+        image = None
+        if not looks_like_placeholder_image(raw_image):
+            image = str(raw_image)
+
         return cls(
-            id=str(payload["id"]),
+            id=str(canonical_id),
             title=str(payload["title"]),
-            url=str(payload["url"]),
-            image=payload.get("image"),
+            url=str(canonical_url),
+            image=image,
             price=numeric_price,
             price_text=price_text,
             currency=currency,
@@ -112,7 +123,7 @@ class Product:
             category=payload.get("category"),
             rating=rating_value if isinstance(rating_value, (int, float)) else None,
             rating_count=rating_count if isinstance(rating_count, int) else None,
-            source=str(payload.get("source", "curated")),
+            source=str(source_value),
             description=payload.get("description"),
             created_at=payload.get("created_at", timestamp()),
             updated_at=payload.get("updated_at", timestamp()),

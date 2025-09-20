@@ -72,3 +72,45 @@ def test_ingest_failure_does_not_persist_files(tmp_path):
 
     assert repo.items_file.read_text(encoding="utf-8") == items_before
     assert repo.seen_file.read_text(encoding="utf-8") == seen_before
+
+
+def test_ingest_dedupes_affiliate_variants(tmp_path):
+    repo = ProductRepository(base_dir=tmp_path)
+    affiliate_one = Product.from_dict(
+        {
+            "id": "ebay-033901618",
+            "title": "Inspired Chia Pet Hedgehog",
+            "url": "https://www.ebay.com/itm/chia-pet-hedgehog-with-seed-pack-decorative-pottery-"
+            "planter-?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=033901618",
+            "image": "https://i.ebayimg.com/images/g/example/s-l1600.jpg",
+            "price": 24.99,
+            "currency": "USD",
+            "rating": 4.4,
+            "category": "For Adventurers",
+            "source": "curated",
+        }
+    )
+    affiliate_two = Product.from_dict(
+        {
+            "id": "ebay-033801617",
+            "title": "Inspired Chia Pet Hedgehog",
+            "url": "https://www.ebay.com/itm/chia-pet-hedgehog-with-seed-pack-decorative-pottery-"
+            "planter-?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=033801617",
+            "image": "https://i.ebayimg.com/images/g/example/s-l1600.jpg",
+            "price": 24.99,
+            "currency": "USD",
+            "rating": 4.4,
+            "category": "For Adventurers",
+            "source": "curated",
+        }
+    )
+
+    assert affiliate_one.id == affiliate_two.id
+    assert "?" not in affiliate_one.url
+
+    filler = [make_product(i + 100) for i in range(59)]
+    stored = repo.ingest([affiliate_one, affiliate_two, *filler])
+
+    stored_ids = [product.id for product in stored]
+    assert stored_ids.count(affiliate_one.id) == 1
+    assert len(stored) == len(filler) + 1

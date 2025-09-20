@@ -6,11 +6,10 @@ import os
 import re
 from pathlib import Path
 from typing import Iterable, List, Sequence
-from urllib.parse import urlparse
-
 from . import amazon
 from .ebay import EbayCredentials, EbayProductClient
 from .models import Product
+from .normalization import canonicalize_product_identity, looks_like_placeholder_image
 from .repository import ProductRepository
 from .retailers import StaticRetailerAdapter
 from .text import clean_text
@@ -24,41 +23,6 @@ DEFAULT_SEARCH_TERMS = ["gift ideas", "kitchen gadgets", "desk accessories"]
 DEFAULT_EBAY_RESULTS_PER_QUERY = 100
 DEFAULT_EBAY_TARGET_ITEMS = 2400
 CURATED_DIR = Path("data/retailers")
-
-_PLACEHOLDER_IMAGE_PREFIXES = ("/assets/amazon-sitestripe/",)
-_PLACEHOLDER_IMAGE_HOSTS = {
-    "images.unsplash.com",
-    "source.unsplash.com",
-    "picsum.photos",
-    "placekitten.com",
-}
-
-
-def _looks_like_placeholder_image(value: object) -> bool:
-    if not value:
-        return True
-    text = str(value).strip()
-    if not text:
-        return True
-    lowered = text.lower()
-    if lowered.startswith("data:image/svg"):
-        return True
-    for prefix in _PLACEHOLDER_IMAGE_PREFIXES:
-        if lowered.startswith(prefix):
-            return True
-    if lowered.endswith(".svg") and "amazon" in lowered:
-        return True
-    if "placeholder" in lowered:
-        return True
-    if lowered.startswith("http://") or lowered.startswith("https://"):
-        try:
-            host = urlparse(lowered).netloc
-        except ValueError:
-            return False
-        if host in _PLACEHOLDER_IMAGE_HOSTS:
-            return True
-    return False
-
 
 def _normalize_sentence(text: object) -> str:
     raw = str(text or "").strip()
@@ -318,6 +282,9 @@ class GiftPipeline:
             url = data["url"]
         except KeyError:
             return None
+        canonical_id, canonical_url = canonicalize_product_identity(
+            raw_id, url, source
+        )
         price_value = data.get("price")
         price_text = data.get("price_text") or data.get("price_display")
         currency = data.get("currency")
@@ -366,7 +333,7 @@ class GiftPipeline:
         elif not isinstance(review_count, int):
             review_count = None
         image = data.get("image")
-        if _looks_like_placeholder_image(image):
+        if looks_like_placeholder_image(image):
             image = None
         description_text = _build_description(
             data,
@@ -376,9 +343,9 @@ class GiftPipeline:
             rating_count=review_count,
         )
         return Product(
-            id=str(raw_id),
+            id=str(canonical_id),
             title=str(title),
-            url=str(url),
+            url=str(canonical_url),
             image=image,
             price=numeric_price,
             price_text=str(price_text) if price_text else None,
