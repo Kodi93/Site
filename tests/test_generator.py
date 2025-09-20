@@ -79,6 +79,14 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     for title in sample_titles:
         assert title in products_index_html
 
+    index_html = (output_dir / "index.html").read_text(encoding="utf-8")
+    assert "Most recent additions" in index_html
+    assert "data-home-ebay" in index_html
+    fragment = index_html.split("data-home-ebay", 1)[1].split("</section>", 1)[0]
+    assert any(
+        product.title in fragment for product in stored_products if product.source == "ebay"
+    )
+
 
 def test_polish_guide_title_removes_for_a_and_right_now():
     cleaned = polish_guide_title("Best For A Techy Gifts Right Now")
