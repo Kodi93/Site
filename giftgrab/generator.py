@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import re
+import shutil
 from collections import Counter
 from html import escape as html_escape
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from statistics import median
 
 from .affiliates import affiliate_rel, prepare_affiliate_url
 from .blog import blurb
-from .config import DEFAULT_PRESS_MENTIONS, PressMention
+from .config import DEFAULT_CATEGORIES, DEFAULT_PRESS_MENTIONS, PressMention
 from .models import Guide, Product
 from .text import title_case
 from .utils import slugify
@@ -324,6 +325,7 @@ class SiteGenerator:
         LOGGER.info("Rendering site to %s", self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._sitemap_entries = []
+        self._copy_static_assets()
         self._write_homepage(guides, products)
         self._write_guides(guides)
         self._write_categories(products)
@@ -339,6 +341,21 @@ class SiteGenerator:
 
     # ------------------------------------------------------------------
     # Rendering helpers
+
+    def _copy_static_assets(self) -> None:
+        assets_source = ROOT_DIR / "data" / "assets"
+        if not assets_source.exists():
+            return
+        assets_target = self.output_dir / "assets"
+        for source in assets_source.rglob("*"):
+            if source.is_dir():
+                continue
+            if source.name.startswith("."):
+                continue
+            relative = source.relative_to(assets_source)
+            destination = assets_target / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
 
     def _press_section_markup(self) -> str | None:
         mentions = getattr(self.settings, "press_mentions", ())
@@ -389,6 +406,79 @@ class SiteGenerator:
                 '</section>',
             ]
         )
+
+    def _category_section_markup(self, products: Sequence[Product]) -> str | None:
+        if not DEFAULT_CATEGORIES:
+            return None
+        slug_counts: Counter[str] = Counter()
+        for product in products:
+            raw_category = getattr(product, "category", "") or ""
+            if not raw_category:
+                continue
+            slug = slugify(raw_category)
+            if slug:
+                slug_counts[slug] += 1
+        ordered = sorted(
+            DEFAULT_CATEGORIES,
+            key=lambda definition: (
+                -slug_counts.get(definition.slug, 0),
+                definition.name.lower(),
+            ),
+        )
+        cards: list[str] = []
+        for definition in ordered:
+            name = (definition.name or "").strip()
+            slug = (definition.slug or "").strip()
+            if not name or not slug:
+                continue
+            blurb = (definition.blurb or "").strip()
+            image = definition.card_image or definition.image
+            count = slug_counts.get(slug, 0)
+            if count == 1:
+                meta_text = "1 pick live"
+            elif count > 1:
+                meta_text = f"{count:,} picks live"
+            else:
+                meta_text = "New drops daily"
+            parts = ['<article class="category-card">']
+            parts.append(
+                f'<a class="category-card__link" href="/categories/{slug}/">'
+            )
+            if image:
+                parts.append(
+                    '<div class="category-card__media">'
+                    + f'<img src="{html_escape(image)}" alt="" loading="lazy" decoding="async" aria-hidden="true">'
+                    + "</div>"
+                )
+            parts.append('<div class="category-card__body">')
+            parts.append(
+                f'<h3 class="category-card__title">{html_escape(name)}</h3>'
+            )
+            if blurb:
+                parts.append(
+                    f'<p class="category-card__description">{html_escape(blurb)}</p>'
+                )
+            parts.append(
+                f'<p class="category-card__meta">{html_escape(meta_text)}</p>'
+            )
+            parts.append("</div>")
+            parts.append("</a>")
+            parts.append("</article>")
+            cards.append("".join(parts))
+        if not cards:
+            return None
+        section_parts = [
+            '<section class="category-section" aria-labelledby="category-heading">',
+            '<div class="page-header">',
+            '<h2 id="category-heading">Trending categories</h2>',
+            '<p>Browse the gift themes our automation keeps stocked for launch day.</p>',
+            '</div>',
+            '<div class="category-grid">',
+            "".join(cards),
+            '</div>',
+            '</section>',
+        ]
+        return "\n".join(section_parts)
 
     def _abs_url(self, path: str) -> str:
         base = (self.settings.base_url or "https://example.com").rstrip("/")
@@ -875,6 +965,9 @@ class SiteGenerator:
         )
         hero_markup.append("</section>")
         sections: List[str] = ["\n".join(hero_markup)]
+        category_section = self._category_section_markup(products)
+        if category_section:
+            sections.append(category_section)
         press_section = self._press_section_markup()
         if press_section:
             sections.append(press_section)
