@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0a0810" />
-  <link rel="stylesheet" href="/assets/theme.css" />
+  <link rel="stylesheet" href="/assets/theme.css">
   {{ head|safe }}
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   {% include "partials/header.html" %}
-  <main class="wrap">{{ content|safe }}</main>
+  <main id="main-content" class="wrap site-main">{{ content|safe }}</main>
   {% include "partials/footer.html" %}
   <script type="module" src="/assets/nav.js"></script>
   <script type="module" src="/assets/feed.js"></script>

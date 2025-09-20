@@ -323,16 +323,18 @@ function renderGuidePage(title, slug, items, summary) {
     .filter(Boolean)
     .join("\n");
   const sections = [
-    '<section class="page-header">',
+    '<section class="panel page-section guide-page">',
+    '<div class="page-header section-heading">',
     `<h1>${escapeHtml(polishedTitle)}</h1>`,
     `<p>${escapeHtml(description)}</p>`,
-    '</section>',
+    '</div>',
   ];
   if (cards) {
-    sections.push(`<div class=\"grid\">${cards}</div>`);
+    sections.push(`<div class=\"grid guide-grid\">${cards}</div>`);
   } else {
-    sections.push("<p>No items are available for this guide right now.</p>");
+    sections.push('<p class="empty-state">No items are available for this guide right now.</p>');
   }
+  sections.push('</section>');
   return renderWithBase(sections.join("\n"));
 }
 
@@ -408,17 +410,104 @@ function writeFeedData(items) {
   };
 }
 
-function renderHomePage(guides, feed, products) {
+function renderHomePage(guides, feed, products, totalGuideCount = 0) {
   const hero = ['<section class="hero">', `<h1>${escapeHtml(SITE_NAME)}</h1>`];
   const description = stripBannedPhrases(SITE_DESCRIPTION);
   if (description) {
     hero.push(`<p>${escapeHtml(description)}</p>`);
   }
+
+  const guideCount =
+    Number.isFinite(totalGuideCount) && totalGuideCount > 0
+      ? totalGuideCount
+      : Array.isArray(guides)
+      ? guides.length
+      : 0;
+
+  let productTotal = 0;
+  let latestTimestamp = 0;
+  const brandSet = new Set();
+  if (Array.isArray(products)) {
+    productTotal = products.length;
+    for (const item of products) {
+      if (!item) continue;
+      if (item.brand) {
+        brandSet.add(item.brand);
+      }
+      const timestamp = parseTimestamp(item.updated_at || item.updatedAt);
+      if (timestamp > latestTimestamp) {
+        latestTimestamp = timestamp;
+      }
+    }
+  }
+  const brandTotal = brandSet.size;
+  const lastRefreshLabel = latestTimestamp
+    ? new Date(latestTimestamp).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : '';
+
+  const heroStats = [];
+  if (guideCount) {
+    heroStats.push(
+      '<li>' +
+        `<span class="hero-meta__value">${escapeHtml(guideCount.toLocaleString('en-US'))}</span>` +
+        '<span class="hero-meta__label">Guides live</span>' +
+        '</li>',
+    );
+  }
+  if (productTotal) {
+    heroStats.push(
+      '<li>' +
+        `<span class="hero-meta__value">${escapeHtml(productTotal.toLocaleString('en-US'))}</span>` +
+        '<span class="hero-meta__label">Products tracked</span>' +
+        '</li>',
+    );
+  }
+  if (brandTotal) {
+    heroStats.push(
+      '<li>' +
+        `<span class="hero-meta__value">${escapeHtml(brandTotal.toLocaleString('en-US'))}</span>` +
+        '<span class="hero-meta__label">Brands covered</span>' +
+        '</li>',
+    );
+  }
+  if (lastRefreshLabel) {
+    heroStats.push(
+      '<li>' +
+        `<span class="hero-meta__value">${escapeHtml(lastRefreshLabel)}</span>` +
+        '<span class="hero-meta__label">Last refresh</span>' +
+        '</li>',
+    );
+  }
+  if (heroStats.length) {
+    hero.push('<ul class="hero-meta" aria-label="Grabgifts highlights">');
+    hero.push(heroStats.join('\n'));
+    hero.push('</ul>');
+  }
+
   hero.push('<div class="hero-actions">');
   hero.push('<a class="button" href="/guides/">Explore today\'s drops</a>');
   hero.push('<a class="button button-secondary" href="/surprise/">Spin up a surprise</a>');
   hero.push('<a class="button button-ghost" href="/changelog/">See the live changelog</a>');
   hero.push('</div>');
+
+  const heroSupport = [
+    'Automation keeps the catalog deduped and stage-ready.',
+    'Conversion copy, SEO, and imagery tuned for high-intent moments.',
+    'Affiliate links ship with compliance-first guardrails.',
+  ];
+  if (heroSupport.length) {
+    hero.push('<div class="hero-support">');
+    hero.push('<p class="hero-support__lede">What each refresh delivers</p>');
+    hero.push('<ul class="hero-support__list">');
+    hero.push(heroSupport.map((line) => `<li>${escapeHtml(line)}</li>`).join('\n'));
+    hero.push('</ul>');
+    hero.push('</div>');
+  }
+
   hero.push('</section>');
   const heroMarkup = hero.filter(Boolean).join('\n');
 
@@ -448,8 +537,8 @@ function renderHomePage(guides, feed, products) {
     );
   });
   const guidesSectionParts = [
-    '<section id="guide-list" data-home-guides>',
-    '<div class="page-header">',
+    '<section id="guide-list" class="panel section-block" data-home-guides>',
+    '<div class="page-header section-heading">',
     "<h2>Today's drops</h2>",
     '<p>Browse the guides refreshed for the latest grabgifts catalog.</p>',
     '</div>',
@@ -464,7 +553,7 @@ function renderHomePage(guides, feed, products) {
       );
     }
   } else {
-    guidesSectionParts.push('<p>Guides are being prepared. Check back soon.</p>');
+    guidesSectionParts.push('<p class="empty-state">Guides are being prepared. Check back soon.</p>');
   }
   guidesSectionParts.push('</section>');
   const guidesSection = guidesSectionParts.join('\n');
@@ -490,8 +579,8 @@ function renderHomePage(guides, feed, products) {
   let productSection = '';
   if (productInitial.length) {
     const sectionParts = [
-      '<section class="feed-section" id="latest-products" data-home-products data-product-batch="6">',
-      '<div class="page-header">',
+      '<section class="panel section-block feed-section" id="latest-products" data-home-products data-product-batch="6">',
+      '<div class="page-header section-heading">',
       '<h2>Fresh product drops</h2>',
       '<p>Catch the newest arrivals across the catalog.</p>',
       '</div>',
@@ -509,11 +598,12 @@ function renderHomePage(guides, feed, products) {
     productSection = sectionParts.join('\n');
   } else {
     productSection = [
-      '<section class="feed-section" id="latest-products">',
-      '<div class="page-header">',
+      '<section class="panel section-block feed-section" id="latest-products">',
+      '<div class="page-header section-heading">',
       '<h2>Fresh product drops</h2>',
       '<p>New arrivals will appear here soon.</p>',
       '</div>',
+      '<p class="empty-state">We will restock this feed after the next automation run.</p>',
       '</section>',
     ].join('\n');
   }
@@ -589,7 +679,7 @@ function renderHomePage(guides, feed, products) {
       (defaultMode && defaultMode.description) ||
       'Scroll through the latest gifts from across the catalog.';
     feedSection = [
-      '<section class="feed-section" id="latest">',
+      '<section class="panel section-block feed-section" id="latest">',
       `<div class="feed-wrapper" data-feed-root data-feed-default="${escapeHtml(defaultMode ? defaultMode.id : '')}">`,
       '<div class="feed-header">',
       '<div class="feed-header-top">',
@@ -620,23 +710,21 @@ function renderHomePage(guides, feed, products) {
 
 function renderFaqPage() {
   const body = [
-    '<section class="page-header">',
+    '<section class="panel page-section">',
+    '<div class="page-header section-heading">',
     '<h1>FAQ &amp; disclosure</h1>',
     '<p>Learn how grabgifts curates daily picks and how affiliate links support the project.</p>',
-    '</section>',
+    '</div>',
+    '<div class="prose">',
     '<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>',
     '<p>Questions? Contact us at <a href="mailto:support@grabgifts.net">support@grabgifts.net</a>.</p>',
+    '</div>',
+    '</section>',
   ];
   return renderWithBase(body.join('\n'));
 }
 
 function renderGuidesIndexPage(guides) {
-  const header = [
-    '<section class="page-header">',
-    '<h1>All guides</h1>',
-    '<p>Every grabgifts collection in one place.</p>',
-    '</section>',
-  ];
   const sorted = Array.isArray(guides) ? guides.slice() : [];
   sorted.sort((a, b) => {
     return (polishGuideTitle(a.title) || '').localeCompare(polishGuideTitle(b.title) || '');
@@ -655,32 +743,40 @@ function renderGuidesIndexPage(guides) {
         '</article>'
       );
     });
-  const body = header.slice();
+  const body = [
+    '<section class="panel page-section">',
+    '<div class="page-header section-heading">',
+    '<h1>All guides</h1>',
+    '<p>Every grabgifts collection in one place.</p>',
+    '</div>',
+  ];
   if (cards.length) {
-    body.push('<div class="grid">');
+    body.push('<div class="grid guide-grid">');
     body.push(cards.join('\n'));
     body.push('</div>');
   } else {
-    body.push('<p>No guides are available right now.</p>');
+    body.push('<p class="empty-state">No guides are available right now.</p>');
   }
+  body.push('</section>');
   return renderWithBase(body.join('\n'));
 }
 
 function renderSurprisePage(guides) {
-  const header = [
-    '<section class="page-header">',
-    '<h1>Spin up a surprise</h1>',
-    '<p>We send you to a random guide from today\'s drops.</p>',
-    '</section>',
-  ];
   const entries = Array.isArray(guides) ? guides.filter((guide) => guide && guide.slug) : [];
   const links = entries.map((guide) => ({
     url: `/guides/${guide.slug}/`,
     title: polishGuideTitle(guide.title),
   }));
-  const body = header.slice();
+  const body = [
+    '<section class="panel page-section">',
+    '<div class="page-header section-heading">',
+    '<h1>Spin up a surprise</h1>',
+    '<p>We send you to a random guide from today\'s drops.</p>',
+    '</div>',
+  ];
   if (links.length) {
     const urls = links.map((entry) => entry.url);
+    body.push('<div class="prose">');
     body.push("<p>Hold tight—we're picking something for you.</p>");
     body.push(
       `<script>const guides = ${escapeHtml(JSON.stringify(urls))};if(guides.length){const target = guides[Math.floor(Math.random()*guides.length)];window.location.href = target;}</script>`,
@@ -691,9 +787,11 @@ function renderSurprisePage(guides) {
     body.push(
       `<noscript><p>Enable JavaScript to jump automatically. Until then, pick a guide below.</p><ul class=\"link-list\">${listItems}</ul></noscript>`,
     );
+    body.push('</div>');
   } else {
-    body.push('<p>No guides are available right now. Check back soon.</p>');
+    body.push('<p class="empty-state">No guides are available right now. Check back soon.</p>');
   }
+  body.push('</section>');
   return renderWithBase(body.join('\n'));
 }
 
@@ -712,12 +810,6 @@ function formatTimelineLabel(value) {
 }
 
 function renderChangelogPage(guides) {
-  const header = [
-    '<section class="page-header">',
-    '<h1>Live changelog</h1>',
-    '<p>Follow every update we push into grabgifts.</p>',
-    '</section>',
-  ];
   const entries = Array.isArray(guides) ? guides.slice() : [];
   entries.sort((a, b) => parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt));
   const items = entries
@@ -734,14 +826,21 @@ function renderChangelogPage(guides) {
         '</li>'
       );
     });
-  const body = header.slice();
+  const body = [
+    '<section class="panel page-section">',
+    '<div class="page-header section-heading">',
+    '<h1>Live changelog</h1>',
+    '<p>Follow every update we push into grabgifts.</p>',
+    '</div>',
+  ];
   if (items.length) {
     body.push('<ul class="timeline">');
     body.push(items.join('\n'));
     body.push('</ul>');
   } else {
-    body.push('<p>No updates yet. Check back soon.</p>');
+    body.push('<p class="empty-state">No updates yet. Check back soon.</p>');
   }
+  body.push('</section>');
   return renderWithBase(body.join('\n'));
 }
 
@@ -810,7 +909,7 @@ function main() {
   const guidesForDisplay = guidesFallback.slice(0, 12);
 
   const feedState = writeFeedData(items);
-  const homeHtml = renderHomePage(guidesForDisplay, feedState, items);
+  const homeHtml = renderHomePage(guidesForDisplay, feedState, items, trimmedLedger.length);
   writeFile(path.join(PUB, "index.html"), homeHtml);
   const guidesIndexHtml = renderGuidesIndexPage(trimmedLedger);
   writeFile(path.join(PUB, "guides", "index.html"), guidesIndexHtml);

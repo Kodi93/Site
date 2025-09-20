@@ -1,0 +1,103 @@
+{
+  "mode": "trending",
+  "label": "Trending",
+  "description": "Browse the crowd-pleasers rising to the top of our catalog.",
+  "pageSize": 18,
+  "totalItems": 400,
+  "totalPages": 23,
+  "generatedAt": "2025-09-20T03:26:36.264Z",
+  "pages": [
+    {
+      "page": 1,
+      "href": "/assets/feed/trending/page-1.json"
+    },
+    {
+      "page": 2,
+      "href": "/assets/feed/trending/page-2.json"
+    },
+    {
+      "page": 3,
+      "href": "/assets/feed/trending/page-3.json"
+    },
+    {
+      "page": 4,
+      "href": "/assets/feed/trending/page-4.json"
+    },
+    {
+      "page": 5,
+      "href": "/assets/feed/trending/page-5.json"
+    },
+    {
+      "page": 6,
+      "href": "/assets/feed/trending/page-6.json"
+    },
+    {
+      "page": 7,
+      "href": "/assets/feed/trending/page-7.json"
+    },
+    {
+      "page": 8,
+      "href": "/assets/feed/trending/page-8.json"
+    },
+    {
+      "page": 9,
+      "href": "/assets/feed/trending/page-9.json"
+    },
+    {
+      "page": 10,
+      "href": "/assets/feed/trending/page-10.json"
+    },
+    {
+      "page": 11,
+      "href": "/assets/feed/trending/page-11.json"
+    },
+    {
+      "page": 12,
+      "href": "/assets/feed/trending/page-12.json"
+    },
+    {
+      "page": 13,
+      "href": "/assets/feed/trending/page-13.json"
+    },
+    {
+      "page": 14,
+      "href": "/assets/feed/trending/page-14.json"
+    },
+    {
+      "page": 15,
+      "href": "/assets/feed/trending/page-15.json"
+    },
+    {
+      "page": 16,
+      "href": "/assets/feed/trending/page-16.json"
+    },
+    {
+      "page": 17,
+      "href": "/assets/feed/trending/page-17.json"
+    },
+    {
+      "page": 18,
+      "href": "/assets/feed/trending/page-18.json"
+    },
+    {
+      "page": 19,
+      "href": "/assets/feed/trending/page-19.json"
+    },
+    {
+      "page": 20,
+      "href": "/assets/feed/trending/page-20.json"
+    },
+    {
+      "page": 21,
+      "href": "/assets/feed/trending/page-21.json"
+    },
+    {
+      "page": 22,
+      "href": "/assets/feed/trending/page-22.json"
+    },
+    {
+      "page": 23,
+      "href": "/assets/feed/trending/page-23.json"
+    }
+  ]
+}

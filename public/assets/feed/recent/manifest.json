@@ -1,0 +1,103 @@
+{
+  "mode": "recent",
+  "label": "Most Recent",
+  "description": "Catch the newest arrivals as soon as we publish them.",
+  "pageSize": 18,
+  "totalItems": 400,
+  "totalPages": 23,
+  "generatedAt": "2025-09-20T03:26:36.256Z",
+  "pages": [
+    {
+      "page": 1,
+      "href": "/assets/feed/recent/page-1.json"
+    },
+    {
+      "page": 2,
+      "href": "/assets/feed/recent/page-2.json"
+    },
+    {
+      "page": 3,
+      "href": "/assets/feed/recent/page-3.json"
+    },
+    {
+      "page": 4,
+      "href": "/assets/feed/recent/page-4.json"
+    },
+    {
+      "page": 5,
+      "href": "/assets/feed/recent/page-5.json"
+    },
+    {
+      "page": 6,
+      "href": "/assets/feed/recent/page-6.json"
+    },
+    {
+      "page": 7,
+      "href": "/assets/feed/recent/page-7.json"
+    },
+    {
+      "page": 8,
+      "href": "/assets/feed/recent/page-8.json"
+    },
+    {
+      "page": 9,
+      "href": "/assets/feed/recent/page-9.json"
+    },
+    {
+      "page": 10,
+      "href": "/assets/feed/recent/page-10.json"
+    },
+    {
+      "page": 11,
+      "href": "/assets/feed/recent/page-11.json"
+    },
+    {
+      "page": 12,
+      "href": "/assets/feed/recent/page-12.json"
+    },
+    {
+      "page": 13,
+      "href": "/assets/feed/recent/page-13.json"
+    },
+    {
+      "page": 14,
+      "href": "/assets/feed/recent/page-14.json"
+    },
+    {
+      "page": 15,
+      "href": "/assets/feed/recent/page-15.json"
+    },
+    {
+      "page": 16,
+      "href": "/assets/feed/recent/page-16.json"
+    },
+    {
+      "page": 17,
+      "href": "/assets/feed/recent/page-17.json"
+    },
+    {
+      "page": 18,
+      "href": "/assets/feed/recent/page-18.json"
+    },
+    {
+      "page": 19,
+      "href": "/assets/feed/recent/page-19.json"
+    },
+    {
+      "page": 20,
+      "href": "/assets/feed/recent/page-20.json"
+    },
+    {
+      "page": 21,
+      "href": "/assets/feed/recent/page-21.json"
+    },
+    {
+      "page": 22,
+      "href": "/assets/feed/recent/page-22.json"
+    },
+    {
+      "page": 23,
+      "href": "/assets/feed/recent/page-23.json"
+    }
+  ]
+}
