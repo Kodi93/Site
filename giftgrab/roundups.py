@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import re
+from statistics import median
 from datetime import datetime
 from pathlib import Path
 from typing import List, Sequence
 
-from .generator import SiteGenerator
+from .generator import SiteGenerator, polish_guide_title
 from .models import Guide, Product
 from .pipeline import GiftPipeline
 from .repository import ProductRepository
@@ -38,6 +40,89 @@ STOP_WORDS = {
     "40",
     "50",
 }
+
+SOURCE_LABELS = {
+    "amazon": "Amazon",
+    "ebay": "eBay",
+    "curated": "Curated",
+}
+
+
+def _format_price(value: float) -> str:
+    if value >= 100:
+        formatted = f"{value:,.0f}"
+    else:
+        formatted = f"{value:,.2f}".rstrip("0").rstrip(".")
+    return f"${formatted}"
+
+
+def _join_list(values: Sequence[str]) -> str:
+    cleaned = [value for value in values if value]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} and {cleaned[1]}"
+    return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
+
+
+def _brand_sentence(topic: Topic, products: Sequence[Product]) -> str | None:
+    if topic.brand:
+        brand = topic.brand.strip()
+        if brand:
+            return f"The edit keeps things on-brand with {brand} releases only."
+    brands = sorted({(product.brand or "").strip() for product in products if product.brand})
+    if not brands:
+        return None
+    if len(brands) <= 3:
+        joined = _join_list(brands)
+        return f"Expect standouts from {joined}."
+    return f"Picks span {len(brands)} brands so the mix stays fresh."
+
+
+def _price_sentence(topic: Topic, products: Sequence[Product]) -> str | None:
+    prices = sorted({float(product.price) for product in products if product.price is not None})
+    if topic.price_cap is not None:
+        return f"Everything lands under {_format_price(float(topic.price_cap))}."
+    if not prices:
+        return None
+    low = prices[0]
+    high = prices[-1]
+    mid = median(prices)
+    if math.isclose(low, high, rel_tol=0.02):
+        return f"Pricing hovers around {_format_price(mid)}."
+    return (
+        f"Pricing runs from {_format_price(low)} to {_format_price(high)} with a median around {_format_price(mid)}."
+    )
+
+
+def _source_sentence(products: Sequence[Product]) -> str | None:
+    sources = sorted({product.source for product in products if product.source})
+    if not sources:
+        return None
+    label = _join_list(
+        sorted({SOURCE_LABELS.get(source, source.title()) for source in sources})
+    )
+    if not label:
+        return None
+    if len(sources) == 1:
+        return f"Inventory is sourced directly from {label}."
+    return f"Inventory is sourced across {label} to keep stock moving."
+
+
+def _sanitize_sentence(text: str | None) -> str | None:
+    if not text:
+        return None
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+    if cleaned[-1] not in ".!?":
+        cleaned = f"{cleaned}."
+    first = cleaned[0]
+    if first.isalpha():
+        cleaned = f"{first.upper()}{cleaned[1:]}"
+    return cleaned
 
 
 def _score_product(product: Product) -> tuple:
@@ -124,12 +209,27 @@ def _select_products_for_topic(
     return chosen[:TARGET_ITEMS_PER_GUIDE]
 
 
-def _guide_description(topic: Topic) -> str:
-    focus = topic.title.lower()
-    return (
-        f"Automated daily refresh spotlighting {focus} gift ideas, with each pick QA'd "
-        "for price accuracy, availability, and brand fit."
+def _guide_description(topic: Topic, products: Sequence[Product]) -> str:
+    display_title = polish_guide_title(topic.title)
+    sentences = [
+        _sanitize_sentence(
+            f"{len(products)} gift-ready picks anchor the {display_title} lineup"
+        )
+    ]
+    for builder in (
+        _brand_sentence(topic, products),
+        _price_sentence(topic, products),
+        _source_sentence(products),
+    ):
+        sentence = _sanitize_sentence(builder)
+        if sentence:
+            sentences.append(sentence)
+    closing = _sanitize_sentence(
+        "Each recommendation is QA'd for availability, price accuracy, and affiliate compliance before publish"
     )
+    if closing:
+        sentences.append(closing)
+    return " ".join(sentence for sentence in sentences if sentence)
 
 
 def generate_guides(
@@ -149,7 +249,7 @@ def generate_guides(
         guide = Guide(
             slug=topic.slug,
             title=topic.title,
-            description=_guide_description(topic),
+            description=_guide_description(topic, items),
             products=list(items),
         )
         guides.append(guide)
