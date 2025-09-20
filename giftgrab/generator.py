@@ -60,6 +60,60 @@ SOURCE_LABELS = {
 }
 
 
+def _retailer_label(source: str | None) -> str:
+    if not source:
+        return "GrabGifts catalog"
+    label = SOURCE_LABELS.get(source)
+    if label:
+        return label
+    cleaned = source.replace("-", " ").strip()
+    return cleaned.title() if cleaned else "GrabGifts catalog"
+
+
+def _fallback_product_copy(product: Product) -> str:
+    retailer = _retailer_label(product.source)
+    sentences: list[str] = []
+    name_bits: list[str] = []
+    title_text = (product.title or "").strip()
+    if title_text:
+        name_bits.append(title_text)
+    brand_text = (product.brand or "").strip()
+    if brand_text:
+        name_bits.append(f"by {brand_text}")
+    if name_bits:
+        sentences.append(f"{' '.join(name_bits)} is available from {retailer}.")
+    else:
+        sentences.append(f"This listing is available from {retailer}.")
+    category_text = (product.category or "").strip()
+    if category_text:
+        sentences.append(
+            f"It sits inside our {category_text.lower()} coverage after editors verified inventory."
+        )
+    else:
+        sentences.append("Editors verified inventory before adding it to the catalog.")
+    feature_highlight = next((feature for feature in product.features if feature.strip()), "")
+    if feature_highlight:
+        sentences.append(feature_highlight)
+    if product.price_text:
+        sentences.append(
+            f"Recent checks put pricing near {product.price_text}; confirm the latest total directly with the seller."
+        )
+    elif product.price is not None:
+        sentences.append(
+            f"Recent checks put pricing near ${product.price:,.2f}; confirm the latest total directly with the seller."
+        )
+    if product.rating is not None and product.rating_count:
+        sentences.append(
+            f"Shoppers currently rate it {product.rating:.1f}/5 across {product.rating_count:,} reviews."
+        )
+    elif product.rating is not None:
+        sentences.append(f"It currently holds a {product.rating:.1f}/5 rating.")
+    sentences.append(
+        "We refresh listing details frequently so you can click through with confidence."
+    )
+    return " ".join(sentence.strip() for sentence in sentences if sentence).strip()
+
+
 def _strip_banned_phrases(text: str) -> str:
     result = text or ""
     for phrase in _BANNED_PHRASES:
@@ -605,7 +659,7 @@ class SiteGenerator:
     def _product_card(self, product: Product) -> tuple[str, dict] | None:
         if not product.image:
             return None
-        description_source = product.description or blurb(product)
+        description_source = product.description or _fallback_product_copy(product)
         description = _strip_banned_phrases(description_source)
         link = prepare_affiliate_url(product.url, product.source)
         price_display = product.price_text
@@ -1428,7 +1482,7 @@ class SiteGenerator:
 
     def _write_products(self, products: Sequence[Product]) -> None:
         for product in products:
-            description_source = product.description or blurb(product)
+            description_source = product.description or _fallback_product_copy(product)
             description = _strip_banned_phrases(description_source)
             link = prepare_affiliate_url(product.url, product.source)
             price_display = product.price_text
@@ -1473,6 +1527,7 @@ class SiteGenerator:
                     + "</div>"
                 )
 
+            retailer_label = _retailer_label(product.source)
             updated_label = _format_updated_label(product.updated_at)
             updated_html = (
                 f"<p class=\"product-card__updated\">Updated {html_escape(updated_label)}</p>"
@@ -1500,6 +1555,65 @@ class SiteGenerator:
             card_parts.append(
                 f"<p class=\"product-card__description\">{html_escape(description)}</p>"
             )
+            feature_items = [feature for feature in product.features if feature.strip()]
+            if feature_items:
+                feature_list = "".join(
+                    f"<li>{html_escape(feature)}</li>" for feature in feature_items
+                )
+                card_parts.append(
+                    '<section class="product-card__section">'
+                    '<h2 class="product-card__section-title">Key features</h2>'
+                    f'<ul class="product-card__feature-list">{feature_list}</ul>'
+                    "</section>"
+                )
+            detail_items: list[str] = []
+            if price_display:
+                detail_items.append(
+                    "<li class=\"product-card__detail-item\">"
+                    "<span class=\"product-card__detail-label\">Price check</span>"
+                    f"<span class=\"product-card__detail-value\">{html_escape(price_display)} (verify at checkout)</span>"
+                    "</li>"
+                )
+            if product.rating is not None:
+                rating_value = f"{product.rating:.1f}".rstrip("0").rstrip(".")
+                if product.rating_count:
+                    rating_detail = f"{rating_value}/5 · {product.rating_count:,} reviews"
+                else:
+                    rating_detail = f"{rating_value}/5 rating"
+                detail_items.append(
+                    "<li class=\"product-card__detail-item\">"
+                    "<span class=\"product-card__detail-label\">Community</span>"
+                    f"<span class=\"product-card__detail-value\">{html_escape(rating_detail)}</span>"
+                    "</li>"
+                )
+            if product.brand:
+                detail_items.append(
+                    "<li class=\"product-card__detail-item\">"
+                    "<span class=\"product-card__detail-label\">Brand</span>"
+                    f"<span class=\"product-card__detail-value\">{html_escape(product.brand)}</span>"
+                    "</li>"
+                )
+            if product.category:
+                detail_items.append(
+                    "<li class=\"product-card__detail-item\">"
+                    "<span class=\"product-card__detail-label\">Category</span>"
+                    f"<span class=\"product-card__detail-value\">{html_escape(product.category)}</span>"
+                    "</li>"
+                )
+            if retailer_label:
+                detail_items.append(
+                    "<li class=\"product-card__detail-item\">"
+                    "<span class=\"product-card__detail-label\">Retailer</span>"
+                    f"<span class=\"product-card__detail-value\">{html_escape(retailer_label)}</span>"
+                    "</li>"
+                )
+            if detail_items:
+                card_parts.append(
+                    '<section class="product-card__section">'
+                    '<h2 class="product-card__section-title">At a glance</h2>'
+                    f'<ul class="product-card__detail-list">{"".join(detail_items)}</ul>'
+                    "</section>"
+                )
             card_parts.append(
                 "<a class=\"button product-card__cta\" "
                 f"rel=\"{affiliate_rel()}\" target=\"_blank\" href=\"{html_escape(link)}\">Shop now</a>"
