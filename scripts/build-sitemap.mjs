@@ -11,12 +11,12 @@ const SITEMAP_FILE = path.join(PUBLIC_DIR, "sitemap.xml");
 const STATIC_ROUTES = [
   "/",
   "/guides",
-  "/for-him",
-  "/for-her",
-  "/techy",
-  "/gamers",
-  "/fandom",
-  "/homebody",
+  "/categories/for-him",
+  "/categories/for-her",
+  "/categories/for-a-techy",
+  "/categories/for-gamers",
+  "/categories/for-fandom",
+  "/categories/homebody-upgrades",
 ];
 
 const formatUrl = (base, route) => {
