@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Iterable, List, Sequence
 from urllib.parse import urlparse
 
-from . import amazon, ebay
+from . import amazon
+from .ebay import EbayCredentials, EbayProductClient
 from .models import Product
 from .repository import ProductRepository
 from .retailers import StaticRetailerAdapter
@@ -153,6 +155,34 @@ def _build_description(data: dict, *, title: str, price_text: str | None, rating
 class GiftPipeline:
     def __init__(self, repository: ProductRepository | None = None) -> None:
         self.repository = repository or ProductRepository()
+        self._ebay_client: EbayProductClient | None = None
+        self._ebay_credentials_warning_logged = False
+
+    def _load_ebay_credentials(self) -> EbayCredentials | None:
+        client_id = (os.getenv("EBAY_CLIENT_ID") or "").strip()
+        client_secret = (os.getenv("EBAY_CLIENT_SECRET") or "").strip()
+        if not client_id or not client_secret:
+            if not self._ebay_credentials_warning_logged:
+                LOGGER.warning("Missing eBay credentials; Browse API disabled")
+                self._ebay_credentials_warning_logged = True
+            return None
+        campaign = (os.getenv("EBAY_CAMPAIGN_ID") or "").strip() or None
+        marketplace = (os.getenv("EBAY_MARKETPLACE_ID") or "").strip() or None
+        return EbayCredentials(
+            client_id=client_id,
+            client_secret=client_secret,
+            affiliate_campaign_id=campaign,
+            marketplace_id=marketplace,
+        )
+
+    def _ensure_ebay_client(self) -> EbayProductClient | None:
+        if self._ebay_client is not None:
+            return self._ebay_client
+        credentials = self._load_ebay_credentials()
+        if not credentials:
+            return None
+        self._ebay_client = EbayProductClient(credentials)
+        return self._ebay_client
 
     # ------------------------------------------------------------------
     # Data discovery
@@ -173,10 +203,18 @@ class GiftPipeline:
         products: list[Product] = []
         if not CURATED_DIR.exists():
             return products
+        sources: list[Path] = []
+        for entry in sorted(CURATED_DIR.iterdir()):
+            name = entry.name.lower()
+            if any(keyword in name for keyword in ("ebay", "amazon")):
+                continue
+            sources.append(entry)
+        if not sources:
+            return products
         adapter = StaticRetailerAdapter(
             slug="curated",
             name="Curated Picks",
-            dataset=CURATED_DIR,
+            dataset=sources,
         )
         for entry in adapter.search_items(keywords=[], item_count=0):
             if not isinstance(entry, dict):
@@ -190,12 +228,13 @@ class GiftPipeline:
     # External API fetches
 
     def _fetch_ebay(self, queries: Sequence[str]) -> List[Product]:
-        token = ebay.get_token()
-        if not token:
+        client = self._ensure_ebay_client()
+        if client is None:
             return []
         results: List[Product] = []
         for query in queries:
-            for item in ebay.search(query, limit=30, token=token):
+            items = client.search_items(keywords=[query], item_count=30)
+            for item in items:
                 product = self._build_product(item, source="ebay")
                 if product:
                     results.append(product)
