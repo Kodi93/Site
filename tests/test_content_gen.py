@@ -1,4 +1,4 @@
-from giftgrab.content_gen import _build_blurb
+from giftgrab.content_gen import _build_blurb, _build_items, _build_specs
 from giftgrab.models import Product
 
 
@@ -49,3 +49,41 @@ def test_build_blurb_handles_sparse_metadata():
     assert "clever stocking stuffers" in blurb
     assert "Check the latest listing" in blurb
     assert "TrailSet Mini Repair Kit" in blurb
+
+
+def test_build_specs_uses_source_fallback_for_retailer():
+    product = make_product()
+
+    specs = _build_specs(product)
+
+    assert "Price:" in specs[0]
+    assert "Retailer: Curated" in specs
+
+
+def test_build_specs_prefers_explicit_retailer_name():
+    product = make_product()
+    setattr(product, "retailer_name", "Acme Gifts")
+
+    specs = _build_specs(product)
+
+    assert "Retailer: Acme Gifts" in specs
+    assert "Retailer: Curated" not in specs
+
+
+def test_build_items_falls_back_to_product_url_when_link_missing():
+    product = make_product()
+    setattr(product, "keywords", ["cozy", "cotton"])
+
+    items = _build_items([product], context="cozy nights")
+
+    assert len(items) == 1
+    assert items[0].outbound_url == product.url
+
+
+def test_build_items_prefers_explicit_product_link():
+    product = make_product()
+    setattr(product, "link", "https://example.com/redirect/cozy-throw")
+
+    items = _build_items([product], context="cozy nights")
+
+    assert items[0].outbound_url == "https://example.com/redirect/cozy-throw"
