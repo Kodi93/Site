@@ -133,6 +133,17 @@ BASE_TEMPLATE = _apply_includes(
     BASE_TEMPLATE_PATH.read_text(encoding="utf-8").lstrip("\ufeff")
 )
 
+
+def _join_with_and(items: Sequence[str]) -> str:
+    cleaned = [item for item in items if item]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]} and {cleaned[1]}"
+    return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
+
 _HEAD_SAFE_PATTERN = re.compile(r"\{\{\s*head\|safe\s*\}\}")
 _HEAD_PATTERN = re.compile(r"\{\{\s*head\s*\}\}")
 _CONTENT_SAFE_PATTERN = re.compile(r"\{\{\s*content\|safe\s*\}\}")
@@ -235,6 +246,9 @@ class SiteGenerator:
         self._write_guides(guides)
         self._write_categories(products)
         self._write_products(products)
+        self._write_about(guides, products)
+        self._write_curation_page(guides, products)
+        self._write_contact()
         self._write_faq()
         self._write_sitemap()
         self._write_robots()
@@ -510,15 +524,6 @@ class SiteGenerator:
         unique_brands = len(brand_set)
         top_categories = [name for name, _count in category_counts.most_common(3)]
 
-        def _join_with_and(items: Sequence[str]) -> str:
-            cleaned = [item for item in items if item]
-            if not cleaned:
-                return ""
-            if len(cleaned) == 1:
-                return cleaned[0]
-            if len(cleaned) == 2:
-                return f"{cleaned[0]} and {cleaned[1]}"
-            return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
         guide_cards: list[str] = []
         for index, guide in enumerate(sorted_guides):
             display_title = polish_guide_title(guide.title)
@@ -1061,12 +1066,377 @@ class SiteGenerator:
             self._write_file(f"/products/{product.slug}/index.html", html)
             self._sitemap_entries.append((f"/products/{product.slug}/", product.updated_at))
 
+    def _write_about(self, guides: Sequence[Guide], products: Sequence[Product]) -> None:
+        live_guides = [guide for guide in guides if guide.products]
+        live_count = len(live_guides)
+        total_products = len(products)
+        category_counts = Counter(
+            product.category for product in products if product.category
+        )
+        category_count = len([name for name in category_counts])
+        brand_count = len({product.brand for product in products if product.brand})
+        top_categories = [name for name, _ in category_counts.most_common(3)]
+        stats_cards: list[str] = []
+        if live_count:
+            guide_label = "guides" if live_count != 1 else "guide"
+            verb = "regenerate" if live_count != 1 else "regenerates"
+            refresh_text = (
+                f"{live_count:,} {guide_label} {verb} before most people finish their first coffee."
+            )
+        else:
+            refresh_text = (
+                "Our automations rebuild the entire catalog every morning so it is ready the moment new inventory appears."
+            )
+        stats_cards.append(
+            "<article class=\"quality-card\">"
+            "<h3>Daily refresh cadence</h3>"
+            f"<p>{refresh_text}</p>"
+            "</article>"
+        )
+        coverage_bits: list[str] = []
+        if total_products:
+            coverage_bits.append(f"{total_products:,} gift ideas tracked")
+        if category_count:
+            category_label = "categories" if category_count != 1 else "category"
+            coverage_bits.append(f"{category_count} {category_label} monitored")
+        if brand_count:
+            brand_label = "brands" if brand_count != 1 else "brand"
+            coverage_bits.append(f"{brand_count:,} {brand_label} represented")
+        if coverage_bits:
+            coverage_text = _join_with_and(coverage_bits)
+            coverage_text = f"{coverage_text}."
+        else:
+            coverage_text = (
+                "We monitor standout gift ideas across the marketplaces our audience shops most."
+            )
+        stats_cards.append(
+            "<article class=\"quality-card\">"
+            "<h3>Catalog depth</h3>"
+            f"<p>{coverage_text}</p>"
+            "</article>"
+        )
+        stats_cards.append(
+            "<article class=\"quality-card\">"
+            "<h3>Editorial guardrails</h3>"
+            "<p>Every pick ships with human-written copy, duplicate scrubbing, and pricing context before it goes live.</p>"
+            "</article>"
+        )
+        if top_categories:
+            escaped = [html_escape(name) for name in top_categories]
+            categories_text = _join_with_and(escaped)
+            verb = "lead" if len(escaped) != 1 else "leads"
+            stats_cards.append(
+                "<article class=\"quality-card\">"
+                "<h3>Trending themes</h3>"
+                f"<p>{categories_text} currently {verb} the click-through charts.</p>"
+                "</article>"
+            )
+        mission_cards = [
+            (
+                "<article class=\"card\">"
+                "<h3>What you'll find</h3>"
+                f"<p>Each guide showcases {GUIDE_ITEM_TARGET} standout gifts with pricing context, verified imagery, and quick-scan blurbs.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"card\">"
+                "<h3>Signals we monitor</h3>"
+                "<p>Release calendars, retailer feeds, review velocity, and community chatter all factor into our selections.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"card\">"
+                "<h3>Automation plus humans</h3>"
+                "<p>Scripted pipelines flag promising items while editors trim the noise, rewrite copy, and ensure merchandising stays sharp.</p>"
+                "</article>"
+            ),
+        ]
+        if category_count and top_categories:
+            category_label = "categories" if category_count != 1 else "category"
+            highlighted = _join_with_and([html_escape(name) for name in top_categories])
+            focus_verb = "are" if len(top_categories) != 1 else "is"
+            mission_cards.append(
+                "<article class=\"card\">"
+                "<h3>Where we focus</h3>"
+                f"<p>We constantly rotate through {category_count} {category_label}, with {highlighted} {focus_verb} resonating right now.</p>"
+                "</article>"
+            )
+        cta_links = [
+            "<li><a href=\"/guides/\">Browse today's guides</a></li>",
+            "<li><a href=\"/how-we-curate/\">See how we curate</a></li>",
+            "<li><a href=\"/contact/\">Reach the team</a></li>",
+        ]
+        body_parts = [
+            "<section class=\"page-header\">",
+            "<h1>About grabgifts</h1>",
+            "<p>grabgifts is a small editorial studio tracking giftable finds with automation, data, and a human edit pass.</p>",
+            "</section>",
+            "<section class=\"quality-section\" aria-labelledby=\"about-highlights\">",
+            "<div class=\"page-header\">",
+            "<h2 id=\"about-highlights\">What drives the project</h2>",
+            "<p>Metrics, manual curation, and constant iteration keep the catalog trustworthy.</p>",
+            "</div>",
+            "<div class=\"quality-grid\">",
+            "".join(stats_cards),
+            "</div>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>How we work</h2>",
+            "<p>Automation handles the heavy lifting while editors focus on storytelling and product fit.</p>",
+            "</div>",
+            "<div class=\"grid\">",
+            "\n".join(mission_cards),
+            "</div>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Explore more</h2>",
+            "<p>Jump into the latest guides or learn more about our process.</p>",
+            "</div>",
+            f"<ul class=\"link-list\">{''.join(cta_links)}</ul>",
+            "</section>",
+        ]
+        html = self._render_document(
+            page_title=f"About {self.settings.name}",
+            description=f"Meet the {self.settings.name} team and see how we scout giftable products.",
+            canonical_path="/about/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/about/index.html", html)
+        self._sitemap_entries.append(("/about/", datetime.now(timezone.utc).isoformat()))
+
+    def _write_curation_page(
+        self, guides: Sequence[Guide], products: Sequence[Product]
+    ) -> None:
+        total_products = len(products)
+        guide_count = len(guides)
+        signals = [
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Inventory sweep</h3>"
+                "<p>Marketplace APIs and curated retailer feeds pipe in promising items with pricing, imagery, and metadata.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Signal scoring</h3>"
+                "<p>We weigh release timing, review velocity, price movement, and gifting fit to rank every product candidate.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Editorial pass</h3>"
+                f"<p>Editors fact-check availability, write blurbs, and assemble {GUIDE_ITEM_TARGET}-item lineups ready for syndication.</p>"
+                "</article>"
+            ),
+        ]
+        guardrails = [
+            (
+                "<article class=\"card\">"
+                "<h3>Duplication control</h3>"
+                "<p>IDs, URLs, and titles are normalized so repeats never sneak into a guide.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"card\">"
+                "<h3>Price monitoring</h3>"
+                "<p>We refresh price data daily and surface shifts that change the recommendation.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"card\">"
+                "<h3>Compliance ready</h3>"
+                "<p>Affiliate rel attributes, sponsored disclosures, and JSON-LD ship in every build.</p>"
+                "</article>"
+            ),
+        ]
+        timeline_entries = [
+            ("07:00", "Automation syncs pricing, inventory status, and new arrivals."),
+            ("11:00", "Editors review flagged products and slot new standouts into guides."),
+            ("15:00", "Guides regenerate, metadata refreshes, and the static site deploys."),
+        ]
+        timeline_markup = []
+        for label, description in timeline_entries:
+            timeline_markup.append(
+                "<li>"
+                f"<time datetime=\"{label}\">{label} UTC</time>"
+                f"<span>{description}</span>"
+                "</li>"
+            )
+        summary_bits: list[str] = []
+        if guide_count:
+            guide_label = "guides" if guide_count != 1 else "guide"
+            summary_bits.append(f"{guide_count} {guide_label} in rotation")
+        if total_products:
+            product_label = "products" if total_products != 1 else "product"
+            summary_bits.append(f"{total_products:,} {product_label} scored")
+        summary_text = " and ".join(summary_bits) if summary_bits else "Our pipeline hums along even when inventory is light"
+        body_parts = [
+            "<section class=\"page-header\">",
+            "<h1>How we curate</h1>",
+            f"<p>{summary_text}. Here's how the workflow runs end to end.</p>",
+            "</section>",
+            "<section class=\"quality-section\" aria-labelledby=\"curation-steps\">",
+            "<div class=\"page-header\">",
+            "<h2 id=\"curation-steps\">Three phases keep quality high</h2>",
+            "<p>Automation narrows the field, scoring ranks the contenders, and editors finalize every recommendation.</p>",
+            "</div>",
+            "<div class=\"quality-grid\">",
+            "".join(signals),
+            "</div>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Daily publishing rhythm</h2>",
+            "<p>Each build runs on a repeatable schedule so updates land like clockwork.</p>",
+            "</div>",
+            "<ul class=\"timeline\">",
+            "".join(timeline_markup),
+            "</ul>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Quality guardrails</h2>",
+            "<p>Checks fire on every run to catch anything that could erode trust.</p>",
+            "</div>",
+            "<div class=\"grid\">",
+            "\n".join(guardrails),
+            "</div>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Need something else?</h2>",
+            "<p>Reach out if you want to collaborate, request coverage, or surface feedback.</p>",
+            "</div>",
+            "<ul class=\"link-list\"><li><a href=\"/contact/\">Contact the editors</a></li><li><a href=\"/about/\">Learn about grabgifts</a></li></ul>",
+            "</section>",
+        ]
+        html = self._render_document(
+            page_title=f"How {self.settings.name} curates",
+            description=f"Understand the scoring pipeline and editorial guardrails that power {self.settings.name}.",
+            canonical_path="/how-we-curate/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/how-we-curate/index.html", html)
+        self._sitemap_entries.append(("/how-we-curate/", datetime.now(timezone.utc).isoformat()))
+
+    def _write_contact(self) -> None:
+        contact_email = self.settings.contact_email or "support@grabgifts.net"
+        contact_label = html_escape(contact_email)
+        contact_href = html_escape(f"mailto:{contact_email}")
+        social_links: list[str] = []
+
+        def _normalize_social(value: str, prefix: str) -> str:
+            cleaned = value.strip()
+            if cleaned.startswith("http://") or cleaned.startswith("https://"):
+                return cleaned
+            handle = cleaned.lstrip("@")
+            return f"{prefix}{handle}"
+
+        if self.settings.twitter:
+            twitter_url = _normalize_social(self.settings.twitter, "https://twitter.com/")
+            social_links.append(
+                "<li><a href=\""
+                + html_escape(twitter_url)
+                + "\" target=\"_blank\" rel=\"noopener\">Say hi on X (Twitter)</a></li>"
+            )
+        if self.settings.facebook:
+            facebook_url = _normalize_social(self.settings.facebook, "https://facebook.com/")
+            social_links.append(
+                "<li><a href=\""
+                + html_escape(facebook_url)
+                + "\" target=\"_blank\" rel=\"noopener\">Follow along on Facebook</a></li>"
+            )
+        link_items = [
+            f"<li><a href=\"{contact_href}\">Email {contact_label}</a></li>",
+            "<li><a href=\"/faq/\">Review our FAQ &amp; disclosure</a></li>",
+            "<li><a href=\"/guides/\">Catch today's guides</a></li>",
+        ]
+        link_items.extend(social_links)
+        support_cards = [
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Partnerships &amp; pitches</h3>"
+                "<p>Share launch timelines, exclusive bundles, or affiliate-ready drops you'd like us to evaluate.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Corrections</h3>"
+                "<p>See an item go out of stock or pricing that drifted? Send the details and we will rerun the checks.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"quality-card\">"
+                "<h3>Press &amp; inquiries</h3>"
+                "<p>Need a quote about gifting trends or our automation stack? Drop a note and we will respond quickly.</p>"
+                "</article>"
+            ),
+        ]
+        expectations_cards = [
+            (
+                "<article class=\"card\">"
+                "<h3>Response time</h3>"
+                "<p>We aim to reply within one business day, often sooner when a launch is in motion.</p>"
+                "</article>"
+            ),
+            (
+                "<article class=\"card\">"
+                "<h3>What to include</h3>"
+                "<p>Links, pricing, regional availability, and any embargo dates help us act fast.</p>"
+                "</article>"
+            ),
+        ]
+        body_parts = [
+            "<section class=\"page-header\">",
+            "<h1>Contact the grabgifts editors</h1>",
+            "<p>We love hearing about new products, partnerships, and feedback from shoppers.</p>",
+            "</section>",
+            "<section class=\"quality-section\" aria-labelledby=\"contact-topics\">",
+            "<div class=\"page-header\">",
+            "<h2 id=\"contact-topics\">How we can help</h2>",
+            "<p>Pick the lane that matches what you need and we will route it to the right editor.</p>",
+            "</div>",
+            "<div class=\"quality-grid\">",
+            "".join(support_cards),
+            "</div>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Reach us quickly</h2>",
+            "<p>Choose the channel that works best for you.</p>",
+            "</div>",
+            f"<ul class=\"link-list\">{''.join(link_items)}</ul>",
+            "</section>",
+            "<section>",
+            "<div class=\"page-header\">",
+            "<h2>Set expectations</h2>",
+            "<p>A little prep goes a long way and keeps the catalog clean.</p>",
+            "</div>",
+            "<div class=\"grid\">",
+            "\n".join(expectations_cards),
+            "</div>",
+            "</section>",
+        ]
+        html = self._render_document(
+            page_title=f"Contact {self.settings.name}",
+            description=f"Get in touch with the {self.settings.name} editors for partnerships, tips, or support.",
+            canonical_path="/contact/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/contact/index.html", html)
+        self._sitemap_entries.append(("/contact/", datetime.now(timezone.utc).isoformat()))
+
     def _write_faq(self) -> None:
+        contact_email = self.settings.contact_email or "support@grabgifts.net"
+        contact_label = html_escape(contact_email)
+        contact_href = html_escape(f"mailto:{contact_email}")
         body = "\n".join(
             [
                 "<h1>Affiliate disclosure</h1>",
                 "<p>GrabGifts may earn commissions from qualifying purchases made through outbound links. We only feature items that fit our curated guides.</p>",
-                "<p>Questions? Contact us at support@grabgifts.net.</p>",
+                f"<p>Questions? Contact us at <a href=\"{contact_href}\">{contact_label}</a>.</p>",
             ]
         )
         html = self._render_document(

@@ -48,6 +48,7 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     repository.ingest(products)
     monkeypatch.setenv("SITE_BASE_URL", "https://example.com")
     monkeypatch.setenv("AMAZON_ASSOCIATE_TAG", "testtag-20")
+    monkeypatch.setenv("SITE_CONTACT_EMAIL", "hello@example.com")
     output_dir = tmp_path / "public"
     guides = generate_guides(repository, limit=15)
     generator = SiteGenerator(output_dir=output_dir)
@@ -55,7 +56,9 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     generator.build(products=stored_products, guides=guides)
 
     sitemap = (output_dir / "sitemap.xml").read_text(encoding="utf-8")
-    assert sitemap.count("<url>") >= 16
+    assert sitemap.count("<url>") >= 19
+    for slug in ("/about/", "/how-we-curate/", "/contact/"):
+        assert f"<loc>https://example.com{slug}</loc>" in sitemap
     assert (output_dir / "rss.xml").exists()
     assert (output_dir / "robots.txt").exists()
 
@@ -63,6 +66,13 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     product_html = (output_dir / "products" / amazon_product.slug / "index.html").read_text(encoding="utf-8")
     assert 'rel="sponsored nofollow noopener"' in product_html
     assert "tag=testtag-20" in product_html
+
+    about_html = (output_dir / "about" / "index.html").read_text(encoding="utf-8")
+    assert "About grabgifts" in about_html
+    contact_html = (output_dir / "contact" / "index.html").read_text(encoding="utf-8")
+    assert "hello@example.com" in contact_html
+    curation_html = (output_dir / "how-we-curate" / "index.html").read_text(encoding="utf-8")
+    assert "How we curate" in curation_html
 
 
 def test_polish_guide_title_removes_for_a_and_right_now():
