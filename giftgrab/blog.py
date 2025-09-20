@@ -6,26 +6,25 @@ from typing import Iterable
 from .models import Product
 
 _OPENERS = (
-    "Great pick for",
-    "Solid choice if you're into",
-    "Smart grab for",
-    "Nice upgrade for",
-    "Reliable find for",
+    "Standout choice for",
+    "Professional pick for",
+    "Reliable recommendation for",
+    "Strategic option for",
+    "Confident selection for",
 )
 
 _CLOSERS = (
-    "Easy win for gifting.",
-    "Keeps your setup feeling tidy.",
-    "Makes quick gifts feel thoughtful.",
-    "A dependable add-on to round out a list.",
-    "Plays nicely with last-minute gifting.",
+    "A reliable lift for conversion teams.",
+    "Keeps merchandising copy on-message.",
+    "Slides into automated roundups clean.",
+    "Supports pro gifting on short notice.",
+    "Gives editors confidence on deadline.",
 )
 
 _PADDING = (
-    "It feels ready to hand off without extra fuss",
-    "Quick to recommend when you're curating gifts",
-    "Keeps the unboxing moment feeling polished",
-    "Still light enough to toss into a weekend roundup",
+    "Copy stays polished for newsletters and onsite placements",
+    "Slides into scheduled posts without extra rewrites",
+    "Maintains a professional tone across channels",
 )
 
 _CATEGORY_FOCUS_OVERRIDES = {
@@ -88,7 +87,7 @@ def _descriptor(product: Product, focus: str) -> str:
         return f"brings a {focus_key} twist"
     if product.price_text:
         return f"keeps the price anchored around {product.price_text}"
-    return "packs in useful details"
+    return "delivers dependable details"
 
 
 def _focus_target(product: Product) -> str:
@@ -120,7 +119,7 @@ def _focus_target(product: Product) -> str:
 def polish(text: str) -> str:
     cleaned = " ".join(text.split()).strip()
     if not cleaned:
-        return "Gift-ready pick that keeps things simple."
+        return "Conversion-ready pick that keeps recommendations simple."
     if not cleaned.endswith("."):
         cleaned = f"{cleaned}."
     if cleaned[0].islower():
@@ -130,8 +129,17 @@ def polish(text: str) -> str:
         if extra:
             cleaned = f"{cleaned[:-1]}; {extra}."
     if len(cleaned) > 160:
-        trimmed = cleaned[:157].rstrip(",;: ")
+        cutoff = cleaned.rfind(" ", 0, 158)
+        if cutoff == -1:
+            cutoff = 157
+        trimmed = cleaned[:cutoff].rstrip(",;: ")
         cleaned = f"{trimmed}."
+    if len(cleaned) < 120:
+        fallback = "Expect conversion-ready polish without additional edits."
+        candidate = f"{cleaned[:-1]}; {fallback}" if cleaned.endswith(".") else f"{cleaned} {fallback}."
+        candidate = " ".join(candidate.split()).strip()
+        if len(candidate) <= 160:
+            cleaned = candidate if candidate.endswith(".") else f"{candidate}."
     return cleaned
 
 
@@ -140,11 +148,11 @@ def blurb(product: Product) -> str:
     opener = _pick(product.id, _OPENERS)
     descriptor = _descriptor(product, focus)
     price_clause = _price_phrase(product)
-    base = f"{opener} {focus}, {product.title} delivers {descriptor}"
+    base = f"{opener} {focus}, {product.title} {descriptor}"
     if price_clause:
-        base = f"{base} and {price_clause}"
+        base = f"{base} while it {price_clause}"
     else:
-        base = f"{base} that feels ready to gift"
+        base = f"{base} and stays gift-ready out of the box"
     closing = _pick(product.title, _CLOSERS)
     sentence = f"{base}. {closing}"
     return polish(sentence)
