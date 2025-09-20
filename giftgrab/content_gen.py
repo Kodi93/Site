@@ -133,7 +133,15 @@ def _build_specs(product: Product) -> List[str]:
     rating = _rating_summary(product)
     if rating:
         specs.append(f"Rating: {rating}")
-    specs.append(f"Retailer: {product.retailer_name}")
+    retailer = getattr(product, "retailer_name", None)
+    retailer_label = str(retailer).strip() if retailer else ""
+    if not retailer_label:
+        source = getattr(product, "source", None)
+        if source:
+            prettified = str(source).replace("-", " ").strip()
+            retailer_label = prettified.title() if prettified else ""
+    if retailer_label:
+        specs.append(f"Retailer: {retailer_label}")
     keywords = _extract_keywords(product, limit=2)
     if keywords:
         specs.append("Highlights: " + ", ".join(keywords))
@@ -325,7 +333,7 @@ def _build_items(products: Sequence[Product], *, context: str) -> List[ArticleIt
                 blurb=blurb,
                 specs=specs,
                 tags=_extract_keywords(product, limit=4),
-                outbound_url=product.link,
+                outbound_url=getattr(product, "link", None) or product.url,
             )
         )
     return items
