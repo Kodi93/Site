@@ -112,6 +112,14 @@ def search(keywords: Iterable[str], limit: int = 10) -> List[dict]:
     credentials = _ensure_credentials()
     if credentials is None:
         return []
+    return _search_with_credentials(credentials, keywords=keywords, limit=limit)
+
+
+def _search_with_credentials(
+    credentials: AmazonCredentials, *, keywords: Iterable[str], limit: int
+) -> List[dict]:
+    """Perform a search against the PA-API using explicit credentials."""
+
     query = " ".join(str(keyword) for keyword in keywords if keyword)
     body = json.dumps(
         {
@@ -201,3 +209,15 @@ def search(keywords: Iterable[str], limit: int = 10) -> List[dict]:
             }
         )
     return results
+
+
+class AmazonProductClient:
+    """Thin client wrapper used by retailer adapters."""
+
+    def __init__(self, credentials: AmazonCredentials) -> None:
+        self.credentials = credentials
+
+    def search_items(self, *, keywords: Iterable[str], item_count: int) -> List[dict]:
+        return _search_with_credentials(
+            self.credentials, keywords=keywords, limit=item_count
+        )

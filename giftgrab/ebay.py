@@ -5,12 +5,44 @@ import base64
 import json
 import logging
 import os
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Iterable, List, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class EbayCredentials:
+    client_id: str
+    client_secret: str
+    affiliate_campaign_id: Optional[str] = None
+
+
+class EbayProductClient:
+    """Minimal wrapper around the Browse API for retailer adapters."""
+
+    def __init__(self, credentials: EbayCredentials) -> None:
+        self.credentials = credentials
+        self._token: Optional[str] = None
+
+    def _ensure_token(self) -> Optional[str]:
+        if self._token:
+            return self._token
+        token = get_token(self.credentials.client_id, self.credentials.client_secret)
+        self._token = token
+        return token
+
+    def search_items(self, *, keywords: Iterable[str], item_count: int) -> List[dict]:
+        token = self._ensure_token()
+        if not token:
+            return []
+        query = " ".join(str(keyword) for keyword in keywords if keyword).strip()
+        if not query:
+            query = "gifts"
+        return search(query, limit=item_count, token=token)
 
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
