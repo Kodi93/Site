@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of guides to publish",
     )
     roundups_parser.add_argument(
+        "--skip-update",
+        action="store_true",
+        help="Skip refreshing products before generating guides",
+    )
+    roundups_parser.add_argument(
         "--output",
         type=Path,
         default=Path("public"),
@@ -113,6 +118,10 @@ def handle_roundups(args: argparse.Namespace) -> None:
     if args.limit < 15:
         raise SystemExit("--limit must be at least 15")
     repository = ProductRepository()
+    if not getattr(args, "skip_update", False):
+        pipeline = GiftPipeline(repository=repository)
+        LOGGER.info("Refreshing catalog before generating guides")
+        pipeline.run()
     guides = generate_guides(repository, limit=args.limit)
     generator = SiteGenerator(output_dir=args.output)
     products = repository.load_products()

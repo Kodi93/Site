@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import logging
+import math
 import os
 import re
 from collections import Counter
@@ -10,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
+from statistics import median
 
 from .affiliates import affiliate_rel, prepare_affiliate_url
 from .blog import blurb
@@ -49,6 +51,12 @@ _PRICE_BUCKETS: tuple[tuple[str, str, float | None, float | None], ...] = (
     ("100-200", "$100 – $200", 100.0, 200.0),
     ("200-plus", "$200 & up", 200.0, None),
 )
+
+SOURCE_LABELS = {
+    "amazon": "Amazon",
+    "ebay": "eBay",
+    "curated": "Curated",
+}
 
 
 def _strip_banned_phrases(text: str) -> str:
@@ -620,6 +628,98 @@ class SiteGenerator:
             "</article>"
         )
 
+    def _guide_summary(self, guide: Guide) -> str | None:
+        products = [product for product in guide.products if product]
+        if not products:
+            return None
+        items: list[str] = []
+        items.append(
+            "<li class=\"guide-meta__item\">"
+            "<span class=\"guide-meta__label\">Total picks</span>"
+            f"<span class=\"guide-meta__value\">{len(products)}</span>"
+            "</li>"
+        )
+        price_values = sorted(
+            float(product.price)
+            for product in products
+            if product.price is not None
+        )
+        if price_values:
+            low = price_values[0]
+            high = price_values[-1]
+            mid = median(price_values)
+            if math.isclose(low, high, rel_tol=0.02, abs_tol=0.5):
+                price_label = _format_price_value(mid)
+            else:
+                price_label = (
+                    f"{_format_price_value(low)} – {_format_price_value(high)}"
+                )
+                if not (
+                    math.isclose(mid, low, rel_tol=0.02, abs_tol=0.5)
+                    or math.isclose(mid, high, rel_tol=0.02, abs_tol=0.5)
+                ):
+                    price_label += f" · median {_format_price_value(mid)}"
+            items.append(
+                "<li class=\"guide-meta__item\">"
+                "<span class=\"guide-meta__label\">Price range</span>"
+                f"<span class=\"guide-meta__value\">{html_escape(price_label)}</span>"
+                "</li>"
+            )
+        brands = sorted(
+            {html_escape(product.brand.strip()) for product in products if product.brand and product.brand.strip()}
+        )
+        if brands:
+            if len(brands) <= 3:
+                brand_label = _join_with_and(brands)
+            else:
+                brand_label = f"{len(brands)} brands"
+            items.append(
+                "<li class=\"guide-meta__item\">"
+                "<span class=\"guide-meta__label\">Brands</span>"
+                f"<span class=\"guide-meta__value\">{brand_label}</span>"
+                "</li>"
+            )
+        categories = sorted(
+            {html_escape(product.category.strip()) for product in products if product.category and product.category.strip()}
+        )
+        if categories:
+            if len(categories) <= 3:
+                category_label = _join_with_and(categories)
+            else:
+                category_label = f"{len(categories)} categories"
+            items.append(
+                "<li class=\"guide-meta__item\">"
+                "<span class=\"guide-meta__label\">Categories</span>"
+                f"<span class=\"guide-meta__value\">{category_label}</span>"
+                "</li>"
+            )
+        sources = sorted(
+            {
+                html_escape(SOURCE_LABELS.get(product.source, product.source.title()))
+                for product in products
+                if product.source
+            }
+        )
+        if sources:
+            source_label = _join_with_and(sources)
+            items.append(
+                "<li class=\"guide-meta__item\">"
+                "<span class=\"guide-meta__label\">Sources</span>"
+                f"<span class=\"guide-meta__value\">{source_label}</span>"
+                "</li>"
+            )
+        if not items:
+            return None
+        return "\n".join(
+            [
+                '<section class="guide-meta" aria-label="Guide highlights">',
+                '<ul class="guide-meta__grid">',
+                "\n".join(items),
+                '</ul>',
+                '</section>',
+            ]
+        )
+
     def _guide_body(self, guide: Guide) -> tuple[str, List[dict]]:
         cards_html = []
         json_ld: List[dict] = []
@@ -639,6 +739,9 @@ class SiteGenerator:
             f"<p>{guide_description}</p>",
             "</section>",
         ]
+        summary = self._guide_summary(guide)
+        if summary:
+            parts.append(summary)
         if cards:
             parts.append(f"<section class=\"grid\">{cards}</section>")
         else:

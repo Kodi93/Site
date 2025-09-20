@@ -24,7 +24,7 @@ jobs:
           AMAZON_PAAPI_SECRET_KEY: ${{ secrets.AMAZON_PAAPI_SECRET_KEY }}
           AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
       - name: Generate guides
-        run: python -m giftgrab.cli roundups --limit 15
+        run: python -m giftgrab.cli roundups --limit 15 --skip-update
         env:
           EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
           AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
