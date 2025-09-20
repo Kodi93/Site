@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional
 
-from .utils import slugify, timestamp
+from .utils import parse_price_string, slugify, timestamp
 
 
 @dataclass
@@ -55,18 +55,63 @@ class Product:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "Product":
+        price_text = payload.get("price_text") or payload.get("price_display")
+        if isinstance(price_text, (int, float)):
+            price_text = f"${float(price_text):,.2f}"
+        elif isinstance(price_text, str):
+            price_text = price_text.strip()
+        else:
+            price_text = None
+
+        price_value = payload.get("price")
+        currency_value = payload.get("currency")
+        currency = str(currency_value).strip() if isinstance(currency_value, str) else None
+        numeric_price: float | None = None
+        if isinstance(price_value, (int, float)):
+            numeric_price = float(price_value)
+        elif isinstance(price_value, str):
+            candidate = price_value.strip()
+            try:
+                numeric_price = float(candidate)
+            except ValueError:
+                parsed = parse_price_string(candidate)
+                if parsed:
+                    numeric_price, parsed_currency = parsed
+                    currency = currency or parsed_currency
+        if numeric_price is None and isinstance(price_text, str) and price_text:
+            parsed = parse_price_string(price_text)
+            if parsed:
+                numeric_price, parsed_currency = parsed
+                currency = currency or parsed_currency
+
+        rating_value = payload.get("rating")
+        if isinstance(rating_value, str):
+            try:
+                rating_value = float(rating_value)
+            except ValueError:
+                rating_value = None
+
+        rating_count = payload.get("rating_count")
+        if isinstance(rating_count, str):
+            try:
+                rating_count = int(rating_count.replace(",", ""))
+            except ValueError:
+                rating_count = None
+        elif isinstance(rating_count, float):
+            rating_count = int(rating_count)
+
         return cls(
             id=str(payload["id"]),
             title=str(payload["title"]),
             url=str(payload["url"]),
             image=payload.get("image"),
-            price=payload.get("price"),
-            price_text=payload.get("price_text"),
-            currency=payload.get("currency"),
+            price=numeric_price,
+            price_text=price_text,
+            currency=currency,
             brand=payload.get("brand"),
             category=payload.get("category"),
-            rating=payload.get("rating"),
-            rating_count=payload.get("rating_count"),
+            rating=rating_value if isinstance(rating_value, (int, float)) else None,
+            rating_count=rating_count if isinstance(rating_count, int) else None,
             source=str(payload.get("source", "curated")),
             description=payload.get("description"),
             created_at=payload.get("created_at", timestamp()),
