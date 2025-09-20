@@ -19,6 +19,10 @@ from .utils import load_json, parse_price_string
 LOGGER = logging.getLogger(__name__)
 
 CONFIG_ROUNDUPS = Path("config/roundups.json")
+CONFIG_SEARCH_TERMS = Path("config/search_terms.json")
+DEFAULT_SEARCH_TERMS = ["gift ideas", "kitchen gadgets", "desk accessories"]
+DEFAULT_EBAY_RESULTS_PER_QUERY = 100
+DEFAULT_EBAY_TARGET_ITEMS = 2400
 CURATED_DIR = Path("data/retailers")
 
 _PLACEHOLDER_IMAGE_PREFIXES = ("/assets/amazon-sitestripe/",)
@@ -188,16 +192,64 @@ class GiftPipeline:
     # Data discovery
 
     def _load_search_terms(self) -> List[str]:
-        if not CONFIG_ROUNDUPS.exists():
-            return ["gift ideas", "kitchen gadgets", "desk accessories"]
-        payload = load_json(CONFIG_ROUNDUPS, default=[]) or []
+        seen: set[str] = set()
         terms: List[str] = []
-        for entry in payload:
-            if isinstance(entry, dict):
-                topic = entry.get("topic")
-                if isinstance(topic, str) and topic.strip():
-                    terms.append(topic.strip())
-        return terms or ["gift ideas"]
+
+        def _add_term(value: object) -> None:
+            if not isinstance(value, str):
+                return
+            text = value.strip()
+            if not text:
+                return
+            key = text.lower()
+            if key in seen:
+                return
+            seen.add(key)
+            terms.append(text)
+
+        if CONFIG_SEARCH_TERMS.exists():
+            payload = load_json(CONFIG_SEARCH_TERMS, default=[]) or []
+            if isinstance(payload, list):
+                for entry in payload:
+                    if isinstance(entry, dict):
+                        topic = entry.get("topic") or entry.get("query")
+                        _add_term(topic if isinstance(topic, str) else None)
+                    else:
+                        _add_term(entry)
+
+        if CONFIG_ROUNDUPS.exists():
+            payload = load_json(CONFIG_ROUNDUPS, default=[]) or []
+            if isinstance(payload, list):
+                for entry in payload:
+                    if isinstance(entry, dict):
+                        topic = entry.get("topic")
+                        _add_term(topic)
+
+        if not terms:
+            for fallback in DEFAULT_SEARCH_TERMS:
+                _add_term(fallback)
+
+        return terms
+
+    def _ebay_items_per_query(self) -> int:
+        configured = os.getenv("EBAY_ITEMS_PER_QUERY", "").strip()
+        try:
+            value = int(configured) if configured else 0
+        except ValueError:
+            value = 0
+        if value <= 0:
+            return DEFAULT_EBAY_RESULTS_PER_QUERY
+        return max(1, min(value, 100))
+
+    def _ebay_target_items(self) -> int:
+        configured = os.getenv("EBAY_TARGET_ITEMS", "").strip()
+        try:
+            value = int(configured) if configured else 0
+        except ValueError:
+            value = 0
+        if value <= 0:
+            return DEFAULT_EBAY_TARGET_ITEMS
+        return max(100, value)
 
     def _load_curated_products(self) -> List[Product]:
         products: list[Product] = []
@@ -232,12 +284,19 @@ class GiftPipeline:
         if client is None:
             return []
         results: List[Product] = []
+        per_query = self._ebay_items_per_query()
+        target = self._ebay_target_items()
         for query in queries:
-            items = client.search_items(keywords=[query], item_count=30)
+            items = client.search_items(keywords=[query], item_count=per_query)
             for item in items:
                 product = self._build_product(item, source="ebay")
                 if product:
                     results.append(product)
+            if target and len(results) >= target:
+                LOGGER.info(
+                    "Reached eBay target of %s items after query '%s'", target, query
+                )
+                break
         return results
 
     def _fetch_amazon(self, queries: Sequence[str]) -> List[Product]:
@@ -349,6 +408,7 @@ class GiftPipeline:
         queries = self._load_search_terms()
         curated = self._load_curated_products()
         LOGGER.info("Loaded %s curated products", len(curated))
+        LOGGER.info("Loaded %s search queries", len(queries))
         ebay_results = self._fetch_ebay(queries)
         LOGGER.info("Fetched %s items from eBay", len(ebay_results))
         amazon_results = self._fetch_amazon(queries)
