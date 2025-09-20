@@ -27,7 +27,7 @@ def sample_products() -> list[Product]:
                     id=f"{category}-{index}",
                     title=f"{brand} {category} Item {index}",
                     url=url,
-                    image=None,
+                    image=f"https://img.example.com/{category.lower().replace(' ', '-')}-{index}.jpg",
                     price=price,
                     price_text=f"${price:,.2f}",
                     currency="USD",
@@ -57,7 +57,7 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
 
     sitemap = (output_dir / "sitemap.xml").read_text(encoding="utf-8")
     assert sitemap.count("<url>") >= 19
-    for slug in ("/about/", "/how-we-curate/", "/contact/"):
+    for slug in ("/about/", "/how-we-curate/", "/contact/", "/products/"):
         assert f"<loc>https://example.com{slug}</loc>" in sitemap
     assert (output_dir / "rss.xml").exists()
     assert (output_dir / "robots.txt").exists()
@@ -73,6 +73,11 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     assert "hello@example.com" in contact_html
     curation_html = (output_dir / "how-we-curate" / "index.html").read_text(encoding="utf-8")
     assert "How we curate" in curation_html
+    products_index_html = (output_dir / "products" / "index.html").read_text(encoding="utf-8")
+    assert "feed-list" in products_index_html
+    sample_titles = [product.title for product in stored_products[:3]]
+    for title in sample_titles:
+        assert title in products_index_html
 
 
 def test_polish_guide_title_removes_for_a_and_right_now():
