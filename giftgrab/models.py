@@ -121,6 +121,13 @@ def merge_products(existing: Iterable[Product], incoming: Iterable[Product]) -> 
             stored.price_text = product.price_text
             stored.currency = product.currency
             updated = True
+        else:
+            if product.price_text and product.price_text != stored.price_text:
+                stored.price_text = product.price_text
+                updated = True
+            if product.currency and product.currency != stored.currency:
+                stored.currency = product.currency
+                updated = True
         if product.brand and product.brand != stored.brand:
             stored.brand = product.brand
             updated = True
