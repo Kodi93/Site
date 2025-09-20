@@ -230,6 +230,17 @@ async function main() {
     throw new Error("/faq/index.html is missing");
   }
 
+  const supplementalPages = [
+    ["/about/", path.join(PUBLIC_DIR, "about", "index.html")],
+    ["/how-we-curate/", path.join(PUBLIC_DIR, "how-we-curate", "index.html")],
+    ["/contact/", path.join(PUBLIC_DIR, "contact", "index.html")],
+  ];
+  for (const [slug, filePath] of supplementalPages) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`${slug} index missing`);
+    }
+  }
+
   const sitemapPath = path.join(PUBLIC_DIR, "sitemap.xml");
   if (!fs.existsSync(sitemapPath)) {
     throw new Error("sitemap.xml missing");
@@ -237,6 +248,12 @@ async function main() {
   const sitemap = fs.readFileSync(sitemapPath, "utf8");
   if (!/\<loc\>[^<]*\/faq\/\<\/loc\>/.test(sitemap)) {
     throw new Error("/faq/ not listed in sitemap.xml");
+  }
+  for (const [slug] of supplementalPages) {
+    const pattern = new RegExp(`\\<loc\\>[^<]*${slug.replace(/\//g, "\\/")}\\<\\/loc\\>`);
+    if (!pattern.test(sitemap)) {
+      throw new Error(`${slug} not listed in sitemap.xml`);
+    }
   }
 
   const imagesToCheck = Array.from(productImages).slice(0, PRODUCT_IMAGE_LIMIT);
