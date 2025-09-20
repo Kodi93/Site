@@ -1,4 +1,5 @@
 from giftgrab.generator import SiteGenerator, polish_guide_title
+from giftgrab.config import DEFAULT_CATEGORIES
 from giftgrab.models import Product
 from giftgrab.repository import ProductRepository
 from giftgrab.roundups import generate_guides
@@ -86,6 +87,14 @@ def test_generator_outputs_required_files(tmp_path, monkeypatch):
     assert any(
         product.title in fragment for product in stored_products if product.source == "ebay"
     )
+    assert "Trending categories" in index_html
+    assert "category-card__link" in index_html
+
+    sample_category = DEFAULT_CATEGORIES[0]
+    asset_reference = sample_category.card_image or sample_category.image
+    if asset_reference:
+        asset_path = output_dir / asset_reference.lstrip("/")
+        assert asset_path.exists()
 
 
 def test_polish_guide_title_removes_for_a_and_right_now():
