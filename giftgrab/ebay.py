@@ -19,6 +19,7 @@ class EbayCredentials:
     client_id: str
     client_secret: str
     affiliate_campaign_id: Optional[str] = None
+    marketplace_id: Optional[str] = None
 
 
 class EbayProductClient:
@@ -42,7 +43,13 @@ class EbayProductClient:
         query = " ".join(str(keyword) for keyword in keywords if keyword).strip()
         if not query:
             query = "gifts"
-        return search(query, limit=item_count, token=token)
+        marketplace = self.credentials.marketplace_id or os.getenv("EBAY_MARKETPLACE_ID")
+        return search(
+            query,
+            limit=item_count,
+            token=token,
+            marketplace_id=marketplace,
+        )
 
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
@@ -160,16 +167,28 @@ def _parse_item(item: object) -> Optional[dict]:
     }
 
 
-def search(query: str, limit: int = 30, token: Optional[str] = None) -> List[dict]:
+def search(
+    query: str,
+    limit: int = 30,
+    token: Optional[str] = None,
+    marketplace_id: Optional[str] = None,
+) -> List[dict]:
     """Search the Browse API and return normalized product dictionaries."""
 
     auth_token = token or get_token()
     if not auth_token:
         return []
     params = {"q": query or "gifts", "limit": max(1, min(int(limit or 0) or 1, 100))}
+    marketplace = (marketplace_id or os.getenv("EBAY_MARKETPLACE_ID") or "").strip()
+    headers = {
+        "Authorization": f"Bearer {auth_token}",
+        "Accept": "application/json",
+    }
+    if marketplace:
+        headers["X-EBAY-C-MARKETPLACE-ID"] = marketplace
     request = Request(
         f"{SEARCH_URL}?{urlencode(params)}",
-        headers={"Authorization": f"Bearer {auth_token}", "Accept": "application/json"},
+        headers=headers,
         method="GET",
     )
     try:

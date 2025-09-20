@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
+from . import ebay
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
 from .reporting import generate_stats_report
@@ -63,6 +65,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of days to treat guides as recently updated",
     )
     stats_parser.set_defaults(func=handle_stats)
+
+    ebay_parser = subparsers.add_parser(
+        "ebay", help="Run an ad-hoc eBay Browse API search for debugging"
+    )
+    ebay_parser.add_argument(
+        "query",
+        nargs="?",
+        default="gift ideas",
+        help="Search keywords to pass to the Browse API",
+    )
+    ebay_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of items to return",
+    )
+    ebay_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output the raw normalized payload as JSON",
+    )
+    ebay_parser.add_argument(
+        "--marketplace",
+        help="Override the X-EBAY-C-MARKETPLACE-ID header (defaults to EBAY_US)",
+    )
+    ebay_parser.set_defaults(func=handle_ebay)
 
     return parser
 
@@ -132,6 +160,54 @@ def handle_stats(args: argparse.Namespace) -> None:
         recent_days=args.recent_days,
     )
     print(report)
+
+
+def _truncate(value: object, width: int) -> str:
+    text = str(value or "")
+    if len(text) <= width:
+        return text.ljust(width)
+    if width <= 1:
+        return text[:width]
+    return (text[: width - 1].rstrip() + "…").ljust(width)
+
+
+def handle_ebay(args: argparse.Namespace) -> None:
+    if args.limit < 1:
+        raise SystemExit("--limit must be positive")
+    token = ebay.get_token()
+    if not token:
+        raise SystemExit(
+            "Unable to obtain eBay OAuth token. "
+            "Check EBAY_CLIENT_ID and EBAY_CLIENT_SECRET."
+        )
+    items = ebay.search(
+        args.query,
+        limit=args.limit,
+        token=token,
+        marketplace_id=getattr(args, "marketplace", None),
+    )
+    if args.json:
+        print(json.dumps(items, indent=2, sort_keys=True))
+        return
+    if not items:
+        print("No products returned for query '" + args.query + "'.")
+        return
+    header = (
+        f"{_truncate('ID', 18)} {_truncate('Title', 52)} "
+        f"{_truncate('Price', 12)} {_truncate('Brand', 18)} URL"
+    )
+    print(header)
+    print("-" * len(header))
+    for item in items:
+        price = item.get("price_text")
+        if not price and isinstance(item.get("price"), (int, float)):
+            price = f"${float(item['price']):,.2f}"
+        brand = item.get("brand") or ""
+        print(
+            f"{_truncate(item.get('id'), 18)} "
+            f"{_truncate(item.get('title'), 52)} "
+            f"{_truncate(price, 12)} {_truncate(brand, 18)} {item.get('url', '')}"
+        )
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -4,7 +4,9 @@ const EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token";
 
 async function getToken(){
   const id = process.env.EBAY_CLIENT_ID;
+  const secret = process.env.EBAY_CLIENT_SECRET;
   if(!id) throw new Error("EBAY_CLIENT_ID missing");
+  if(!secret) throw new Error("EBAY_CLIENT_SECRET missing");
   const body = new URLSearchParams({
     grant_type:"client_credentials",
     scope: process.env.EBAY_SCOPE || "https://api.ebay.com/oauth/api_scope"
@@ -13,7 +15,7 @@ async function getToken(){
     method:"POST",
     headers:{
       "Content-Type":"application/x-www-form-urlencoded",
-      "Authorization":"Basic "+Buffer.from(`${id}:`).toString("base64")
+      "Authorization":"Basic "+Buffer.from(`${id}:${secret}`).toString("base64")
     },
     body
   });
@@ -25,7 +27,15 @@ async function getToken(){
 export async function ebaySearch(q, limit=30){
   const token = await getToken();
   const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(q)}&limit=${Math.min(limit,50)}`;
-  const r = await fetch(url,{ headers:{ Authorization:`Bearer ${token}` }});
+  const headers = {
+    Authorization:`Bearer ${token}`,
+    Accept:"application/json",
+  };
+  const marketplace = process.env.EBAY_MARKETPLACE_ID;
+  if(marketplace){
+    headers["X-EBAY-C-MARKETPLACE-ID"] = marketplace;
+  }
+  const r = await fetch(url,{ headers });
   if(!r.ok) throw new Error("ebay search failed: "+r.status);
   const j = await r.json();
   return (j.itemSummaries||[]).map(s=>(

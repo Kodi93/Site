@@ -1,9 +1,10 @@
 import argparse
+import json
 from datetime import datetime, timezone
 
 import pytest
 
-from giftgrab.cli import handle_stats
+from giftgrab.cli import handle_ebay, handle_stats
 from giftgrab.models import Guide, Product
 from giftgrab.repository import ProductRepository
 
@@ -76,3 +77,70 @@ def test_handle_stats_validates_arguments():
     with pytest.raises(SystemExit) as excinfo:
         handle_stats(args)
     assert "--recent-days must be at least 1" in str(excinfo.value)
+
+
+def test_handle_ebay_table_output(monkeypatch, capsys):
+    args = argparse.Namespace(query="coffee", limit=2, json=False, marketplace="EBAY_US")
+
+    monkeypatch.setattr("giftgrab.cli.ebay.get_token", lambda: "token")
+
+    sample_items = [
+        {
+            "id": "1",
+            "title": "Coffee Grinder",
+            "price": 49.99,
+            "price_text": "$49.99",
+            "brand": "Acme",
+            "url": "https://example.com/1",
+        },
+        {
+            "id": "2",
+            "title": "Pour-over Kit",
+            "price": None,
+            "price_text": None,
+            "brand": None,
+            "url": "https://example.com/2",
+        },
+    ]
+
+    captured: dict[str, tuple[str, int]] = {}
+
+    def fake_search(query: str, limit: int, token: str, marketplace_id=None):
+        captured["params"] = (query, limit, marketplace_id)
+        assert token == "token"
+        return sample_items
+
+    monkeypatch.setattr("giftgrab.cli.ebay.search", fake_search)
+
+    handle_ebay(args)
+
+    output = capsys.readouterr().out
+    assert "Coffee Grinder" in output
+    assert "https://example.com/2" in output
+    assert captured["params"] == ("coffee", 2, "EBAY_US")
+
+
+def test_handle_ebay_json_output(monkeypatch, capsys):
+    args = argparse.Namespace(query="games", limit=1, json=True, marketplace=None)
+
+    monkeypatch.setattr("giftgrab.cli.ebay.get_token", lambda: "token")
+    monkeypatch.setattr(
+        "giftgrab.cli.ebay.search",
+        lambda query, limit, token, marketplace_id=None: [
+            {"id": "xyz", "title": "Board Game", "url": "https://example.com/xyz"}
+        ],
+    )
+
+    handle_ebay(args)
+
+    data = json.loads(capsys.readouterr().out)
+    assert data[0]["id"] == "xyz"
+
+
+def test_handle_ebay_missing_token(monkeypatch):
+    args = argparse.Namespace(query="coffee", limit=1, json=False, marketplace=None)
+    monkeypatch.setattr("giftgrab.cli.ebay.get_token", lambda: None)
+
+    with pytest.raises(SystemExit) as excinfo:
+        handle_ebay(args)
+    assert "Unable to obtain eBay OAuth token" in str(excinfo.value)
