@@ -295,6 +295,7 @@ class SiteGenerator:
         self._write_guides(guides)
         self._write_categories(products)
         self._write_products(products)
+        self._write_products_index(products)
         self._write_about(guides, products)
         self._write_curation_page(guides, products)
         self._write_contact()
@@ -1179,6 +1180,64 @@ class SiteGenerator:
             )
             self._write_file(f"/products/{product.slug}/index.html", html)
             self._sitemap_entries.append((f"/products/{product.slug}/", product.updated_at))
+
+    def _write_products_index(self, products: Sequence[Product]) -> None:
+        header = [
+            '<section class="page-header">',
+            '<h1>All products</h1>',
+            '<p>Every grabgifts find in one catalog.</p>',
+            '</section>',
+        ]
+        sorted_products = sorted(
+            products,
+            key=lambda item: (
+                max(
+                    _parse_iso_datetime(item.created_at),
+                    _parse_iso_datetime(item.updated_at),
+                ),
+                item.title.lower() if item.title else "",
+            ),
+            reverse=True,
+        )
+        cards: list[str] = []
+        for product in sorted_products:
+            card = self._product_preview_card(product)
+            if not card:
+                continue
+            cards.append(card)
+
+        body_parts = header[:]
+        if cards:
+            body_parts.extend(
+                [
+                    '<section class="feed-section">',
+                    '<div class="feed-list" data-product-grid>',
+                    "\n".join(cards),
+                    '</div>',
+                    '</section>',
+                ]
+            )
+        else:
+            body_parts.append("<p>No products are available right now.</p>")
+
+        html = self._render_document(
+            page_title=f"Products – {self.settings.name}",
+            description="Browse every product in the GrabGifts catalog.",
+            canonical_path="/products/",
+            body="\n".join(body_parts),
+        )
+        self._write_file("/products/index.html", html)
+        latest = max(
+            (
+                max(
+                    _parse_iso_datetime(product.created_at),
+                    _parse_iso_datetime(product.updated_at),
+                )
+                for product in sorted_products
+            ),
+            default=datetime.now(timezone.utc),
+        )
+        self._sitemap_entries.append(("/products/", latest.isoformat()))
 
     def _write_about(self, guides: Sequence[Guide], products: Sequence[Product]) -> None:
         live_guides = [guide for guide in guides if guide.products]
