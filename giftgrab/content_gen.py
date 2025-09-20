@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from .articles import Article, ArticleItem
 from .models import Product
+from .text import clamp, clean_text
 from .utils import slugify
 
 
@@ -25,25 +26,34 @@ DEFAULT_RELATED_FALLBACK = [
 
 
 def _safe_price(product: Product) -> str:
-    if product.price:
-        return product.price
-    latest = product.latest_price_point
-    if latest:
-        symbol = "$"
-        return f"{symbol}{latest.amount:,.2f}"
+    price_text = getattr(product, "price_text", None)
+    if price_text:
+        return str(price_text)
+    price_value = getattr(product, "price", None)
+    if price_value is not None:
+        return f"${price_value:,.2f}"
+    latest = getattr(product, "latest_price_point", None)
+    amount = getattr(latest, "amount", None) if latest else None
+    if amount is not None:
+        return f"${amount:,.2f}"
     return "See current listing"
 
 
 def _rating_summary(product: Product) -> str | None:
-    if product.rating and product.total_reviews:
-        return f"{product.rating:.1f}/5 ({product.total_reviews:,} reviews)"
-    if product.rating:
-        return f"Rated {product.rating:.1f}/5"
-    return None
+    rating = getattr(product, "rating", None)
+    if not rating:
+        return None
+    total_reviews = getattr(product, "total_reviews", None)
+    if total_reviews is None:
+        total_reviews = getattr(product, "rating_count", None)
+    if total_reviews:
+        return f"{float(rating):.1f}/5 ({int(total_reviews):,} reviews)"
+    return f"Rated {float(rating):.1f}/5"
 
 
 def _extract_keywords(product: Product, limit: int = 3) -> List[str]:
-    keywords = [keyword for keyword in product.keywords if keyword]
+    raw_keywords = getattr(product, "keywords", []) or []
+    keywords = [keyword for keyword in raw_keywords if keyword]
     seen: List[str] = []
     for keyword in keywords:
         normalized = keyword.strip()
@@ -56,24 +66,65 @@ def _extract_keywords(product: Product, limit: int = 3) -> List[str]:
 
 def _build_blurb(product: Product, *, context: str) -> str:
     keywords = _extract_keywords(product, limit=3)
-    highlight = ", ".join(keywords[:2]) if keywords else "gift-worthy details"
-    rating = _rating_summary(product)
-    sentences: List[str] = []
-    sentences.append(
-        f"{product.title} folds those {context} vibes into a compact package with {highlight}."
-    )
-    if rating:
-        sentences.append(
-            f"Reviewers highlight the balance of value and quality, giving it {rating}."
-        )
+    if len(keywords) >= 2:
+        highlight = f"{keywords[0]} and {keywords[1]}"
+    elif keywords:
+        highlight = keywords[0]
     else:
-        sentences.append(
-            "It blends practical touches with fun flair so it feels thoughtful without the splurge."
-        )
-    sentences.append(
-        "Pair it with a handwritten card or bundle it with a favorite treat to create a ready-to-gift surprise."
+        highlight = "thoughtful details"
+
+    price_text = _safe_price(product)
+    rating = _rating_summary(product)
+
+    first_sentence = (
+        f"{product.title} delivers on {context} with {highlight}."
     )
-    return " ".join(sentences)
+
+    listing_phrase = (
+        "Check the latest listing to confirm pricing and ship windows before you wrap it."
+        if isinstance(price_text, str)
+        and price_text.lower().startswith("see")
+        else None
+    )
+
+    if rating:
+        if listing_phrase:
+            second_sentence = (
+                f"Fans rate it {rating}, and you can check the latest listing for up-to-date pricing."
+            )
+        else:
+            second_sentence = (
+                f"Fans rate it {rating}, and the {price_text} price keeps gifting simple."
+            )
+    else:
+        if listing_phrase:
+            second_sentence = listing_phrase
+        else:
+            second_sentence = f"It leans on the {price_text} price to stay easy on the budget."
+
+    blurb = clean_text(f"{first_sentence} {second_sentence}")
+
+    extras = [
+        "Pair it with a personal note for extra delight.",
+        "Ships quickly so the surprise lands on time.",
+        "Packaging feels premium without extra wrapping.",
+    ]
+    for extra in extras:
+        if len(blurb) >= 120:
+            break
+        candidate = clean_text(f"{blurb} {extra}")
+        if len(candidate) <= 160:
+            blurb = candidate
+
+    if len(blurb) > 160:
+        blurb = clamp(blurb, 160)
+
+    if len(blurb) < 120:
+        fallback = "Expect ready-to-gift touches without extra prep."
+        candidate = clean_text(f"{blurb} {fallback}")
+        blurb = clamp(candidate, 160)
+
+    return blurb
 
 
 def _build_specs(product: Product) -> List[str]:
