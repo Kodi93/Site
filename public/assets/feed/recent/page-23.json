@@ -1,0 +1,40 @@
+{
+  "page": 23,
+  "pageSize": 18,
+  "totalPages": 23,
+  "totalItems": 400,
+  "items": [
+    {
+      "id": "ebay-004500204",
+      "title": "Weekend SFOUR Astronaut Galaxy Projector Night Light，Lights for Bedroom,Kids Room Decor Aesthetic, Adjustable Head Angle,Gift for Kids Adults Home Party Ceiling Decor，Christmas Gift – Bestseller Spotlight",
+      "url": "https://www.ebay.com/itm/sfour-astronaut-galaxy-projector-night-light-lights-for-bedr?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=004500204",
+      "image": "/assets/amazon-sitestripe/amzn-3IbS6Tr.svg",
+      "price": "$39.99",
+      "category": "For a Techy"
+    },
+    {
+      "id": "ebay-018500904",
+      "title": "Weekend Small Pocket Knife Gift for Men, Keychain Box Cutter with 1.34inch Blade, Mini Folding Knives EDC Gadgets for Everyday Carry, Stocking Stuffers Gift for Adults Men Him – Fast Shipping Pick",
+      "url": "https://www.ebay.com/itm/small-pocket-knife-gift-for-men-keychain-box-cutter-with-1-3?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=018500904",
+      "image": "/assets/amazon-sitestripe/amzn-3It90Np.svg",
+      "price": "$7.98",
+      "category": "Family Time"
+    },
+    {
+      "id": "ebay-022501104",
+      "title": "Weekend Toilet Golf Game-Practice Mini Golf in Any Restroom/Bathroom - Great Toilet Time - Dad Gifts, Funny Gifts for Dad, Funny White Elephant Gifts, Gag Gifts for Husband, Boyfriend, Men – Verified Seller",
+      "url": "https://www.ebay.com/itm/toilet-golf-game-practice-mini-golf-in-any-restroom-bathroom?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=022501104",
+      "image": "/assets/amazon-sitestripe/amzn-3K47stH.svg",
+      "price": "$15.99",
+      "category": "For Her"
+    },
+    {
+      "id": "ebay-020501004",
+      "title": "Weekend YATSKIA Chakra Crystal Tree - Handmade Healing Crystal Trees with 7 Chakra Stones - Decorative Tree of Life for Meditation, Feng Shui, and Home Decor - Unique Birthday Gifts for Women – Money-Back Guarantee",
+      "url": "https://www.ebay.com/itm/yatskia-chakra-crystal-tree-handmade-healing-crystal-trees-w?mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=BESTGIFTS&customid=020501004",
+      "image": "/assets/amazon-sitestripe/amzn-3K3A32p.svg",
+      "price": "$23.99",
+      "category": "For Him"
+    }
+  ]
+}
