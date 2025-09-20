@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from html import escape as html_escape
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -872,6 +872,81 @@ class SiteGenerator:
                 )
             )
 
+        highlighted_ids: set[str] = set()
+        ebay_products = [
+            product
+            for product in products
+            if (product.source or "").lower() == "ebay"
+        ]
+        if ebay_products:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+
+            def _recency(product: Product) -> tuple[datetime, str]:
+                created = _parse_iso_datetime(product.created_at)
+                updated = _parse_iso_datetime(product.updated_at)
+                latest = max(created, updated)
+                title_key = (product.title or "").lower()
+                return latest, title_key
+
+            sorted_ebay = sorted(
+                ebay_products,
+                key=lambda item: _recency(item),
+                reverse=True,
+            )
+            recent_ebay = [
+                product for product in sorted_ebay if _recency(product)[0] >= cutoff
+            ]
+            display_pool = recent_ebay or sorted_ebay
+            recent_cards: list[str] = []
+            for product in display_pool[:8]:
+                card = self._product_preview_card(product)
+                if card:
+                    if product.id:
+                        highlighted_ids.add(product.id)
+                    recent_cards.append(card)
+            if recent_cards:
+                sections.append(
+                    "\n".join(
+                        [
+                            '<section class="feed-section" id="recent-ebay-products" data-home-ebay>',
+                            '<div class="page-header">',
+                            '<h2>Most recent additions</h2>',
+                            '<p>Fresh arrivals pulled from the latest eBay sweep.</p>',
+                            '</div>',
+                            '<div class="feed-list">',
+                            "\n".join(recent_cards),
+                            '</div>',
+                            '</section>',
+                        ]
+                    )
+                )
+            else:
+                sections.append(
+                    "\n".join(
+                        [
+                            '<section class="feed-section" id="recent-ebay-products" data-home-ebay>',
+                            '<div class="page-header">',
+                            '<h2>Most recent additions</h2>',
+                            '<p>Fresh eBay picks will land here after the next refresh.</p>',
+                            '</div>',
+                            '</section>',
+                        ]
+                    )
+                )
+        else:
+            sections.append(
+                "\n".join(
+                    [
+                        '<section class="feed-section" id="recent-ebay-products" data-home-ebay>',
+                        '<div class="page-header">',
+                        '<h2>Most recent additions</h2>',
+                        '<p>Fresh eBay picks will land here after the next refresh.</p>',
+                        '</div>',
+                        '</section>',
+                    ]
+                )
+            )
+
         product_cards_initial: list[str] = []
         product_cards_remaining: list[str] = []
         for product in sorted(
@@ -885,6 +960,8 @@ class SiteGenerator:
             ),
             reverse=True,
         ):
+            if product.id in highlighted_ids:
+                continue
             card = self._product_preview_card(product)
             if not card:
                 continue
