@@ -42,6 +42,14 @@ _BEST_FOR_PATTERN = re.compile(
 )
 _TITLE_REPLACEMENTS = {"Techy": "Tech"}
 
+_PRICE_BUCKETS: tuple[tuple[str, str, float | None, float | None], ...] = (
+    ("under-25", "Under $25", None, 25.0),
+    ("25-50", "$25 – $50", 25.0, 50.0),
+    ("50-100", "$50 – $100", 50.0, 100.0),
+    ("100-200", "$100 – $200", 100.0, 200.0),
+    ("200-plus", "$200 & up", 200.0, None),
+)
+
 
 def _strip_banned_phrases(text: str) -> str:
     result = text or ""
@@ -144,6 +152,23 @@ def _join_with_and(items: Sequence[str]) -> str:
     if len(cleaned) == 2:
         return f"{cleaned[0]} and {cleaned[1]}"
     return ", ".join(cleaned[:-1]) + f", and {cleaned[-1]}"
+
+
+def _price_in_bucket(price: float | None, minimum: float | None, maximum: float | None) -> bool:
+    if price is None:
+        return False
+    if minimum is not None and price < minimum:
+        return False
+    if maximum is not None and price >= maximum:
+        return False
+    return True
+
+
+def _format_price_value(value: float | None) -> str:
+    if value is None:
+        return ""
+    text = f"{value:.2f}"
+    return text.rstrip("0").rstrip(".")
 
 _HEAD_SAFE_PATTERN = re.compile(r"\{\{\s*head\|safe\s*\}\}")
 _HEAD_PATTERN = re.compile(r"\{\{\s*head\s*\}\}")
@@ -523,11 +548,15 @@ class SiteGenerator:
                 price_display = f"${product.price:,.2f}"
             else:
                 price_display = f"{product.price:,.2f} {currency.upper()}"
+        raw_title = product.title or ""
+        raw_brand = product.brand or ""
+        raw_category = product.category or ""
+        description = product.description or ""
         meta_parts: list[str] = []
-        if product.category:
-            meta_parts.append(html_escape(product.category))
-        if product.brand:
-            meta_parts.append(html_escape(product.brand))
+        if raw_category:
+            meta_parts.append(html_escape(raw_category))
+        if raw_brand:
+            meta_parts.append(html_escape(raw_brand))
         meta_html = (
             "<p class=\"feed-card-meta\">" + " • ".join(meta_parts) + "</p>"
             if meta_parts
@@ -538,12 +567,48 @@ class SiteGenerator:
             if price_display
             else ""
         )
-        id_attr = f" data-product-id=\"{html_escape(product.id)}\"" if product.id else ""
+        summary_source = [raw_title, raw_brand, raw_category]
+        if description:
+            summary_source.append(description)
+        keywords = " ".join(
+            " ".join(str(value).split()) for value in summary_source if value
+        ).lower()
+        keywords_attr = html_escape(keywords[:600])
+        category_slug = slugify(raw_category) if raw_category else ""
+        category_attr = html_escape(category_slug)
+        brand_attr = html_escape(raw_brand.lower())
+        title_attr = html_escape(raw_title.lower())
+        price_attr = (
+            f"{product.price:.2f}"
+            if product.price is not None
+            else ""
+        )
+        attributes = [
+            'class="feed-card"',
+            'data-home-product-card="true"',
+            'data-product-card="true"',
+        ]
+        if product.id:
+            attributes.append(f'data-product-id="{html_escape(product.id)}"')
+        attributes.append(f'data-product-title="{title_attr}"')
+        attributes.append(f'data-product-brand="{brand_attr}"')
+        attributes.append(
+            f'data-product-category="{category_attr}"'
+            if category_attr
+            else 'data-product-category=""'
+        )
+        attributes.append(
+            f'data-product-price="{price_attr}"'
+            if price_attr
+            else 'data-product-price=""'
+        )
+        attributes.append(f'data-product-keywords="{keywords_attr}"')
+        attr_html = " ".join(attributes)
         slug = html_escape(product.slug)
         image = html_escape(product.image)
-        title = html_escape(product.title)
+        title = html_escape(raw_title)
         return (
-            f"<article class=\"feed-card\" data-home-product-card=\"true\"{id_attr}>"
+            f"<article {attr_html}>"
             f"<a class=\"feed-card-link\" href=\"/products/{slug}/\">"
             f"<div class=\"feed-card-media\"><img src=\"{image}\" alt=\"{title}\" loading=\"lazy\"></div>"
             "<div class=\"feed-card-body\">"
@@ -1181,11 +1246,136 @@ class SiteGenerator:
             self._write_file(f"/products/{product.slug}/index.html", html)
             self._sitemap_entries.append((f"/products/{product.slug}/", product.updated_at))
 
+    def _build_category_options(self, products: Sequence[Product]) -> list[str]:
+        counts: dict[str, int] = {}
+        labels: dict[str, str] = {}
+        for product in products:
+            if not product.category:
+                continue
+            label = product.category.strip()
+            if not label:
+                continue
+            slug = slugify(label)
+            if not slug:
+                continue
+            counts[slug] = counts.get(slug, 0) + 1
+            labels.setdefault(slug, label)
+        if not counts:
+            return []
+        total = len(products)
+        options = [f'<option value="">All categories ({total:,})</option>']
+        for slug in sorted(
+            counts.keys(),
+            key=lambda key: (-counts[key], labels[key].lower()),
+        ):
+            count = counts[slug]
+            label = labels[slug]
+            options.append(
+                f'<option value="{html_escape(slug)}">{html_escape(label)} ({count:,})</option>'
+            )
+        return options
+
+    def _build_price_options(self, products: Sequence[Product]) -> list[str]:
+        bucket_counts = {bucket_id: 0 for bucket_id, *_ in _PRICE_BUCKETS}
+        priced_total = 0
+        missing_price = 0
+        for product in products:
+            if product.price is None:
+                missing_price += 1
+                continue
+            price = product.price
+            priced_total += 1
+            for bucket_id, _label, minimum, maximum in _PRICE_BUCKETS:
+                if _price_in_bucket(price, minimum, maximum):
+                    bucket_counts[bucket_id] += 1
+                    break
+        options: list[str] = []
+        if priced_total or missing_price:
+            options.append('<option value="">All price ranges</option>')
+            for bucket_id, label, minimum, maximum in _PRICE_BUCKETS:
+                count = bucket_counts[bucket_id]
+                if not count:
+                    continue
+                attrs: list[str] = []
+                if minimum is not None:
+                    attrs.append(f'data-product-min="{_format_price_value(minimum)}"')
+                if maximum is not None:
+                    attrs.append(f'data-product-max="{_format_price_value(maximum)}"')
+                attr_text = f" {' '.join(attrs)}" if attrs else ""
+                options.append(
+                    f'<option value="{bucket_id}"{attr_text}>{html_escape(label)} ({count:,})</option>'
+                )
+            if missing_price:
+                options.append(
+                    f'<option value="no-price" data-product-missing="true">Price unavailable ({missing_price:,})</option>'
+                )
+        if len(options) <= 1:
+            return []
+        return options
+
+    def _render_product_catalog(
+        self, cards: Sequence[str], products: Sequence[Product]
+    ) -> list[str]:
+        total = len(cards)
+        summary_text = f"Showing {total:,} of {total:,} products"
+        summary_id = "product-results-summary"
+        category_options = self._build_category_options(products)
+        price_options = self._build_price_options(products)
+        parts: list[str] = ['<section class="product-catalog" data-product-catalog>']
+        parts.extend(
+            [
+                '  <div class="product-catalog__controls">',
+                '    <form class="product-filters" data-product-form>',
+                '      <div class="product-filters__fields">',
+                '        <div class="product-filters__group product-filters__group--search">',
+                '          <label class="product-filters__label" for="product-search">Search</label>',
+                '          <input class="product-filters__input" type="search" id="product-search" name="search" placeholder="Search by product, brand, or keyword" autocomplete="off" spellcheck="false" aria-describedby="product-results-summary" data-product-search>',
+                '        </div>',
+            ]
+        )
+        if category_options:
+            parts.append('        <div class="product-filters__group">')
+            parts.append('          <label class="product-filters__label" for="product-category">Category</label>')
+            parts.append('          <select class="product-filters__select" id="product-category" name="category" data-product-filter="category">')
+            parts.extend(f"            {option}" for option in category_options)
+            parts.append('          </select>')
+            parts.append('        </div>')
+        if price_options:
+            parts.append('        <div class="product-filters__group">')
+            parts.append('          <label class="product-filters__label" for="product-price">Price</label>')
+            parts.append('          <select class="product-filters__select" id="product-price" name="price" data-product-filter="price">')
+            parts.extend(f"            {option}" for option in price_options)
+            parts.append('          </select>')
+            parts.append('        </div>')
+        parts.extend(
+            [
+                '      </div>',
+                '      <div class="product-filters__actions">',
+                '        <button type="reset" class="button button-ghost product-filters__reset">Clear filters</button>',
+                '      </div>',
+                '    </form>',
+                f'    <p class="product-filters__summary" id="{summary_id}" data-product-summary aria-live="polite">{summary_text}</p>',
+                '  </div>',
+                '  <section class="feed-section product-catalog__results">',
+                f'    <div class="feed-list" data-product-grid data-product-total="{total}">',
+            ]
+        )
+        parts.extend(f"      {card}" for card in cards)
+        parts.extend(
+            [
+                '    </div>',
+                '  </section>',
+                '  <p class="product-catalog__empty" data-product-empty aria-live="polite" hidden>No products match your filters yet. Try adjusting or clearing the filters.</p>',
+                '</section>',
+            ]
+        )
+        return parts
+
     def _write_products_index(self, products: Sequence[Product]) -> None:
         header = [
             '<section class="page-header">',
             '<h1>All products</h1>',
-            '<p>Every grabgifts find in one catalog.</p>',
+            '<p>Every grabgifts find in one catalog. Use the filters below to zero in on the perfect gift fast.</p>',
             '</section>',
         ]
         sorted_products = sorted(
@@ -1208,21 +1398,13 @@ class SiteGenerator:
 
         body_parts = header[:]
         if cards:
-            body_parts.extend(
-                [
-                    '<section class="feed-section">',
-                    '<div class="feed-list" data-product-grid>',
-                    "\n".join(cards),
-                    '</div>',
-                    '</section>',
-                ]
-            )
+            body_parts.extend(self._render_product_catalog(cards, sorted_products))
         else:
             body_parts.append("<p>No products are available right now.</p>")
 
         html = self._render_document(
             page_title=f"Products – {self.settings.name}",
-            description="Browse every product in the GrabGifts catalog.",
+            description="Browse every product in the GrabGifts catalog with fast category, price, and keyword filters.",
             canonical_path="/products/",
             body="\n".join(body_parts),
         )
