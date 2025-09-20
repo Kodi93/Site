@@ -10,6 +10,8 @@ if (toggle && panel) {
   const collapseMedia = window.matchMedia("(max-width: 900px)");
   let isOpen = false;
   let lastFocused = null;
+  const tabindexDataAttribute = "data-nav-tabindex";
+  const tabindexSentinel = "__nav_none__";
 
   function updatePanelAccessibility() {
     if (collapseMedia.matches) {
@@ -17,6 +19,33 @@ if (toggle && panel) {
     } else {
       panel.removeAttribute("aria-hidden");
     }
+  }
+
+  function setPanelFocusability(disabled) {
+    if (disabled) {
+      const focusable = panel.querySelectorAll(focusableSelectors);
+      focusable.forEach((element) => {
+        if (!element.hasAttribute(tabindexDataAttribute)) {
+          const stored = element.hasAttribute("tabindex")
+            ? element.getAttribute("tabindex")
+            : tabindexSentinel;
+          element.setAttribute(tabindexDataAttribute, stored);
+        }
+        element.setAttribute("tabindex", "-1");
+      });
+      return;
+    }
+
+    const storedElements = panel.querySelectorAll(`[${tabindexDataAttribute}]`);
+    storedElements.forEach((element) => {
+      const stored = element.getAttribute(tabindexDataAttribute);
+      if (stored === tabindexSentinel) {
+        element.removeAttribute("tabindex");
+      } else if (stored !== null) {
+        element.setAttribute("tabindex", stored);
+      }
+      element.removeAttribute(tabindexDataAttribute);
+    });
   }
 
   function setState(open, { focus = true } = {}) {
@@ -28,6 +57,7 @@ if (toggle && panel) {
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
     panel.classList.toggle("is-open", open);
     document.body.classList.toggle("nav-open", open);
+    setPanelFocusability(collapseMedia.matches && !open);
     updatePanelAccessibility();
 
     if (open) {
@@ -110,6 +140,7 @@ if (toggle && panel) {
       closeNav({ focus: false });
     } else {
       updatePanelAccessibility();
+      setPanelFocusability(event.matches && !isOpen);
     }
   }
 
@@ -120,5 +151,6 @@ if (toggle && panel) {
   }
 
   updatePanelAccessibility();
+  setPanelFocusability(collapseMedia.matches && !isOpen);
   toggle.setAttribute("aria-expanded", "false");
 }

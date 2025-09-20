@@ -288,6 +288,15 @@ body.nav-open .site-nav-toggle-icon .site-nav-toggle-bar:nth-child(3) {
   color: #ff3d9e;
 }
 
+.site-nav a:focus-visible,
+.site-footer a:focus-visible,
+.footer-nav a:focus-visible {
+  background: rgba(255, 61, 158, 0.18);
+  color: var(--accent-strong);
+  outline: 2px solid rgba(255, 143, 207, 0.75);
+  outline-offset: 2px;
+}
+
 .hero {
   background: linear-gradient(145deg, rgba(33, 14, 58, 0.9), rgba(18, 7, 40, 0.85));
   border: 1px solid var(--border);
