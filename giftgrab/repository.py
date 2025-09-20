@@ -79,11 +79,11 @@ class ProductRepository:
             accepted.append(product)
             seen_map[product.id] = reference.isoformat()
         merged = merge_products(existing, accepted)
-        self.save_products(merged)
-        self._save_seen(seen_map)
         count = len(merged)
         if count < 50:
             raise RuntimeError(f"Inventory too small: {count}")
+        self.save_products(merged)
+        self._save_seen(seen_map)
         return merged
 
     def _load_seen(self) -> dict[str, str]:
