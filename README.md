@@ -11,6 +11,7 @@ All entry points live in `giftgrab/cli.py` and are executed with `python -m gift
 | `python -m giftgrab.cli update` | Fetch products from eBay, merge curated JSON feeds under `data/retailers/`, enforce the 30-day item cooldown, and persist the catalog to `data/items.json`. Builds fail if fewer than 50 products remain. |
 | `python -m giftgrab.cli roundups --limit 15` | Generate at least fifteen roundup guides, update `data/topics_history.json`, and render the static site to `public/` with canonical URLs, WebSite JSON-LD, ItemList JSON-LD for each guide, and Product JSON-LD for every card/page. |
 | `python -m giftgrab.cli check` | Lightweight QA gate that ensures the catalog has ≥50 products, ≥15 guides, no duplicate slugs, and that `public/sitemap.xml`, `public/robots.txt`, and `public/rss.xml` exist. |
+| `python -m giftgrab.cli ebay "coffee gifts" --limit 5 --marketplace EBAY_US` | Run a quick Browse API query to validate credentials and inspect normalized eBay inventory. |
 
 The recommended Netlify build command is:
 
@@ -35,6 +36,7 @@ The static site is written to `public/` and includes `guides/`, `categories/`, `
 
 - `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` – required to call the eBay Browse API.
 - `EBAY_CAMPAIGN_ID` (optional) – appended to outbound eBay URLs when present.
+- `EBAY_MARKETPLACE_ID` (optional) – overrides the default `EBAY_US` marketplace header for Browse API requests.
 - `AMAZON_PAAPI_ACCESS_KEY` and `AMAZON_PAAPI_SECRET_KEY` (optional) – enable Amazon PA-API requests.
 - `AMAZON_ASSOCIATE_TAG` – applied to every Amazon URL; defaults to the site’s required tag when unset.
 - `AMAZON_MARKETPLACE` (optional) – defaults to `www.amazon.com`.
