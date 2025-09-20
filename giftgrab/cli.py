@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .generator import SiteGenerator
 from .pipeline import GiftPipeline
+from .reporting import generate_stats_report
 from .repository import ProductRepository
 from .roundups import generate_guides
 
@@ -45,6 +46,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output directory that should contain the generated site",
     )
     check_parser.set_defaults(func=handle_check)
+
+    stats_parser = subparsers.add_parser(
+        "stats", help="Summarize catalog health and guide freshness"
+    )
+    stats_parser.add_argument(
+        "--top-categories",
+        type=int,
+        default=5,
+        help="Number of top categories to display",
+    )
+    stats_parser.add_argument(
+        "--recent-days",
+        type=int,
+        default=7,
+        help="Number of days to treat guides as recently updated",
+    )
+    stats_parser.set_defaults(func=handle_stats)
 
     return parser
 
@@ -96,6 +114,24 @@ def handle_check(args: argparse.Namespace) -> None:
             LOGGER.error(error)
         raise SystemExit(1)
     LOGGER.info("Check passed: %s products, %s guides", len(products), len(guides))
+
+
+def handle_stats(args: argparse.Namespace) -> None:
+    if args.recent_days < 1:
+        raise SystemExit("--recent-days must be at least 1")
+    if args.top_categories < 0:
+        raise SystemExit("--top-categories cannot be negative")
+
+    repository = ProductRepository()
+    products = repository.load_products()
+    guides = repository.load_guides()
+    report = generate_stats_report(
+        products=products,
+        guides=guides,
+        top_categories=args.top_categories,
+        recent_days=args.recent_days,
+    )
+    print(report)
 
 
 def main(argv: list[str] | None = None) -> None:
