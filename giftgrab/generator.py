@@ -13,6 +13,7 @@ from typing import Iterable, List, Sequence
 
 from .affiliates import affiliate_rel, prepare_affiliate_url
 from .blog import blurb
+from .config import DEFAULT_PRESS_MENTIONS, PressMention
 from .models import Guide, Product
 from .text import title_case
 from .utils import slugify
@@ -181,6 +182,7 @@ class SiteSettings:
     adsense_slot: str | None
     adsense_rail_slot: str | None
     favicon_url: str | None
+    press_mentions: tuple[PressMention, ...]
 
 
 def _env(name: str, default: str | None = None) -> str | None:
@@ -189,6 +191,52 @@ def _env(name: str, default: str | None = None) -> str | None:
         return default
     value = value.strip()
     return value or default
+
+
+def _parse_press_mentions(raw: str | None) -> tuple[PressMention, ...]:
+    """Parse press mentions from an environment payload."""
+
+    if not raw:
+        return DEFAULT_PRESS_MENTIONS
+
+    text = raw.strip()
+    if not text:
+        return DEFAULT_PRESS_MENTIONS
+    if text.lower() in {"none", "off"}:
+        return ()
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        logging.getLogger(__name__).warning("Failed to parse SITE_PRESS_MENTIONS JSON; using defaults")
+        return DEFAULT_PRESS_MENTIONS
+
+    entries: list[PressMention] = []
+    if isinstance(payload, dict):
+        payload = [payload]
+    if isinstance(payload, list):
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            outlet = str(item.get("outlet", "")).strip()
+            quote = str(item.get("quote", "")).strip()
+            if not outlet or not quote:
+                continue
+            url_raw = item.get("url")
+            logo_raw = item.get("logo")
+            url = str(url_raw).strip() if isinstance(url_raw, str) else None
+            logo = str(logo_raw).strip() if isinstance(logo_raw, str) else None
+            entries.append(
+                PressMention(
+                    outlet=outlet,
+                    quote=quote,
+                    url=url or None,
+                    logo=logo or None,
+                )
+            )
+    if entries:
+        return tuple(entries)
+    return ()
 
 
 def load_settings() -> SiteSettings:
@@ -225,6 +273,7 @@ def load_settings() -> SiteSettings:
         adsense_slot=_env("ADSENSE_SLOT"),
         adsense_rail_slot=_env("ADSENSE_RAIL_SLOT"),
         favicon_url=_env("SITE_FAVICON_URL"),
+        press_mentions=_parse_press_mentions(_env("SITE_PRESS_MENTIONS")),
     )
 
 
@@ -256,6 +305,56 @@ class SiteGenerator:
 
     # ------------------------------------------------------------------
     # Rendering helpers
+
+    def _press_section_markup(self) -> str | None:
+        mentions = getattr(self.settings, "press_mentions", ())
+        cards: list[str] = []
+        for mention in mentions:
+            if not mention or not getattr(mention, "quote", None):
+                continue
+            outlet = getattr(mention, "outlet", "").strip()
+            if not outlet:
+                continue
+            quote = html_escape(str(mention.quote).strip())
+            outlet_label = html_escape(outlet)
+            url = getattr(mention, "url", None)
+            outlet_markup = outlet_label
+            if isinstance(url, str) and url.strip():
+                outlet_markup = (
+                    f'<a href="{html_escape(url.strip())}" rel="noopener" target="_blank">'
+                    + outlet_label
+                    + "</a>"
+                )
+            logo = getattr(mention, "logo", None)
+            logo_markup = ""
+            if isinstance(logo, str) and logo.strip():
+                logo_markup = (
+                    '<div class="press-logo">'
+                    f"<img src=\"{html_escape(logo.strip())}\" alt=\"{outlet_label} logo\" loading=\"lazy\">"
+                    "</div>"
+                )
+            parts = ["<article class=\"press-card\">"]
+            if logo_markup:
+                parts.append(logo_markup)
+            parts.append(f"<p class=\"press-quote\">&ldquo;{quote}&rdquo;</p>")
+            parts.append(f"<p class=\"press-outlet\">{outlet_markup}</p>")
+            parts.append("</article>")
+            cards.append("".join(parts))
+        if not cards:
+            return None
+        return "\n".join(
+            [
+                '<section class="press-section" aria-labelledby="press-heading">',
+                '<div class="page-header">',
+                '<h2 id="press-heading">Loved by performance teams</h2>',
+                '<p>Clips from operators who lean on grabgifts to launch faster.</p>',
+                '</div>',
+                '<div class="press-grid">',
+                "\n".join(cards),
+                '</div>',
+                '</section>',
+            ]
+        )
 
     def _abs_url(self, path: str) -> str:
         base = (self.settings.base_url or "https://example.com").rstrip("/")
@@ -593,8 +692,23 @@ class SiteGenerator:
                 "</div>",
             ]
         )
+        hero_markup.extend(
+            [
+                '<div class="hero-support">',
+                '<p class="hero-support__lede">What each refresh delivers</p>',
+                '<ul class="hero-support__list">',
+                '<li>Daily automations capture trending inventory before your morning standup.</li>',
+                '<li>Editors rewrite blurbs, remove duplicates, and QA every affiliate-safe link.</li>',
+                '<li>Each deploy ships with JSON-LD, RSS, and metadata ready to publish.</li>',
+                '</ul>',
+                '</div>',
+            ]
+        )
         hero_markup.append("</section>")
         sections: List[str] = ["\n".join(hero_markup)]
+        press_section = self._press_section_markup()
+        if press_section:
+            sections.append(press_section)
         freshness_detail = (
             "Refreshed on "
             + html_escape(updated_label)

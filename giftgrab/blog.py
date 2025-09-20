@@ -28,6 +28,26 @@ _PADDING = (
     "Still light enough to toss into a weekend roundup",
 )
 
+_CATEGORY_FOCUS_OVERRIDES = {
+    "fandom": "fandom superfans",
+    "homebody upgrades": "homebodies",
+    "productivity power ups": "productivity power-ups",
+}
+
+_DESCRIPTOR_FOCUS_OVERRIDES = {
+    "family time": "keeps family hangouts feeling intentional",
+    "a techy": "layers in gadget-lover polish",
+    "adventurers": "packs weekend-warrior utility",
+    "fandom superfans": "brings fandom-grade flair",
+    "gamers": "levels up play sessions",
+    "her": "feels like a thoughtful-for-her upgrade",
+    "him": "lands with him without feeling cliché",
+    "homebodies": "makes cozy nights even better",
+    "productivity power-ups": "sharpens productivity routines",
+    "wellness warriors": "supports wellness rituals",
+    "gift hunters": "stays useful for last-minute gift hunters",
+}
+
 _PRICE_THRESHOLDS = (
     (25, "stays under $25"),
     (50, "lands under $50"),
@@ -54,14 +74,47 @@ def _price_phrase(product: Product) -> str | None:
     return None
 
 
-def _descriptor(product: Product) -> str:
-    if product.brand:
-        return f"a {product.brand} finish"
-    if product.category:
-        return f"a {product.category.lower()} twist"
+def _descriptor(product: Product, focus: str) -> str:
+    brand = product.brand
+    if brand:
+        cleaned = " ".join(str(brand).split()).strip()
+        if cleaned:
+            return f"leans on {cleaned} craftsmanship"
+    focus_key = focus.lower().strip()
+    override = _DESCRIPTOR_FOCUS_OVERRIDES.get(focus_key)
+    if override:
+        return override
+    if focus_key:
+        return f"brings a {focus_key} twist"
     if product.price_text:
-        return f"value that feels like {product.price_text}"
-    return "useful details"
+        return f"keeps the price anchored around {product.price_text}"
+    return "packs in useful details"
+
+
+def _focus_target(product: Product) -> str:
+    """Return a focus phrase tuned for the product's category or brand."""
+
+    category = product.category
+    if category:
+        cleaned = " ".join(str(category).split()).strip()
+        lowered = cleaned.lower()
+        for prefix in ("for ", "the "):
+            if lowered.startswith(prefix):
+                cleaned = cleaned[len(prefix) :].lstrip()
+                lowered = cleaned.lower()
+        lowered = cleaned.lower()
+        if not lowered:
+            return "gift hunters"
+        override = _CATEGORY_FOCUS_OVERRIDES.get(lowered)
+        if override:
+            return override
+        return lowered
+
+    brand = product.brand
+    if brand:
+        return " ".join(str(brand).split()).strip()
+
+    return "gift hunters"
 
 
 def polish(text: str) -> str:
@@ -83,11 +136,11 @@ def polish(text: str) -> str:
 
 
 def blurb(product: Product) -> str:
-    focus = product.category or product.brand or "gift hunters"
+    focus = _focus_target(product)
     opener = _pick(product.id, _OPENERS)
-    descriptor = _descriptor(product)
+    descriptor = _descriptor(product, focus)
     price_clause = _price_phrase(product)
-    base = f"{opener} {focus.lower()}, {product.title} delivers {descriptor}"
+    base = f"{opener} {focus}, {product.title} delivers {descriptor}"
     if price_clause:
         base = f"{base} and {price_clause}"
     else:
