@@ -25,6 +25,7 @@ class Product:
     rating: Optional[float]
     rating_count: Optional[int]
     source: str
+    features: List[str] = field(default_factory=list)
     description: Optional[str] = None
     created_at: str = field(default_factory=timestamp)
     updated_at: str = field(default_factory=timestamp)
@@ -47,6 +48,7 @@ class Product:
             "rating": self.rating,
             "rating_count": self.rating_count,
             "source": self.source,
+            "features": list(self.features),
             "description": self.description,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -111,6 +113,20 @@ class Product:
         if not looks_like_placeholder_image(raw_image):
             image = str(raw_image)
 
+        raw_features = payload.get("features")
+        features: List[str] = []
+        if isinstance(raw_features, list):
+            seen: set[str] = set()
+            for entry in raw_features:
+                text = " ".join(str(entry).split()).strip()
+                if not text:
+                    continue
+                key = text.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                features.append(text)
+
         return cls(
             id=str(canonical_id),
             title=str(payload["title"]),
@@ -124,6 +140,7 @@ class Product:
             rating=rating_value if isinstance(rating_value, (int, float)) else None,
             rating_count=rating_count if isinstance(rating_count, int) else None,
             source=str(source_value),
+            features=features,
             description=payload.get("description"),
             created_at=payload.get("created_at", timestamp()),
             updated_at=payload.get("updated_at", timestamp()),
@@ -199,6 +216,20 @@ def merge_products(existing: Iterable[Product], incoming: Iterable[Product]) -> 
         ):
             stored.rating_count = product.rating_count
             updated = True
+        new_features = [feature for feature in getattr(product, "features", []) if feature]
+        if new_features:
+            existing_features = [feature for feature in stored.features if feature]
+            combined = list(existing_features)
+            seen = {feature.lower() for feature in existing_features}
+            for feature in new_features:
+                key = feature.lower()
+                if key in seen:
+                    continue
+                combined.append(feature)
+                seen.add(key)
+            if combined != existing_features:
+                stored.features = combined
+                updated = True
         if product.description and product.description != stored.description:
             stored.description = product.description
             updated = True

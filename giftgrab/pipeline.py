@@ -63,7 +63,7 @@ def _feature_sentences(payload: dict) -> List[str]:
                 continue
             sentences.append(normalized)
             seen.add(normalized)
-            if len(sentences) >= 3:
+            if len(sentences) >= 5:
                 break
     return sentences
 
@@ -91,13 +91,21 @@ def _meta_sentences(*, price_text: str | None, rating: float | None, rating_coun
     return [sentence for sentence in sentences if sentence]
 
 
-def _build_description(data: dict, *, title: str, price_text: str | None, rating: float | None, rating_count: int | None) -> str | None:
+def _build_description(
+    data: dict,
+    *,
+    title: str,
+    price_text: str | None,
+    rating: float | None,
+    rating_count: int | None,
+    feature_sentences: Sequence[str],
+) -> str | None:
     sentences: List[str] = []
     raw_description = data.get("description")
     normalized_description = _normalize_sentence(raw_description)
     if normalized_description:
         sentences.append(normalized_description)
-    for sentence in _feature_sentences(data):
+    for sentence in feature_sentences:
         if sentence not in sentences:
             sentences.append(sentence)
         if len(sentences) >= 3:
@@ -111,11 +119,36 @@ def _build_description(data: dict, *, title: str, price_text: str | None, rating
             if len(sentences) >= 4:
                 break
     if not sentences:
-        fallback = _normalize_sentence(
-            f"{title} is a ready-to-gift pick with practical details"
-        )
-        if fallback:
-            sentences.append(fallback)
+        context_bits = [
+            _normalize_sentence(
+                f"{title} earned a spot in our catalog after editors verified availability"
+            )
+        ]
+        if price_text:
+            context_bits.append(
+                _normalize_sentence(
+                    f"Recent price checks hovered near {price_text}; confirm the latest total at checkout"
+                )
+            )
+        if rating is not None and rating_count:
+            context_bits.append(
+                _normalize_sentence(
+                    f"Shoppers rate it {rating:.1f}/5 based on {rating_count:,} reviews"
+                )
+            )
+        elif rating is not None:
+            context_bits.append(
+                _normalize_sentence(f"It currently holds a {rating:.1f}/5 rating")
+            )
+        for sentence in context_bits:
+            if sentence:
+                sentences.append(sentence)
+        if not sentences:
+            fallback = _normalize_sentence(
+                f"{title} is part of our verified catalog of giftable finds"
+            )
+            if fallback:
+                sentences.append(fallback)
     description = clean_text(" ".join(sentences))
     return description or None
 
@@ -335,12 +368,14 @@ class GiftPipeline:
         image = data.get("image")
         if looks_like_placeholder_image(image):
             image = None
+        feature_sentences = _feature_sentences(data)
         description_text = _build_description(
             data,
             title=str(title),
             price_text=str(price_text) if price_text else None,
             rating=rating_numeric,
             rating_count=review_count,
+            feature_sentences=feature_sentences,
         )
         return Product(
             id=str(canonical_id),
@@ -355,6 +390,7 @@ class GiftPipeline:
             rating=rating_numeric,
             rating_count=review_count,
             source=source,
+            features=feature_sentences,
             description=description_text,
         )
 
